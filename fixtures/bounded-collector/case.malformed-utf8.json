@@ -1,0 +1,1 @@
+{"paths":["src/malformed.txt"],"bytes":[195,40],"expected":"malformed_utf8"}
