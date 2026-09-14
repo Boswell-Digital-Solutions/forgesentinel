@@ -57,4 +57,8 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Build and test
-        run: npm test
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build --silent
+          node --test dist/test/*.test.js
