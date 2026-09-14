@@ -1,0 +1,14 @@
+{
+  "fixtureSet": "forgesentinel.cp3f.assurance-expansion.v0.1",
+  "classification": "synthetic-only",
+  "containsRealSecrets": false,
+  "containsPersonalData": false,
+  "members": [
+    { "path": "SEC-FOUNDATION-001.json", "sha256": "52c33c41ee23ef5118e9041f2cb032dc89401a576a54d13b302abda1ed5b06d0" },
+    { "path": "TRU-FOUNDATION-001.json", "sha256": "f9fdc8d5efbceb2d1f7f409ce48283225e3619882494b2f13f039b7c878e3a22" },
+    { "path": "ACC-FOUNDATION-001.json", "sha256": "5d2c2ce62ddec42916a6c116776584d8cb28990a61bd1b555609e28696ce4a51" },
+    { "path": "VER-FOUNDATION-001.json", "sha256": "92723b840025deac4d1c89b69965d05ddfe9a7d76a75dfa9ad8e6d1174dd9c41" },
+    { "path": "LIN-FOUNDATION-001.json", "sha256": "5156b24b69e5862547a6ab000ef88543a330533480482e9c410d0b6d8d22cf75" },
+    { "path": "RED-MET-FOUNDATION-001.json", "sha256": "f73096038a2d6dda94392efd2e9d7665763cfc84ea32717a714694924f67fcd5" }
+  ]
+}

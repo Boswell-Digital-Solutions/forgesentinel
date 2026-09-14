@@ -1,0 +1,7 @@
+{
+  "fixtureId": "VER-FOUNDATION-001",
+  "analyzerStateToken": "syn_state_analyzer",
+  "verifierStateToken": "syn_state_verifier",
+  "oracleRuleId": "syn_oracle_v1",
+  "states": ["CONFIRMED", "NOT_CONFIRMED", "INCONCLUSIVE", "BLOCKED", "INDEPENDENCE_VIOLATION"]
+}

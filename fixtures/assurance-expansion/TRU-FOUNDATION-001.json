@@ -1,0 +1,11 @@
+{
+  "fixtureId": "TRU-FOUNDATION-001",
+  "cases": [
+    { "id": "TRU-001", "ruleId": "completion_receipt", "expected": "present", "observed": "missing" },
+    { "id": "TRU-002", "ruleId": "green_freshness", "expected": "fresh", "observed": "stale" },
+    { "id": "TRU-003", "ruleId": "evidence_class", "expected": "runtime", "observed": "mock" },
+    { "id": "TRU-004", "ruleId": "contradiction_visibility", "expected": "included", "observed": "omitted" },
+    { "id": "TRU-005", "ruleId": "fallback_disclosure", "expected": "declared", "observed": "silent" },
+    { "id": "TRU-006", "ruleId": "supported_claim", "expected": "operational", "observed": "operational" }
+  ]
+}

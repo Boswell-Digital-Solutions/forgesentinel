@@ -1,0 +1,5 @@
+{
+  "fixtureId": "LIN-FOUNDATION-001",
+  "identity": { "targetId": "syn_repo_alpha", "lane": "security", "ruleId": "secret_canary", "surface": "syn_surface", "procedureMajor": 1 },
+  "states": ["OPEN", "RESOLVED", "REOPENED", "SUPERSEDED"]
+}
