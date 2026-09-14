@@ -2,7 +2,7 @@ import { clamp01 } from "../contracts/common.js";
 import type { EventEnvelope } from "../contracts/envelope.js";
 import type { EvidenceRecord } from "../contracts/evidence.js";
 import type { Finding } from "../contracts/finding.js";
-import { eventEvidence, featureEvidence, FeatureService } from "./features.js";
+import { eventEvidence, FeatureService, thresholdBurst } from "./features.js";
 import type { NodeOutput } from "./cost.js";
 
 export const PATCHES_PER_HOUR = "agent.patches_per_hour@1.0.0";
@@ -74,90 +74,52 @@ export class SentinelAgentNode {
       findings.push(this.boundaryFinding(event, record, tenantId, accountId));
     }
 
-    const patchBurst = this.burst(sorted, learnCutoff, {
+    const patchBurst = thresholdBurst(this.features, {
+      events: sorted,
+      learnCutoff,
       eventType: "agent.patch.applied",
       featureRef: PATCHES_PER_HOUR,
       threshold: this.config.patch_burst_count,
+      groupField: "actor_id",
+      unit: "patches/hour",
+      nextFindingId: () => this.nextFindingId(),
+      node: { name: this.name, version: this.version },
       findingType: "agent.patch_burst",
       actionClass: "REQUEST_OPERATOR",
       playbook: "PB-AGENT-PATCHBURST-01",
-      unit: "patches/hour",
+      likelihood: (count) => clamp01(0.4 + 0.04 * count),
+      impact: 0.55,
+      confidence: 0.7,
       summarize: (count) => `${count} patches applied by this agent within an hour — far above a normal task.`,
+      subject: (_tenantId, actorId) => ({ type: "agent", id: actorId }),
+      correlationHints: (tenantId, actorId, last) => ({ account_id: last.tenant?.account_id ?? tenantId, actor_id: actorId }),
     });
     findings.push(...patchBurst.findings);
     evidence.push(...patchBurst.evidence);
 
-    const denialBurst = this.burst(sorted, learnCutoff, {
+    const denialBurst = thresholdBurst(this.features, {
+      events: sorted,
+      learnCutoff,
       eventType: "agent.permission.denied",
       featureRef: DENIALS_PER_15M,
       threshold: this.config.denial_burst_count,
+      groupField: "actor_id",
+      unit: "denials/15m",
+      nextFindingId: () => this.nextFindingId(),
+      node: { name: this.name, version: this.version },
       findingType: "agent.denied_action_burst",
       actionClass: "RECOMMEND_ONLY",
       playbook: "PB-AGENT-DENIED-01",
-      unit: "denials/15m",
+      likelihood: (count) => clamp01(0.4 + 0.04 * count),
+      impact: 0.55,
+      confidence: 0.7,
       summarize: (count) => `${count} denied permission attempts by this agent within 15 minutes.`,
+      subject: (_tenantId, actorId) => ({ type: "agent", id: actorId }),
+      correlationHints: (tenantId, actorId, last) => ({ account_id: last.tenant?.account_id ?? tenantId, actor_id: actorId }),
     });
     findings.push(...denialBurst.findings);
     evidence.push(...denialBurst.evidence);
 
-    return { findings, evidence };
-  }
-
-  private burst(
-    events: EventEnvelope[],
-    learnCutoff: number,
-    spec: {
-      eventType: string;
-      featureRef: string;
-      threshold: number;
-      findingType: string;
-      actionClass: "REQUEST_OPERATOR" | "RECOMMEND_ONLY";
-      playbook: string;
-      unit: string;
-      summarize: (count: number) => string;
-    },
-  ): NodeOutput {
-    const findings: Finding[] = [];
-    const evidence: EvidenceRecord[] = [];
-    const relevant = events.filter((event) => event.event_type === spec.eventType && Date.parse(event.occurred_at) >= learnCutoff && event.tenant?.tenant_id);
-    const byAgent = new Map<string, EventEnvelope[]>();
-    for (const event of relevant) {
-      const key = `${event.tenant?.tenant_id}|${event.actor.actor_id}`;
-      byAgent.set(key, [...(byAgent.get(key) ?? []), event]);
-    }
-    for (const [agentKey, agentEvents] of byAgent) {
-      const last = agentEvents[agentEvents.length - 1];
-      if (!last) continue;
-      const [tenantId, actorId] = agentKey.split("|") as [string, string];
-      const accountId = last.tenant?.account_id ?? tenantId;
-      const scopeKey = `tenant_id=${tenantId}|actor_id=${actorId}`;
-      const window = this.features.evaluateWindow(spec.featureRef, scopeKey, last.occurred_at);
-      if (window.value < spec.threshold) continue;
-      const record = featureEvidence(window, spec.unit, { tenant_id: tenantId, account_id: accountId }, false);
-      evidence.push(record);
-      findings.push({
-        finding_id: this.nextFindingId(),
-        finding_type: spec.findingType,
-        node: { name: this.name, version: this.version },
-        subject: { type: "agent", id: actorId },
-        tenant_id: tenantId,
-        window: window.window,
-        risk: { likelihood: clamp01(0.4 + 0.04 * window.value), impact: 0.55, confidence: 0.7, evidence_quality: record.quality.score },
-        evidence_ids: [record.evidence_id],
-        source_event_roots: [record.source_event_root],
-        explanation: {
-          summary: spec.summarize(window.value),
-          top_factors: [{ factor: spec.findingType, contribution: 1 }],
-          uncertainties: ["A large but legitimate task (e.g. a wide refactor) can resemble a burst; verify the run."],
-          observed: window.value,
-          expected: 0,
-        },
-        recommendation: { action_class: spec.actionClass, playbook: spec.playbook },
-        expires_at: new Date(Date.parse(last.occurred_at) + 24 * 3600 * 1000).toISOString(),
-        correlation_hints: { account_id: accountId, actor_id: actorId },
-        policy_generated_effect: last.control_lineage?.policy_generated_effect === true,
-      });
-    }
     return { findings, evidence };
   }
 

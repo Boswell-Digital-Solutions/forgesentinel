@@ -1,7 +1,5 @@
-import type { CapabilityToken } from "../contracts/capability.js";
 import type { ActionReceipt } from "../contracts/receipt.js";
-import type { CapabilityService } from "./capability.js";
-import type { ReceiptService } from "./receipts.js";
+import { CapabilityValidatedAuthority, type PresentedAction } from "./authority-base.js";
 
 /**
  * YellowJacket authority adapter (02 authority adapters): runtime/tool
@@ -10,15 +8,10 @@ import type { ReceiptService } from "./receipts.js";
  * version (fingerprint), other versions are untouched, and the re-enable
  * path is a receipted rollback (Wave 5 exit gate).
  */
-export class YellowJacketAuthority {
+export class YellowJacketAuthority extends CapabilityValidatedAuthority {
   readonly audience = "yellowjacket";
   private readonly runs = new Map<string, "running" | "stopped">();
   private readonly agentVersions = new Map<string, "active" | "quarantined">();
-
-  constructor(
-    private readonly capabilities: CapabilityService,
-    private readonly receipts: ReceiptService,
-  ) {}
 
   registerRun(runId: string): void {
     this.runs.set(runId, "running");
@@ -36,41 +29,11 @@ export class YellowJacketAuthority {
     return this.agentVersions.get(fingerprint);
   }
 
-  execute(token: CapabilityToken, presented: { action: string; target: string; scope: string }, nowIso: string): ActionReceipt {
-    const validation = this.capabilities.validate(token, { audience: this.audience, ...presented }, nowIso);
-    const decision = {
-      decision_id: token.claims.policy_decision_id,
-      policy_id: "sentinel_agent_drift",
-      policy_version: "1.0.0",
-      result: "ALLOW_BOUNDED_ACTION",
-      approver: { type: "operator", id: "via_capability" },
-    };
-
-    if (!validation.ok) {
-      return this.receipts.create(
-        {
-          receipt_type: "sentinel.action",
-          incident_id: token.claims.incident_id,
-          decision,
-          action: {
-            requested: presented.action,
-            executed: null,
-            target_id: presented.target,
-            scope: presented.scope,
-            result: "rejected",
-            failure_reason: validation.issues.map((issue) => `${issue.code}: ${issue.message}`).join("; "),
-          },
-          rollback: { supported: false },
-          control_lineage: { policy_decision_id: token.claims.policy_decision_id },
-        },
-        nowIso,
-      );
-    }
-
+  protected applyAction(presented: PresentedAction) {
     const before: Record<string, unknown> = {};
     const after: Record<string, unknown> = {};
     let result: "success" | "failure" = "success";
-    let rollbackAction: string | undefined;
+    let rollback_action: string | undefined;
 
     switch (presented.action) {
       case "yellowjacket.run.stop": {
@@ -92,7 +55,7 @@ export class YellowJacketAuthority {
           before["agent_version_state"] = state;
           this.agentVersions.set(presented.target, "quarantined");
           after["agent_version_state"] = "quarantined";
-          rollbackAction = "yellowjacket.agent_version.reenable";
+          rollback_action = "yellowjacket.agent_version.reenable";
         }
         break;
       }
@@ -100,26 +63,7 @@ export class YellowJacketAuthority {
         result = "failure";
     }
 
-    return this.receipts.create(
-      {
-        receipt_type: "sentinel.action",
-        incident_id: token.claims.incident_id,
-        decision,
-        action: {
-          requested: presented.action,
-          executed: result === "success" ? presented.action : null,
-          target_id: presented.target,
-          scope: presented.scope,
-          result,
-          ...(result === "failure" ? { failure_reason: "target unknown or action unsupported by this authority" } : {}),
-        },
-        before_state: before,
-        after_state: after,
-        rollback: rollbackAction ? { supported: true, action_type: rollbackAction } : { supported: false },
-        control_lineage: { policy_decision_id: token.claims.policy_decision_id },
-      },
-      nowIso,
-    );
+    return { result, before, after, rollback_action };
   }
 
   /** Re-enable path: receipted rollback of a quarantine. */

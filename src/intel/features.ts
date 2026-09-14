@@ -1,5 +1,6 @@
 import type { EventEnvelope } from "../contracts/envelope.js";
 import type { EvidenceRecord } from "../contracts/evidence.js";
+import type { Finding } from "../contracts/finding.js";
 
 /**
  * Versioned feature definitions (02, SNT-030, 13 examples). A feature value
@@ -176,6 +177,88 @@ export function featureEvidence(
     source_event_root: window.evidence_root,
     policy_generated_effect: policyGenerated,
   };
+}
+
+export interface ThresholdBurstSpec {
+  events: EventEnvelope[];
+  learnCutoff: number;
+  /** Event type counted toward the threshold. */
+  eventType: string;
+  featureRef: string;
+  threshold: number;
+  /** Grouping field — must match the feature definition's own `scope`. */
+  groupField: "account_id" | "actor_id";
+  unit: string;
+  nextFindingId: () => string;
+  node: { name: string; version: string };
+  findingType: string;
+  actionClass: Finding["recommendation"]["action_class"];
+  playbook?: string;
+  likelihood: (count: number) => number;
+  impact: number;
+  confidence: number;
+  summarize: (count: number) => string;
+  subject: (tenantId: string, groupId: string) => Finding["subject"];
+  correlationHints: (tenantId: string, groupId: string, lastEvent: EventEnvelope) => Finding["correlation_hints"];
+}
+
+/**
+ * Shared shape behind every "N qualifying events for one subject within a
+ * rolling window" detector (agent patch/denial bursts, cloud login-failure
+ * bursts, license activation abuse, data egress anomaly): filter by event
+ * type and learn cutoff, group by tenant+subject, evaluate the feature
+ * window for the most recent event in each group, and emit one finding per
+ * group that crosses `threshold`. Only the per-node specifics (finding
+ * shape, likelihood curve, grouping field) vary between callers.
+ */
+export function thresholdBurst(features: FeatureService, spec: ThresholdBurstSpec): { findings: Finding[]; evidence: EvidenceRecord[] } {
+  const findings: Finding[] = [];
+  const evidence: EvidenceRecord[] = [];
+  const relevant = spec.events.filter(
+    (event) => event.event_type === spec.eventType && Date.parse(event.occurred_at) >= spec.learnCutoff && event.tenant?.tenant_id,
+  );
+  const byGroup = new Map<string, EventEnvelope[]>();
+  for (const event of relevant) {
+    const tenantId = event.tenant!.tenant_id;
+    const groupId = scopeValue(event, spec.groupField) ?? tenantId;
+    const key = `${tenantId}|${groupId}`;
+    const group = byGroup.get(key);
+    if (group) group.push(event);
+    else byGroup.set(key, [event]);
+  }
+  for (const [key, groupEvents] of byGroup) {
+    const last = groupEvents[groupEvents.length - 1];
+    if (!last) continue;
+    const [tenantId, groupId] = key.split("|") as [string, string];
+    const scopeKey = `tenant_id=${tenantId}|${spec.groupField}=${groupId}`;
+    const window = features.evaluateWindow(spec.featureRef, scopeKey, last.occurred_at);
+    if (window.value < spec.threshold) continue;
+    const record = featureEvidence(window, spec.unit, { tenant_id: tenantId, account_id: last.tenant?.account_id ?? tenantId }, false);
+    evidence.push(record);
+    findings.push({
+      finding_id: spec.nextFindingId(),
+      finding_type: spec.findingType,
+      node: spec.node,
+      subject: spec.subject(tenantId, groupId),
+      tenant_id: tenantId,
+      window: window.window,
+      risk: { likelihood: spec.likelihood(window.value), impact: spec.impact, confidence: spec.confidence, evidence_quality: record.quality.score },
+      evidence_ids: [record.evidence_id],
+      source_event_roots: [record.source_event_root],
+      explanation: {
+        summary: spec.summarize(window.value),
+        top_factors: [{ factor: spec.findingType, contribution: 1 }],
+        uncertainties: ["A large but legitimate burst of activity can resemble abuse; verify before acting."],
+        observed: window.value,
+        expected: 0,
+      },
+      recommendation: { action_class: spec.actionClass, ...(spec.playbook !== undefined ? { playbook: spec.playbook } : {}) },
+      expires_at: new Date(Date.parse(last.occurred_at) + 24 * 3600 * 1000).toISOString(),
+      correlation_hints: spec.correlationHints(tenantId, groupId, last),
+      policy_generated_effect: last.control_lineage?.policy_generated_effect === true,
+    });
+  }
+  return { findings, evidence };
 }
 
 export function eventEvidence(event: EventEnvelope, scope: Record<string, string>): EvidenceRecord {

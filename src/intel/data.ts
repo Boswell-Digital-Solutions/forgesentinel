@@ -2,7 +2,7 @@ import { clamp01 } from "../contracts/common.js";
 import type { EventEnvelope } from "../contracts/envelope.js";
 import type { EvidenceRecord } from "../contracts/evidence.js";
 import type { Finding } from "../contracts/finding.js";
-import { eventEvidence, featureEvidence, FeatureService } from "./features.js";
+import { eventEvidence, FeatureService, thresholdBurst } from "./features.js";
 import type { NodeOutput } from "./cost.js";
 
 export const EXPORTS_PER_HOUR = "data.exports_per_hour@1.0.0";
@@ -111,48 +111,33 @@ export class SentinelDataNode {
   }
 
   private egressAnomaly(events: EventEnvelope[], learnCutoff: number): NodeOutput {
-    const findings: Finding[] = [];
-    const evidence: EvidenceRecord[] = [];
-    const relevant = events.filter((event) => event.event_type === "data.object.exported" && Date.parse(event.occurred_at) >= learnCutoff && event.tenant?.tenant_id);
-    const byAccount = new Map<string, EventEnvelope[]>();
-    for (const event of relevant) {
-      const tenantId = event.tenant?.tenant_id;
-      const key = `${tenantId}|${event.tenant?.account_id ?? tenantId}`;
-      byAccount.set(key, [...(byAccount.get(key) ?? []), event]);
-    }
-    for (const [accountKey, accountEvents] of byAccount) {
-      const last = accountEvents[accountEvents.length - 1];
-      if (!last) continue;
-      const [tenantId, accountId] = accountKey.split("|") as [string, string];
-      const scopeKey = `tenant_id=${tenantId}|account_id=${accountId}`;
-      const window = this.features.evaluateWindow(EXPORTS_PER_HOUR, scopeKey, last.occurred_at);
-      if (window.value < this.config.egress_burst_count) continue;
-      const record = featureEvidence(window, "exports/hour", { tenant_id: tenantId, account_id: accountId }, false);
-      evidence.push(record);
-      findings.push({
-        finding_id: this.nextFindingId(),
-        finding_type: "data.egress_anomaly",
-        node: { name: this.name, version: this.version },
-        subject: { type: "account", id: accountId },
-        tenant_id: tenantId,
-        window: window.window,
-        risk: { likelihood: clamp01(0.4 + 0.02 * window.value), impact: 0.6, confidence: 0.65, evidence_quality: record.quality.score },
-        evidence_ids: [record.evidence_id],
-        source_event_roots: [record.source_event_root],
-        explanation: {
-          summary: `${window.value} data exports in one hour for this account — an egress spike that may indicate exfiltration.`,
-          top_factors: [{ factor: "export_rate", contribution: 1 }],
-          uncertainties: ["A legitimate bulk export or migration can produce a high export rate; verify the destination."],
-          observed: window.value,
-          expected: 0,
-        },
-        recommendation: { action_class: "REQUEST_OPERATOR", playbook: "PB-DATA-EGRESS-01" },
-        expires_at: new Date(Date.parse(last.occurred_at) + 24 * 3600 * 1000).toISOString(),
-        correlation_hints: { account_id: accountId },
-        policy_generated_effect: last.control_lineage?.policy_generated_effect === true,
-      });
-    }
-    return { findings, evidence };
+    return thresholdBurst(this.features, {
+      events,
+      learnCutoff,
+      eventType: "data.object.exported",
+      featureRef: EXPORTS_PER_HOUR,
+      threshold: this.config.egress_burst_count,
+      groupField: "account_id",
+      unit: "exports/hour",
+      nextFindingId: () => this.nextFindingId(),
+      node: { name: this.name, version: this.version },
+      findingType: "data.egress_anomaly",
+      actionClass: "REQUEST_OPERATOR",
+      playbook: "PB-DATA-EGRESS-01",
+      likelihood: (count) => clamp01(0.4 + 0.02 * count),
+      impact: 0.6,
+      confidence: 0.65,
+      summarize: (count) => `${count} data exports in one hour for this account — an egress spike that may indicate exfiltration.`,
+      subject: (_tenantId, accountId) => ({ type: "account", id: accountId }),
+      // Surfaces the triggering export's destination so a downstream
+      // data_exfiltration compound incident can recommend an
+      // exact-destination block (DATA_EXFILTRATION_POLICY) instead of an
+      // action with no target to bind to.
+      correlationHints: (_tenantId, accountId, last) => ({
+        account_id: accountId,
+        ...(typeof last.payload["destination"] === "string" ? { destination: last.payload["destination"] } : {}),
+      }),
+    });
   }
 
   private directFinding(event: EventEnvelope, record: EvidenceRecord, tenantId: string, accountId: string, spec: DirectSpec): Finding {

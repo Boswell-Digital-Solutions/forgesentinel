@@ -206,3 +206,36 @@ test("every finding and incident is reconstructable from ledger evidence (defini
   }
   assert.ok(runtime.ledger.integrityCheck().every((check) => check.ok));
 });
+
+test("evidence-before-inference is enforced on the real production path, not only the CLI validate command", () => {
+  const runtime = new SentinelRuntime("production");
+  const evidenceFreeFinding = {
+    finding_id: "fnd_bad_00001",
+    finding_type: "agent.patch_burst",
+    node: { name: "sentinel-agent", version: "1.0.0" },
+    subject: { type: "agent", id: "agt_x" },
+    tenant_id: "ten_bad",
+    window: { start: "2026-06-09T17:00:00.000Z", end: "2026-06-09T17:00:00.000Z" },
+    risk: { likelihood: 0.9, impact: 0.9, confidence: 0.9, evidence_quality: 0.9 },
+    evidence_ids: [], // violates evidence-before-inference (01) — must never reach Prime
+    source_event_roots: [],
+    explanation: { summary: "no real evidence backs this", top_factors: [], uncertainties: [] },
+    recommendation: { action_class: "RECOMMEND_ONLY" as const },
+    expires_at: "2026-06-10T17:00:00.000Z",
+    correlation_hints: {},
+    policy_generated_effect: false,
+  };
+  // A bug in a detector node is the only realistic way an evidence-free
+  // finding is ever produced; simulate it directly rather than construct a
+  // contrived event sequence.
+  runtime.agentNode.process = () => ({ findings: [evidenceFreeFinding], evidence: [] });
+
+  const report = runtime.runShadow(COMPOUND);
+  assert.ok(
+    !report.findings.some((finding) => finding.finding_id === "fnd_bad_00001"),
+    "an invalid finding must not reach the returned report or Sentinel Prime",
+  );
+  const rejection = runtime.ledger.all().find((record) => record.kind === "rejection" && (record.body as { finding_id?: string }).finding_id === "fnd_bad_00001");
+  assert.ok(rejection, "the rejection is durably recorded, not silently dropped");
+  assert.ok(rejection.rejection_reasons?.some((issue) => issue.code === "required_array" && issue.path === "evidence_ids"));
+});

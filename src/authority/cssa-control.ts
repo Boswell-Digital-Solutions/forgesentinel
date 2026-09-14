@@ -11,6 +11,7 @@ import type { ControlLineage } from "../contracts/envelope.js";
 import type { ActionReceipt } from "../contracts/receipt.js";
 import type { PolicyDecision } from "../contracts/policy.js";
 import type { ApprovalRecord } from "./capability.js";
+import { GLOBAL_ALWAYS_DENY } from "./policy.js";
 import type { ReceiptService } from "./receipts.js";
 
 function directiveSignature(directive: CloudSecurityControlDirective, key: string): string {
@@ -103,6 +104,16 @@ export class CssaControlRegistry {
     const shape = validateControlDirectiveShape(directive);
     issues.push(...shape.issues);
     if (issues.length > 0) return this.rejected(directive, issues, nowIso);
+
+    // GLOBAL_ALWAYS_DENY (06) is Sentinel's non-negotiable floor and must
+    // hold on every authority path, not only PolicyService.evaluate() — a
+    // future scoped CSSA control accidentally allowlisting a forbidden
+    // action must not bypass it.
+    const globalDenyReason = GLOBAL_ALWAYS_DENY[directive.action];
+    if (globalDenyReason) {
+      issues.push({ path: "action", code: "globally_denied", message: globalDenyReason });
+      return this.rejected(directive, issues, nowIso);
+    }
 
     const key = this.trustedIssuers.get(`${directive.issuer}:${directive.integrity.key_id}`);
     if (!key) {

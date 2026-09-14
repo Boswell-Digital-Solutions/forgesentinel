@@ -41,7 +41,12 @@ export const ACCOUNT_COMPROMISE_POLICY: PolicyDefinition = {
       allow: [{ action: "identity.session.revoke", scope: "affected_sessions", approval: "emergency_policy", reversible: false, expires_in_seconds: 300 }],
     },
   ],
-  always_deny: ["license.permanent_revoke", "customer_data.delete", "source_code.direct_patch"],
+  // Every entry here was already a subset of GLOBAL_ALWAYS_DENY, which is
+  // checked unconditionally regardless of what a policy's own list says
+  // (see evaluate() below) — a partial per-policy copy only invited the two
+  // lists to silently drift. Add here only a deny that's specific to this
+  // policy and not already global.
+  always_deny: [],
   cooldown_seconds: 600,
 };
 
@@ -67,7 +72,9 @@ export const AGENT_DRIFT_POLICY: PolicyDefinition = {
       ],
     },
   ],
-  always_deny: ["agent.patch.apply", "agent.patch.promote", "source_code.direct_patch", "smith.proposal.approve"],
+  // See ACCOUNT_COMPROMISE_POLICY's always_deny comment: these were all
+  // already covered by GLOBAL_ALWAYS_DENY.
+  always_deny: [],
   cooldown_seconds: 600,
 };
 
@@ -93,7 +100,9 @@ export const DATA_EXFILTRATION_POLICY: PolicyDefinition = {
       ],
     },
   ],
-  always_deny: ["customer_data.delete", "license.permanent_revoke", "source_code.direct_patch"],
+  // See ACCOUNT_COMPROMISE_POLICY's always_deny comment: these were all
+  // already covered by GLOBAL_ALWAYS_DENY.
+  always_deny: [],
   cooldown_seconds: 600,
 };
 
@@ -170,7 +179,16 @@ export class PolicyService {
       if (!conditionMatches(rule.when, incident, context)) continue;
       for (const entry of rule.allow) {
         if (GLOBAL_ALWAYS_DENY[entry.action] || policy.always_deny.includes(entry.action)) continue;
-        const cooldownKey = `${entry.action}:${incident.subject["account_id"] ?? incident.subject.tenant_id}`;
+        // Key on the actual per-action target when the incident names one (it
+        // matches what recordExecutedAction is later called with at execution
+        // time) so two distinct targets of the same action type never share a
+        // cooldown; only fall back to the incident subject when no
+        // recommended action of this type carries a specific target.
+        const targetId =
+          incident.recommended_actions.find((action) => action.action_type === entry.action)?.target_id ??
+          incident.subject["account_id"] ??
+          incident.subject.tenant_id;
+        const cooldownKey = `${entry.action}:${targetId}`;
         const lastAt = this.lastActionAt.get(cooldownKey);
         if (lastAt !== undefined && Date.parse(nowIso) - lastAt < policy.cooldown_seconds * 1000) {
           denied.push({ action_type: entry.action, reason: `cooldown: action executed less than ${policy.cooldown_seconds}s ago (06 hysteresis)` });

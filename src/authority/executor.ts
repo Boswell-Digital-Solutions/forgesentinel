@@ -1,7 +1,5 @@
-import type { CapabilityToken } from "../contracts/capability.js";
 import type { ActionReceipt } from "../contracts/receipt.js";
-import type { CapabilityService } from "./capability.js";
-import type { ReceiptService } from "./receipts.js";
+import { CapabilityValidatedAuthority, type PresentedAction } from "./authority-base.js";
 
 /**
  * Identity authority adapter (02 authority adapters). The identity service —
@@ -9,15 +7,10 @@ import type { ReceiptService } from "./receipts.js";
  * approved action presented with a valid capability, and every attempt
  * (success, rejection, rollback) yields a receipt.
  */
-export class IdentityAuthority {
+export class IdentityAuthority extends CapabilityValidatedAuthority {
   readonly audience = "identity-service";
   private readonly keyStates = new Map<string, "active" | "paused">();
   private readonly mfaRequired = new Set<string>();
-
-  constructor(
-    private readonly capabilities: CapabilityService,
-    private readonly receipts: ReceiptService,
-  ) {}
 
   registerKey(keyFingerprint: string): void {
     this.keyStates.set(keyFingerprint, "active");
@@ -31,41 +24,11 @@ export class IdentityAuthority {
     return this.mfaRequired.has(accountId);
   }
 
-  execute(token: CapabilityToken, presented: { action: string; target: string; scope: string }, nowIso: string): ActionReceipt {
-    const validation = this.capabilities.validate(token, { audience: this.audience, ...presented }, nowIso);
-    const decision = {
-      decision_id: token.claims.policy_decision_id,
-      policy_id: "sentinel_account_compromise",
-      policy_version: "3.1.0",
-      result: "ALLOW_BOUNDED_ACTION",
-      approver: { type: "operator", id: "via_capability" },
-    };
-
-    if (!validation.ok) {
-      return this.receipts.create(
-        {
-          receipt_type: "sentinel.action",
-          incident_id: token.claims.incident_id,
-          decision,
-          action: {
-            requested: presented.action,
-            executed: null,
-            target_id: presented.target,
-            scope: presented.scope,
-            result: "rejected",
-            failure_reason: validation.issues.map((issue) => `${issue.code}: ${issue.message}`).join("; "),
-          },
-          rollback: { supported: false },
-          control_lineage: { policy_decision_id: token.claims.policy_decision_id },
-        },
-        nowIso,
-      );
-    }
-
+  protected applyAction(presented: PresentedAction) {
     const before: Record<string, unknown> = {};
     const after: Record<string, unknown> = {};
     let result: "success" | "failure" = "success";
-    let rollbackAction: string | undefined;
+    let rollback_action: string | undefined;
 
     switch (presented.action) {
       case "identity.api_key.pause": {
@@ -76,7 +39,7 @@ export class IdentityAuthority {
           before["key_state"] = state;
           this.keyStates.set(presented.target, "paused");
           after["key_state"] = "paused";
-          rollbackAction = "identity.api_key.resume";
+          rollback_action = "identity.api_key.resume";
         }
         break;
       }
@@ -95,33 +58,14 @@ export class IdentityAuthority {
         before["mfa_required"] = this.mfaRequired.has(presented.target);
         this.mfaRequired.add(presented.target);
         after["mfa_required"] = true;
-        rollbackAction = "identity.mfa.release";
+        rollback_action = "identity.mfa.release";
         break;
       }
       default:
         result = "failure";
     }
 
-    return this.receipts.create(
-      {
-        receipt_type: "sentinel.action",
-        incident_id: token.claims.incident_id,
-        decision,
-        action: {
-          requested: presented.action,
-          executed: result === "success" ? presented.action : null,
-          target_id: presented.target,
-          scope: presented.scope,
-          result,
-          ...(result === "failure" ? { failure_reason: "target unknown or action unsupported by this authority" } : {}),
-        },
-        before_state: before,
-        after_state: after,
-        rollback: rollbackAction ? { supported: true, action_type: rollbackAction } : { supported: false },
-        control_lineage: { policy_decision_id: token.claims.policy_decision_id },
-      },
-      nowIso,
-    );
+    return { result, before, after, rollback_action };
   }
 
   /** Rollback is itself a receipted action referencing what it reverses. */

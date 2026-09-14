@@ -108,11 +108,27 @@ test("cooldown denies repeat actions inside the hold period (06 hysteresis)", ()
   const policy = service();
   const first = policy.evaluate(incident(), { environment: "production" }, NOW);
   assert.ok(first.allowed_actions.some((action) => action.action_type === "identity.api_key.pause"));
-  policy.recordExecutedAction("identity.api_key.pause", "acct_1", NOW);
+  // Keyed on the exact target ("key_1", from the incident's recommended
+  // action) so it matches what recordExecutedAction is called with at real
+  // execution time (presented.target) — not the coarser account id.
+  policy.recordExecutedAction("identity.api_key.pause", "key_1", NOW);
   const second = policy.evaluate(incident(), { environment: "production" }, "2026-06-09T17:08:00.000Z");
   assert.ok(second.denied_actions.some((action) => action.action_type === "identity.api_key.pause" && action.reason.includes("cooldown")));
   const later = policy.evaluate(incident(), { environment: "production" }, "2026-06-09T17:20:00.000Z");
   assert.ok(later.allowed_actions.some((action) => action.action_type === "identity.api_key.pause"), "allowed again after cooldown");
+});
+
+test("cooldown is keyed per exact target, not the whole account (06 hysteresis)", () => {
+  const policy = service();
+  policy.recordExecutedAction("identity.api_key.pause", "key_1", NOW);
+  // A second, unrelated key on the same account must not inherit key_1's
+  // cooldown — otherwise one action anywhere on an account would silently
+  // block every future bounded action of that type on the account.
+  const otherKey = incident({
+    recommended_actions: [{ action_type: "identity.api_key.pause", target_id: "key_2", scope: "single_key", reversible: true, approval: "single_operator" }],
+  });
+  const decision = policy.evaluate(otherKey, { environment: "production" }, "2026-06-09T17:08:00.000Z");
+  assert.ok(decision.allowed_actions.some((action) => action.action_type === "identity.api_key.pause"), "a different target is not blocked by another target's cooldown");
 });
 
 test("emergency rule requires its own strict conditions", () => {

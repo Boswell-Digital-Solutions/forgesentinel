@@ -38,11 +38,17 @@ export class CrossTenantAccessDenied extends Error {
 
 export class EvidenceLedger {
   private readonly records: LedgerRecord[] = [];
+  private readonly bySeqIndex = new Map<number, LedgerRecord>();
   private seq = 0;
   readonly denials: { at: string; requested_tenant: string; principal: string }[] = [];
 
   constructor(private readonly walPath?: string) {
-    if (walPath && existsSync(walPath)) this.loadWal(walPath);
+    if (walPath) {
+      // Create the WAL directory once, up front, rather than on every
+      // append — the path never changes for the lifetime of this ledger.
+      mkdirSync(dirname(walPath), { recursive: true });
+      if (existsSync(walPath)) this.loadWal(walPath);
+    }
   }
 
   private loadWal(path: string): void {
@@ -50,13 +56,13 @@ export class EvidenceLedger {
     for (const line of lines) {
       const record = JSON.parse(line) as LedgerRecord;
       this.records.push(record);
+      this.bySeqIndex.set(record.ledger_seq, record);
       this.seq = Math.max(this.seq, record.ledger_seq);
     }
   }
 
   private persist(record: LedgerRecord): void {
     if (!this.walPath) return;
-    mkdirSync(dirname(this.walPath), { recursive: true });
     appendFileSync(this.walPath, `${JSON.stringify(record)}\n`, "utf8");
   }
 
@@ -68,6 +74,7 @@ export class EvidenceLedger {
       source_hash: hashPayload(input.body),
     };
     this.records.push(record);
+    this.bySeqIndex.set(record.ledger_seq, record);
     this.persist(record);
     return record;
   }
@@ -87,7 +94,7 @@ export class EvidenceLedger {
   }
 
   bySeq(seq: number): LedgerRecord | undefined {
-    return this.records.find((record) => record.ledger_seq === seq);
+    return this.bySeqIndex.get(seq);
   }
 
   all(): readonly LedgerRecord[] {
