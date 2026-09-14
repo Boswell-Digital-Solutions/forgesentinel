@@ -1,0 +1,1 @@
+{"fixtureSet":"forgesentinel.bounded-local-collector.cp4c.v0.1","classification":"synthetic-only","containsRealSecrets":false,"containsPersonalData":false,"members":["manifest.valid.json","case.path-escape.json","case.symlink.json","case.secret.json","case.binary.json","case.malformed-utf8.json","case.revision-drift.json","case.stop.json"]}
