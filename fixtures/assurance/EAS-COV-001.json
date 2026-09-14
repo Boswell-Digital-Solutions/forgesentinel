@@ -1,0 +1,26 @@
+{
+  "fixtureId": "EAS-COV-001",
+  "input": {
+    "fixtureId": "EAS-COV-001",
+    "subject": "synthetic BDS repository estate",
+    "admittedTargets": ["repo-alpha", "repo-x"],
+    "observations": [
+      {
+        "source": "ordinary-enumeration",
+        "observedTargets": ["repo-alpha"],
+        "evidenceRef": "sha256:coverage-ordinary-enumeration"
+      },
+      {
+        "source": "installed-exact-lookup",
+        "observedTargets": ["repo-alpha", "repo-x"],
+        "evidenceRef": "sha256:coverage-installed-exact-lookup"
+      }
+    ]
+  },
+  "expected": {
+    "classification": "COVERAGE_GAP",
+    "requiredPhrases": ["Coverage is partial"],
+    "forbiddenPhrases": ["does not exist", "complete estate coverage", "authorize repair"]
+  }
+}
+

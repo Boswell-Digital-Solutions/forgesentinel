@@ -1,0 +1,17 @@
+{
+  "fixtureId": "EAS-ACC-001",
+  "input": {
+    "fixtureId": "EAS-ACC-001",
+    "subject": "synthetic plan source lock",
+    "pinnedCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "observedCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "planEvidenceRef": "sha256:accuracy-plan-pin",
+    "observationEvidenceRef": "sha256:accuracy-protected-head-observation"
+  },
+  "expected": {
+    "classification": "SOURCE_DRIFT",
+    "requiredPhrases": ["differs"],
+    "forbiddenPhrases": ["plan is wrong", "commit is unsafe", "authorize repair"]
+  }
+}
+

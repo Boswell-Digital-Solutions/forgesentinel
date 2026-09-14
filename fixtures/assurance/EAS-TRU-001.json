@@ -1,0 +1,24 @@
+{
+  "fixtureId": "EAS-TRU-001",
+  "input": {
+    "fixtureId": "EAS-TRU-001",
+    "subject": "synthetic incident surface",
+    "claim": {
+      "statement": "The incident surface is operational.",
+      "assertedState": "operational",
+      "evidenceRef": "sha256:truthfulness-documentation-claim"
+    },
+    "implementationEvidence": [
+      {
+        "state": "mock-only",
+        "evidenceRef": "sha256:truthfulness-implementation-state"
+      }
+    ]
+  },
+  "expected": {
+    "classification": "CONTRADICTED",
+    "requiredPhrases": ["scoped claim"],
+    "forbiddenPhrases": ["intent", "deception", "generally unreliable", "authorize repair"]
+  }
+}
+
