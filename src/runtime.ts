@@ -12,10 +12,11 @@ import { BaselineService } from "./intel/baselines.js";
 import { SentinelCostNode, TOKENS_PER_DAY, RETRIES_PER_HOUR, DAILY_USAGE_BASELINE, CACHE_HITS, CACHE_HIT_RATIO_BASELINE } from "./intel/cost.js";
 import { SentinelCloudNode, LOGIN_FAILURES_15M } from "./intel/cloud.js";
 import { SentinelAgentNode } from "./intel/agent.js";
+import { SentinelProviderNode } from "./intel/provider.js";
 import { SentinelLicenseNode } from "./intel/license.js";
 import { SentinelDataNode } from "./intel/data.js";
-import { SentinelPrime, ACCOUNT_COMPROMISE_COMPOUND } from "./intel/prime.js";
-import { PolicyService, ACCOUNT_COMPROMISE_POLICY } from "./authority/policy.js";
+import { SentinelPrime, ACCOUNT_COMPROMISE_COMPOUND, AGENT_DRIFT_COMPOUND, DATA_EXFILTRATION_COMPOUND } from "./intel/prime.js";
+import { PolicyService, ACCOUNT_COMPROMISE_POLICY, AGENT_DRIFT_POLICY, DATA_EXFILTRATION_POLICY } from "./authority/policy.js";
 import { ReceiptService } from "./authority/receipts.js";
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -55,6 +56,7 @@ export class SentinelRuntime {
   readonly costNode: SentinelCostNode;
   readonly cloudNode: SentinelCloudNode;
   readonly agentNode: SentinelAgentNode;
+  readonly providerNode: SentinelProviderNode;
   readonly licenseNode: SentinelLicenseNode;
   readonly dataNode: SentinelDataNode;
   readonly prime: SentinelPrime;
@@ -208,10 +210,13 @@ export class SentinelRuntime {
     this.costNode = new SentinelCostNode(this.features, this.baselines);
     this.cloudNode = new SentinelCloudNode(this.features);
     this.agentNode = new SentinelAgentNode(this.features);
+    this.providerNode = new SentinelProviderNode();
     this.licenseNode = new SentinelLicenseNode(this.features);
     this.dataNode = new SentinelDataNode(this.features);
-    this.prime = new SentinelPrime([ACCOUNT_COMPROMISE_COMPOUND]);
+    this.prime = new SentinelPrime([ACCOUNT_COMPROMISE_COMPOUND, AGENT_DRIFT_COMPOUND, DATA_EXFILTRATION_COMPOUND]);
     this.policy.register(ACCOUNT_COMPROMISE_POLICY);
+    this.policy.register(AGENT_DRIFT_POLICY);
+    this.policy.register(DATA_EXFILTRATION_POLICY);
   }
 
   /**
@@ -266,6 +271,10 @@ export class SentinelRuntime {
     const agentOutput = this.agentNode.process(events, learnCutoff);
     findings.push(...agentOutput.findings);
     evidence.push(...agentOutput.evidence);
+
+    const providerOutput = this.providerNode.process(events);
+    findings.push(...providerOutput.findings);
+    evidence.push(...providerOutput.evidence);
 
     const licenseOutput = this.licenseNode.process(events, learnCutoff);
     findings.push(...licenseOutput.findings);

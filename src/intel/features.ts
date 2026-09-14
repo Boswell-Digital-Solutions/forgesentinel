@@ -13,7 +13,7 @@ export interface FeatureDefinition {
   source_events: string[];
   scope: string[];
   window: { type: "rolling"; duration_ms: number; lateness_allowance_ms: number };
-  aggregation: { operation: "sum" | "count"; field?: string };
+  aggregation: { operation: "sum" | "count" | "mean"; field?: string };
   privacy: { stores_content: false; cloud_allowed: boolean; retention_class: string };
 }
 
@@ -95,8 +95,13 @@ export class FeatureService {
         value = 1;
       } else {
         const raw = valueAtPath(event, def.aggregation.field ?? "");
-        if (typeof raw !== "number") continue;
-        value = raw;
+        if (typeof raw === "boolean") {
+          value = raw ? 1 : 0;
+        } else if (typeof raw === "number") {
+          value = raw;
+        } else {
+          continue;
+        }
       }
       const key = `${def.feature_id}@${def.version}::${scopeKey}`;
       const list = this.samples.get(key) ?? [];
@@ -112,7 +117,8 @@ export class FeatureService {
     const list = (this.samples.get(`${featureRef}::${scopeKey}`) ?? []).filter(
       (sample) => sample.occurred_at_ms > startMs && sample.occurred_at_ms <= endMs,
     );
-    const value = def.aggregation.operation === "count" ? list.length : list.reduce((sum, sample) => sum + sample.value, 0);
+    const sum = list.reduce((total, sample) => total + sample.value, 0);
+    const value = def.aggregation.operation === "count" ? list.length : def.aggregation.operation === "mean" ? (list.length > 0 ? sum / list.length : 0) : sum;
     return {
       feature: featureRef,
       scope_key: scopeKey,

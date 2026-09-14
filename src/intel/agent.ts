@@ -181,7 +181,7 @@ export class SentinelAgentNode {
       },
       recommendation: { action_class: "REQUEST_OPERATOR", playbook: "PB-AGENT-BOUNDARY-01" },
       expires_at: new Date(Date.parse(event.occurred_at) + 24 * 3600 * 1000).toISOString(),
-      correlation_hints: { account_id: accountId, actor_id: actorId },
+      correlation_hints: { account_id: accountId, actor_id: actorId, ...(event.correlation?.run_id !== undefined ? { run_id: event.correlation.run_id } : {}) },
       policy_generated_effect: event.control_lineage?.policy_generated_effect === true,
     };
   }

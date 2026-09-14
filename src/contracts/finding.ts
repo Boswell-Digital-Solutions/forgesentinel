@@ -53,7 +53,17 @@ export interface Finding {
   explanation: FindingExplanation;
   recommendation: { action_class: (typeof RECOMMENDATION_ACTION_CLASSES)[number]; playbook?: string };
   expires_at: string;
-  correlation_hints: { account_id?: string; actor_id?: string; api_key_fingerprint?: string; route_class?: string };
+  correlation_hints: {
+    account_id?: string;
+    actor_id?: string;
+    api_key_fingerprint?: string;
+    route_class?: string;
+    agent_fingerprint?: string;
+    run_id?: string;
+    provider?: string;
+    model_fingerprint?: string;
+    destination?: string;
+  };
   policy_generated_effect: boolean;
 }
 
