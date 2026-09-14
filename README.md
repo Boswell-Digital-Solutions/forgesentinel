@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/forge-sentinel-banner.webp" alt="Forge Sentinel — security-intelligence fabric for the Forge ecosystem" width="100%">
-</p>
-
 # Forge Sentinel
 
 A governed security-intelligence fabric for the Forge ecosystem. Sentinel
