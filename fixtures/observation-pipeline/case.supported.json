@@ -1,0 +1,1 @@
+{"ruleId":"docs_present","lane":"truthfulness","severity":"S2","surface":"doc/system","evidencePath":"doc/system/example.md","needle":"canonical doctrine","expected":"present","oracleExpectedClassification":"SUPPORTED"}

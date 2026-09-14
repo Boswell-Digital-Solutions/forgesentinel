@@ -1,0 +1,1 @@
+{"ruleId":"secret_absent","lane":"security","severity":"S1","surface":"src/config.ts","evidencePath":"src/config.ts","needle":"unsafe_marker","expected":"absent","oracleExpectedClassification":"FINDING"}

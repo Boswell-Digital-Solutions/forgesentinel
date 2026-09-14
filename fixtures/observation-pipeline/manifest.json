@@ -1,0 +1,1 @@
+{"fixtureSet":"forgesentinel.deterministic-observation-pipeline.cp4d.v0.1","classification":"synthetic-only","containsRealSecrets":false,"containsPersonalData":false,"members":["case.supported.json","case.finding.json","case.accuracy.json","case.disagreement.json","case.missing.json","case.canary.json","case.cross-lane.json","case.replay.json"]}
