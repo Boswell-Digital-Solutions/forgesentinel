@@ -1,0 +1,14 @@
+{
+  "fixtureSet": "forgesentinel.cp3c.mission-foundation.v0.1",
+  "classification": "synthetic-only",
+  "containsRealSecrets": false,
+  "containsPersonalData": false,
+  "members": [
+    { "path": "AUTH-FOUNDATION-001.json", "sha256": "1dfa87964e4ddf9823b9994d4c57ce915e28676898d75cc41332a1d4a618aff5" },
+    { "path": "INV-FOUNDATION-001.json", "sha256": "3df31f0ebab0094716e0beeb63fd5bd9517a3662c369aa64b7ee49ae99faf325" },
+    { "path": "COV-FOUNDATION-001.json", "sha256": "97f40f2b18ff084061eb3f5297bf5d88047f5afef39cfb72a184062f63e6682d" },
+    { "path": "CAP-FOUNDATION-001.json", "sha256": "ffee6b37ca9c723146275cc08ef0356336185b7be9dc6f519bdcb5ccbfdf3bac" },
+    { "path": "RCP-FOUNDATION-001.json", "sha256": "9f6f831b3456f4fa9d4e2ffb7749649732c379d1bfef865cac56cbe53a93dfc3" },
+    { "path": "ZERO-EFFECT-001.json", "sha256": "eda8ba152b60265e67bd003c860fe69354d6639c59ab91014fae17f706c9cd07" }
+  ]
+}

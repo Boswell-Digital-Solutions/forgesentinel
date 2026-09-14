@@ -1,0 +1,5 @@
+{
+  "fixtureId": "INV-FOUNDATION-001",
+  "states": ["admitted", "unknown", "conflicted", "stale", "revision_drift"],
+  "reservedTargets": ["syn_repo_alpha", "syn_repo_unknown", "syn_repo_conflict", "syn_repo_stale", "syn_repo_drift"]
+}

@@ -1,0 +1,20 @@
+{
+  "fixtureId": "AUTH-FOUNDATION-001",
+  "now": "2026-09-14T12:00:00.000Z",
+  "grant": {
+    "missionId": "syn_mission_auth_001",
+    "authorizationId": "syn_auth_001",
+    "issuedAt": "2026-09-14T11:00:00.000Z",
+    "expiresAt": "2026-09-14T13:00:00.000Z",
+    "targets": ["syn_repo_alpha"],
+    "sourceRevision": "syn_revision_a",
+    "procedureId": "syn_procedure_1",
+    "caps": { "wallTimeMs": 1000, "evidenceBytes": 1024, "toolCalls": 2, "retries": 1 }
+  },
+  "inventory": [
+    { "targetId": "syn_repo_alpha", "state": "admitted", "revision": "syn_revision_a", "freshUntil": "2026-09-15T00:00:00.000Z" }
+  ],
+  "operations": [
+    { "operationId": "syn_op_read_1", "targetId": "syn_repo_alpha", "kind": "read", "at": "2026-09-14T12:00:01.000Z", "elapsedMs": 10, "evidenceBytes": 10 }
+  ]
+}

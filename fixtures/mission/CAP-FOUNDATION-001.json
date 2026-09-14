@@ -1,0 +1,5 @@
+{
+  "fixtureId": "CAP-FOUNDATION-001",
+  "caps": { "wallTimeMs": 1000, "evidenceBytes": 1024, "toolCalls": 2, "retries": 1 },
+  "nonRetryable": ["authority", "schema", "integrity", "scope"]
+}
