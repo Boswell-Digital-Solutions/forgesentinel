@@ -1,0 +1,10 @@
+{
+  "fixtureId": "ACC-FOUNDATION-001",
+  "cases": [
+    { "id": "ACC-001", "ruleId": "documentation_configuration", "expected": "enabled", "observed": "disabled" },
+    { "id": "ACC-002", "ruleId": "contract_compatibility", "expected": "v1", "observed": "v2-incompatible" },
+    { "id": "ACC-003", "ruleId": "source_artifact", "expected": "syn_sha_a", "observed": "syn_sha_b" },
+    { "id": "ACC-004", "ruleId": "calculation", "expected": "42", "observed": "41" },
+    { "id": "ACC-005", "ruleId": "consistent_control", "expected": "match", "observed": "match" }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "fixtureId": "SEC-FOUNDATION-001",
+  "cases": [
+    { "id": "SEC-001", "ruleId": "secret_canary", "severity": "S1", "expected": "absent", "fault": "present", "clean": "absent" },
+    { "id": "SEC-002", "ruleId": "least_privilege", "severity": "S1", "expected": "read", "fault": "admin", "clean": "read" },
+    { "id": "SEC-003", "ruleId": "tenant_boundary", "severity": "S0", "expected": "syn_tenant_a", "fault": "syn_tenant_b", "clean": "syn_tenant_a" },
+    { "id": "SEC-004", "ruleId": "artifact_provenance", "severity": "S1", "expected": "syn_digest_a", "fault": "syn_digest_b", "clean": "syn_digest_a" },
+    { "id": "SEC-005", "ruleId": "listener_scope", "severity": "S1", "expected": "loopback", "fault": "public", "clean": "loopback" },
+    { "id": "SEC-006", "ruleId": "accepted_effects", "severity": "S1", "expected": "0", "fault": "1", "clean": "0" }
+  ]
+}

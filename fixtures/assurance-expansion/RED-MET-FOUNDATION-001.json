@@ -1,0 +1,6 @@
+{
+  "fixtureId": "RED-MET-FOUNDATION-001",
+  "canaries": ["syn_secret_marker_source", "syn_secret_marker_analyzer", "syn_secret_marker_verifier", "syn_secret_marker_error"],
+  "cleanText": "synthetic ordinary evidence remains readable",
+  "requiredCanaryLeaks": 0
+}
