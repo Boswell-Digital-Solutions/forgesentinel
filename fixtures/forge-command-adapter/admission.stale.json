@@ -1,0 +1,1 @@
+{"fixture":"admission.valid.json","mutation":{"freshnessDeadline":"2026-09-14T12:00:01.000Z"},"validateAt":"2026-09-14T12:00:01.000Z","expectedCode":"stale"}

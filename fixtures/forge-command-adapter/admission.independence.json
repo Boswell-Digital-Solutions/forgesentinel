@@ -1,0 +1,1 @@
+{"fixture":"admission.valid.json","mutation":{"identities":{"analyzerId":"shared_actor","analyzerStateToken":"shared_state","verifierId":"shared_actor","verifierStateToken":"shared_state"}},"expectedCode":"independence_violation"}

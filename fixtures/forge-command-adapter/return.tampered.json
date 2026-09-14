@@ -1,0 +1,1 @@
+{"fixture":"return.valid.json","mutation":{"reason":"healthy"},"expectedCode":"integrity_mismatch"}
