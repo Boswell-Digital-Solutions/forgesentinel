@@ -16,6 +16,7 @@ import {
 const FIXTURES = join(process.cwd(), "fixtures", "replay");
 const COMPOUND = loadReplayFile(join(FIXTURES, "compound_account_compromise.jsonl"));
 const SPIKE_ONLY = loadReplayFile(join(FIXTURES, "usage_spike_only.jsonl"));
+const AGENT_DRIFT = loadReplayFile(join(FIXTURES, "agent_drift.jsonl"));
 
 function run(lines: ReplayLine[]): ShadowReport {
   return new SentinelRuntime("production").runShadow(lines);
@@ -49,6 +50,41 @@ test("end-to-end compound compromise: evidence -> findings -> incident -> REQUES
 
   const pauseTarget = incident.recommended_actions.find((action) => action.action_type === "identity.api_key.pause");
   assert.ok(pauseTarget?.target_id.endsWith("7fa2"), "action targets the exact new key");
+});
+
+test("end-to-end agent drift: patch burst + denials + boundary violation -> quarantine exact version (12 scenario)", () => {
+  const report = run(AGENT_DRIFT);
+  assert.equal(report.replay.rejected, 0);
+  const types = report.findings.map((finding) => finding.finding_type);
+  for (const expected of ["agent.boundary_violation", "agent.patch_burst", "agent.denied_action_burst"]) {
+    assert.ok(types.includes(expected), `missing finding ${expected}`);
+  }
+  assert.equal(report.incidents.length, 1);
+  const incident = report.incidents[0]!;
+  assert.equal(validateIncident(incident).ok, true, JSON.stringify(validateIncident(incident).issues));
+  assert.equal(incident.incident_type, "compound.agent_drift");
+  assert.equal(incident.independent_signal_count, 3);
+  assert.deepEqual(incident.required_authority, ["yellowjacket", "forge_command_operator"]);
+
+  // SentinelAgentNode scopes findings by actor_id (event.actor.actor_id), not
+  // a separate versioned fingerprint identity, so the quarantine target is
+  // the actor id rather than the fixture's agent_fingerprint payload field.
+  const quarantine = incident.recommended_actions.find((action) => action.action_type === "yellowjacket.agent_version.quarantine");
+  assert.ok(quarantine, "quarantine is recommended");
+  assert.equal(quarantine.target_id, "forge-smithy", "quarantine targets the agent actor id");
+  assert.equal(quarantine.scope, "single_agent_version");
+  assert.equal(quarantine.reversible, true, "re-enable path exists");
+  const stop = incident.recommended_actions.find((action) => action.action_type === "yellowjacket.run.stop");
+  assert.ok(stop && stop.target_id === "run_smith_771" && stop.scope === "single_run");
+
+  const decision = report.decisions[0]!;
+  assert.equal(decision.policy_id, "sentinel_agent_drift");
+  assert.equal(decision.result, "REQUEST_OPERATOR");
+  assert.ok(
+    !incident.recommended_actions.some((action) => action.action_type.startsWith("agent.patch")) &&
+      !decision.allowed_actions.some((action) => action.action_type.startsWith("agent.patch")),
+    "Sentinel never patches code (ADR-007)",
+  );
 });
 
 test("usage spike alone: finding, monitor-grade incident, no containment (12 scenario)", () => {

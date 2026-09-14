@@ -1,4 +1,4 @@
-import { clamp01 } from "../contracts/common.js";
+import { canonicalJson, clamp01 } from "../contracts/common.js";
 import type { Finding } from "../contracts/finding.js";
 import type { Incident, IncidentPriority, IncidentStatus, RecommendedAction } from "../contracts/incident.js";
 
@@ -6,7 +6,8 @@ import type { Incident, IncidentPriority, IncidentStatus, RecommendedAction } fr
 export interface CorrelationRule {
   correlation_id: string;
   version: string;
-  subject_key: ("tenant_id" | "account_id")[];
+  /** Field name the correlated subject is stored under in the incident. */
+  subject_field: "account_id" | "agent_fingerprint";
   window_ms: number;
   supporting: { finding_type: string; weight: number }[];
   independence: { minimum_groups: number };
@@ -16,7 +17,7 @@ export interface CorrelationRule {
 export const ACCOUNT_COMPROMISE_COMPOUND: CorrelationRule = {
   correlation_id: "prime.account_compromise_compound",
   version: "1.0.0",
-  subject_key: ["tenant_id", "account_id"],
+  subject_field: "account_id",
   window_ms: 2 * 3600 * 1000,
   supporting: [
     { finding_type: "cloud.new_api_key", weight: 0.25 },
@@ -31,6 +32,53 @@ export const ACCOUNT_COMPROMISE_COMPOUND: CorrelationRule = {
     playbook: "PB-ACCOUNT-COMPROMISE-01",
     title: "Possible account compromise with rapid usage growth",
     required_authority: ["identity_service", "forge_command_operator"],
+  },
+};
+
+export const DATA_EXFILTRATION_COMPOUND: CorrelationRule = {
+  correlation_id: "prime.data_exfiltration_compound",
+  version: "1.0.0",
+  subject_field: "account_id",
+  window_ms: 2 * 3600 * 1000,
+  // finding_type values matched to SentinelDataNode's actual output
+  // (src/intel/data.ts): no per-destination novelty or volume-based
+  // bulk-export detector exists yet, so egress_anomaly stands in for scale.
+  supporting: [
+    { finding_type: "data.egress_anomaly", weight: 0.35 },
+    { finding_type: "data.redaction_failure", weight: 0.3 },
+    { finding_type: "data.cross_tenant_access", weight: 0.35 },
+  ],
+  independence: { minimum_groups: 2 },
+  emit: {
+    incident_type: "compound.data_exfiltration",
+    playbook: "PB-DATA-EXFIL-01",
+    title: "Possible data exfiltration: bulk movement with boundary pressure",
+    required_authority: ["dataforge", "forge_command_operator"],
+  },
+};
+
+export const AGENT_DRIFT_COMPOUND: CorrelationRule = {
+  correlation_id: "prime.agent_drift_compound",
+  version: "1.0.0",
+  // SentinelAgentNode (src/intel/agent.ts) scopes findings by actor_id, not a
+  // separate fingerprint identity; subject_field falls back to finding.subject.id
+  // when no matching correlation_hints entry exists, so this still groups
+  // correctly per agent.
+  subject_field: "agent_fingerprint",
+  window_ms: 2 * 3600 * 1000,
+  // finding_type values matched to SentinelAgentNode's actual output: no loop
+  // detector exists yet, and the denial-burst type is agent.denied_action_burst.
+  supporting: [
+    { finding_type: "agent.boundary_violation", weight: 0.4 },
+    { finding_type: "agent.patch_burst", weight: 0.3 },
+    { finding_type: "agent.denied_action_burst", weight: 0.3 },
+  ],
+  independence: { minimum_groups: 2 },
+  emit: {
+    incident_type: "compound.agent_drift",
+    playbook: "PB-AGENT-DRIFT-01",
+    title: "Agent drift: boundary pressure with abnormal activity",
+    required_authority: ["yellowjacket", "forge_command_operator"],
   },
 };
 
@@ -105,8 +153,8 @@ export class SentinelPrime {
     const bySubject = new Map<string, Finding[]>();
     for (const finding of this.findings) {
       if (!supportingTypes.has(finding.finding_type)) continue;
-      const accountId = finding.correlation_hints.account_id ?? finding.subject.id;
-      bySubject.set(`${finding.tenant_id}/${accountId}`, [...(bySubject.get(`${finding.tenant_id}/${accountId}`) ?? []), finding]);
+      const subjectId = finding.correlation_hints[rule.subject_field] ?? finding.subject.id;
+      bySubject.set(`${finding.tenant_id}/${subjectId}`, [...(bySubject.get(`${finding.tenant_id}/${subjectId}`) ?? []), finding]);
     }
 
     for (const [subjectKey, candidates] of bySubject) {
@@ -116,8 +164,8 @@ export class SentinelPrime {
       const groups = this.independenceGroups(inWindow);
       if (groups.size < rule.independence.minimum_groups) continue;
 
-      const [tenantId, accountId] = subjectKey.split("/") as [string, string];
-      const incident = this.formIncident(rule, tenantId, accountId, inWindow, groups, nowIso);
+      const [tenantId, subjectId] = subjectKey.split("/") as [string, string];
+      const incident = this.formIncident(rule, tenantId, subjectId, inWindow, groups, nowIso);
       const existing = this.findOpenDuplicate(incident);
       if (existing) {
         this.mergeIncident(existing, incident, nowIso);
@@ -132,7 +180,7 @@ export class SentinelPrime {
   private formIncident(
     rule: CorrelationRule,
     tenantId: string,
-    accountId: string,
+    subjectId: string,
     findings: Finding[],
     groups: Map<string, Finding[]>,
     nowIso: string,
@@ -153,12 +201,15 @@ export class SentinelPrime {
     let confidence = clamp01(0.5 + 0.1 * groups.size);
 
     const conflicts: string[] = [];
-    const overlapping = this.changeWindows.find(
-      (window) =>
-        window.tenant_id === tenantId &&
-        window.account_id === accountId &&
-        findings.some((finding) => Date.parse(finding.window.end) >= Date.parse(window.start) && Date.parse(finding.window.start) <= Date.parse(window.end)),
-    );
+    const overlapping =
+      rule.subject_field === "account_id"
+        ? this.changeWindows.find(
+            (window) =>
+              window.tenant_id === tenantId &&
+              window.account_id === subjectId &&
+              findings.some((finding) => Date.parse(finding.window.end) >= Date.parse(window.start) && Date.parse(finding.window.start) <= Date.parse(window.end)),
+          )
+        : undefined;
     if (overlapping) {
       // Conflict preservation (03): the approved change window lowers risk but
       // stays visible — evidence is never deleted to make the story cleaner.
@@ -173,19 +224,58 @@ export class SentinelPrime {
     }
 
     const signals = [...new Set(findings.map((finding) => finding.finding_type))];
-    const keyFingerprint = findings.map((finding) => finding.correlation_hints.api_key_fingerprint).find((value) => value !== undefined);
     const risk = { likelihood, impact, confidence, evidence_quality: evidenceQuality };
     const recommendedActions: RecommendedAction[] = [];
-    if (!overlapping) {
-      if (keyFingerprint) {
-        recommendedActions.push({ action_type: "identity.api_key.pause", target_id: keyFingerprint, scope: "single_key", reversible: true, approval: "single_operator" });
+    let briefing: Incident["briefing"];
+
+    if (rule.emit.incident_type === "compound.data_exfiltration") {
+      const destination = findings.map((finding) => finding.correlation_hints.destination).find((value) => value !== undefined);
+      if (destination) {
+        recommendedActions.push({ action_type: "data.export_destination.block", target_id: destination, scope: "single_destination", reversible: true, approval: "single_operator" });
       }
-      recommendedActions.push({ action_type: "identity.mfa.require", target_id: accountId, scope: "account", reversible: true, approval: "policy_allowed" });
+      recommendedActions.push({ action_type: "data.redaction.require", target_id: subjectId, scope: "account_exports", reversible: true, approval: "policy_allowed" });
+      briefing = {
+        issue: `Account ${subjectId} shows correlated data-movement signals: ${signals.join(", ")}.`,
+        where: `Data exports for account ${subjectId} (tenant ${tenantId}).`,
+        recommended_fix: destination
+          ? `Temporarily block only destination "${destination}", require redaction on this account's exports, and preserve evidence without copying raw content.`
+          : "Require redaction on this account's exports and preserve evidence without copying raw content.",
+        why_now: `Independent weak signals (${groups.size} independent evidence groups) now form a correlated exfiltration pattern.`,
+      };
+    } else if (rule.emit.incident_type === "compound.agent_drift") {
+      const boundary = findings.find((finding) => finding.finding_type === "agent.boundary_violation");
+      const runId = boundary?.correlation_hints.run_id;
+      if (runId) {
+        recommendedActions.push({ action_type: "yellowjacket.run.stop", target_id: runId, scope: "single_run", reversible: false, approval: "policy_allowed" });
+      }
+      recommendedActions.push({ action_type: "yellowjacket.agent_version.quarantine", target_id: subjectId, scope: "single_agent_version", reversible: true, approval: "single_operator" });
+      briefing = {
+        issue: `Agent version ${subjectId} shows correlated drift signals: ${signals.join(", ")}.`,
+        where: `Agent version ${subjectId} (tenant ${tenantId}).`,
+        recommended_fix: "Stop the active run through YellowJacket and quarantine exactly this agent version pending sandbox replay and SMITH review. Sentinel does not patch code.",
+        why_now: `Independent weak signals (${groups.size} independent evidence groups) now form a correlated drift pattern.`,
+      };
+    } else {
+      const keyFingerprint = findings.map((finding) => finding.correlation_hints.api_key_fingerprint).find((value) => value !== undefined);
+      if (!overlapping) {
+        if (keyFingerprint) {
+          recommendedActions.push({ action_type: "identity.api_key.pause", target_id: keyFingerprint, scope: "single_key", reversible: true, approval: "single_operator" });
+        }
+        recommendedActions.push({ action_type: "identity.mfa.require", target_id: subjectId, scope: "account", reversible: true, approval: "policy_allowed" });
+      }
+      const cost = findings.find((finding) => finding.finding_type === "cost.usage_change_extreme");
+      const ratioText = cost?.baseline ? `${cost.baseline.change_ratio.toFixed(0)}x` : "sharply";
+      briefing = {
+        issue: `Token usage increased ${ratioText} together with: ${signals.join(", ")}.`,
+        where: `Cloud access for account ${subjectId} (tenant ${tenantId}).`,
+        recommended_fix: overlapping
+          ? "No containment recommended: activity overlaps an approved change window. Review and annotate."
+          : "Pause only the new key, require MFA, and review the last 24 hours.",
+        why_now: `Independent weak signals (${groups.size} independent evidence groups) now form a correlated compromise pattern.`,
+      };
     }
 
     this.incidentCounter += 1;
-    const cost = findings.find((finding) => finding.finding_type === "cost.usage_change_extreme");
-    const ratioText = cost?.baseline ? `${cost.baseline.change_ratio.toFixed(0)}x` : "sharply";
     return {
       incident_id: `inc_${String(this.incidentCounter).padStart(4, "0")}`,
       title: rule.emit.title,
@@ -193,16 +283,9 @@ export class SentinelPrime {
       status: "open",
       priority: priorityOf(risk),
       origin: [...new Set(findings.map((finding) => finding.node.name))],
-      subject: { tenant_id: tenantId, account_id: accountId },
+      subject: { tenant_id: tenantId, [rule.subject_field]: subjectId },
       risk,
-      briefing: {
-        issue: `Token usage increased ${ratioText} together with: ${signals.join(", ")}.`,
-        where: `Cloud access for account ${accountId} (tenant ${tenantId}).`,
-        recommended_fix: overlapping
-          ? "No containment recommended: activity overlaps an approved change window. Review and annotate."
-          : "Pause only the new key, require MFA, and review the last 24 hours.",
-        why_now: `Independent weak signals (${groups.size} independent evidence groups) now form a correlated compromise pattern.`,
-      },
+      briefing,
       finding_ids: findings.map((finding) => finding.finding_id),
       evidence_ids: [...new Set(findings.flatMap((finding) => finding.evidence_ids))],
       independent_signal_count: groups.size,
@@ -276,8 +359,7 @@ export class SentinelPrime {
     return [...this.incidents.values()].find(
       (existing) =>
         existing.incident_type === incident.incident_type &&
-        existing.subject.tenant_id === incident.subject.tenant_id &&
-        existing.subject["account_id"] === incident.subject["account_id"] &&
+        canonicalJson(existing.subject) === canonicalJson(incident.subject) &&
         !["resolved", "dismissed"].includes(existing.status),
     );
   }

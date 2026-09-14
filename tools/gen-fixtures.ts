@@ -137,11 +137,43 @@ function spikeOnlyScenario(): ReplayLine[] {
   ];
 }
 
+const AGENT_FP = "agt_forge-smithy@1.4.2+prompt_3aa1";
+const AGENT_RUN = "run_smith_771";
+
+function agentEvent(id: string, eventType: string, occurredAt: string, payload: Record<string, unknown>): ReplayLine {
+  return buildEvent(producers["forgeagents"]!, {
+    event_id: id,
+    event_type: eventType,
+    occurred_at: occurredAt,
+    tenant: TENANT,
+    actor: { actor_type: "agent", actor_id: "forge-smithy" },
+    subject: { subject_type: "agent_version", subject_id: AGENT_FP },
+    correlation: { trace_id: `trc_${id}`, run_id: AGENT_RUN },
+    payload: { agent_fingerprint: AGENT_FP, ...payload },
+  });
+}
+
+/** 12 core scenario: agent patch burst + denials + boundary violation. */
+function agentDriftScenario(): ReplayLine[] {
+  const lines: ReplayLine[] = [agentEvent("evt_agt_run_start", "agent.run.started", "2026-06-09T14:00:00.000Z", { task: "refactor_billing_adapter" })];
+  for (let patch = 0; patch < 16; patch++) {
+    const at = new Date(Date.parse("2026-06-09T14:05:00.000Z") + patch * 60 * 1000).toISOString();
+    lines.push(agentEvent(`evt_agt_patch_${String(patch).padStart(2, "0")}`, "agent.patch.applied", at, { files_changed: 3, patch_size_lines: 120 }));
+  }
+  for (let denial = 0; denial < 6; denial++) {
+    const at = new Date(Date.parse("2026-06-09T14:21:00.000Z") + denial * 60 * 1000).toISOString();
+    lines.push(agentEvent(`evt_agt_denial_${denial}`, "agent.permission.denied", at, { requested_permission: "fs.write:/etc" }));
+  }
+  lines.push(agentEvent("evt_agt_boundary", "agent.boundary.violated", "2026-06-09T14:27:30.000Z", { boundary: "repository:authorforge (allowed: forge-smithy)" }));
+  return lines;
+}
+
 mkdirSync(REPLAY_DIR, { recursive: true });
 mkdirSync(GOLDEN_DIR, { recursive: true });
 
 writeFileSync(join(REPLAY_DIR, "compound_account_compromise.jsonl"), compromiseScenario().map((line) => JSON.stringify(line)).join("\n") + "\n");
 writeFileSync(join(REPLAY_DIR, "usage_spike_only.jsonl"), spikeOnlyScenario().map((line) => JSON.stringify(line)).join("\n") + "\n");
+writeFileSync(join(REPLAY_DIR, "agent_drift.jsonl"), agentDriftScenario().map((line) => JSON.stringify(line)).join("\n") + "\n");
 
 // --- Golden contract fixtures -------------------------------------------
 
@@ -291,4 +323,4 @@ writeFileSync(
   JSON.stringify(golden.map(({ file, contract, expect_valid }) => ({ file, contract, expect_valid })), null, 2) + "\n",
 );
 
-console.log(`wrote ${golden.length} golden fixtures and 2 replay fixtures`);
+console.log(`wrote ${golden.length} golden fixtures and 3 replay fixtures`);
