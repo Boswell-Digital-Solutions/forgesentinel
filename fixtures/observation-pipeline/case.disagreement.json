@@ -1,0 +1,1 @@
+{"ruleId":"disputed","lane":"truthfulness","severity":"S1","surface":"docs/sentinel/status.md","evidencePath":"docs/sentinel/status.md","needle":"claim=true","expected":"present","oracleExpectedClassification":"FINDING"}

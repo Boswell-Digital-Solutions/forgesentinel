@@ -1,0 +1,1 @@
+{"ruleId":"canary_summary","lane":"security","severity":"S1","surface":"src/canary.ts","evidencePath":"src/canary.ts","needle":"syn_secret_marker_pipeline","expected":"absent","oracleExpectedClassification":"FINDING"}

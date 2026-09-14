@@ -1,0 +1,1 @@
+{"ruleId":"revision_claim","lane":"accuracy","severity":"S2","surface":"docs/sentinel/status.md","evidencePath":"docs/sentinel/status.md","needle":"revision=expected","expected":"present","oracleExpectedClassification":"FINDING"}
