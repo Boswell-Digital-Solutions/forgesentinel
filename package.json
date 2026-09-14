@@ -2,7 +2,8 @@
   "name": "forgesentinel",
   "version": "0.1.0",
   "description": "Forge Sentinel — governed security-intelligence fabric (Waves 0-3 MVP slice)",
-  "main": "index.js",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "directories": {
     "doc": "docs"
   },
@@ -16,11 +17,17 @@
     "type": "git",
     "url": "https://github.com/Boswell-Digital-Solutions/forgesentinel.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "UNLICENSED",
+  "keywords": [
+    "forge",
+    "security-intelligence",
+    "governance",
+    "evidence",
+    "anomaly-detection"
+  ],
+  "author": "Boswell Digital Solutions LLC",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
-  "private": "true",
+  "private": true,
   "devDependencies": {
     "@types/node": "^22.19.21",
     "typescript": "5.6"
