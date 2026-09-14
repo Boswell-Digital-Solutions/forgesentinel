@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact commit SHA to qualify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forgesentinel-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event_name == 'workflow_dispatch' && inputs.target_sha || github.sha }}
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          observed_sha="$(git rev-parse HEAD)"
+          test "$observed_sha" = "$EXPECTED_SHA"
+          echo "qualified_sha=$observed_sha"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.19.0
+
+      - name: Record environment and evidence hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          sha256sum package-lock.json fixtures/assurance/EAS-ACC-001.json fixtures/assurance/EAS-COV-001.json fixtures/assurance/EAS-TRU-001.json
+
+      - name: Clean install
+        run: npm ci --ignore-scripts
+
+      - name: Build and test
+        run: npm test

@@ -7,7 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "npm run build --silent && node --test dist/test/",
+    "test": "npm run build --silent && node --test dist/test/*.test.js",
     "build": "tsc -p tsconfig.json",
     "fixtures": "npm run build --silent && node dist/tools/gen-fixtures.js",
     "cli": "node dist/src/cli.js"
