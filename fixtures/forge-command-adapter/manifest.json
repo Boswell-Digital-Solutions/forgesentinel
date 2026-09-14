@@ -1,0 +1,1 @@
+{"fixtureSet":"forgesentinel.forge-command-adapter.cp4b.v0.1","classification":"synthetic-only","containsRealSecrets":false,"containsPersonalData":false,"members":["admission.valid.json","admission.stale.json","admission.revoked-stop.json","admission.substituted.json","admission.unsafe-cap.json","admission.independence.json","return.valid.json","return.tampered.json"]}

@@ -1,0 +1,1 @@
+{"fixture":"admission.valid.json","mutation":{"stop":{"channelId":"fc_stop_cp4b","state":"revoked"}},"expectedCode":"stop_not_active"}

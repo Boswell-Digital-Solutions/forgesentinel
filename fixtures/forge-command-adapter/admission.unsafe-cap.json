@@ -1,0 +1,1 @@
+{"fixture":"admission.valid.json","mutation":{"caps":{"wallTimeMs":60001,"evidenceBytes":2097153,"fileCount":251,"readOps":301,"retries":2}},"expectedCode":"cap_out_of_range"}
