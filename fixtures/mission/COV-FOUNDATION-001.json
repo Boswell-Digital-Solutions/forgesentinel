@@ -1,0 +1,5 @@
+{
+  "fixtureId": "COV-FOUNDATION-001",
+  "cases": ["complete", "partial", "rejected_access", "collector_failure"],
+  "healthInferenceAllowed": false
+}

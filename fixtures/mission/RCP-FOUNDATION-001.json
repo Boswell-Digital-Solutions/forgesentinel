@@ -1,0 +1,5 @@
+{
+  "fixtureId": "RCP-FOUNDATION-001",
+  "states": ["COMPLETED", "BLOCKED", "HALTED", "EXPIRED", "FAILED", "PAUSED"],
+  "requiredIdentity": ["missionId", "authorizationId", "qualifierId", "procedureId", "sourceRevision", "state", "reason", "at", "usage", "acceptedEffects", "integrity"]
+}

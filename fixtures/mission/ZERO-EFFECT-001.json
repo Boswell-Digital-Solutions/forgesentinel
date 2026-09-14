@@ -1,0 +1,7 @@
+{
+  "fixtureId": "ZERO-EFFECT-001",
+  "syntheticEndpoint": "syn_endpoint_denied",
+  "syntheticPath": "syn_path_denied",
+  "attempts": ["write", "network"],
+  "expectedAcceptedEffects": 0
+}
