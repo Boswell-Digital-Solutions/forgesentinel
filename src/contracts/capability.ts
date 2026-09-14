@@ -11,6 +11,11 @@ export interface CapabilityClaims {
   jti: string;
   incident_id: string;
   policy_decision_id: string;
+  /** Carried from the authorizing PolicyDecision so an executor's receipt never has to guess or hardcode it. */
+  policy_id: string;
+  policy_version: string;
+  approver_type: string;
+  approver_id: string;
   action: string;
   target: string;
   scope: string;
@@ -32,6 +37,10 @@ export const CAPABILITY_CLAIM_FIELDS = new Set([
   "jti",
   "incident_id",
   "policy_decision_id",
+  "policy_id",
+  "policy_version",
+  "approver_type",
+  "approver_id",
   "action",
   "target",
   "scope",
@@ -51,6 +60,10 @@ export function validateCapabilityClaims(value: unknown): ValidationResult {
   requireString(issues, value, "jti", { pattern: /^cap_[A-Za-z0-9_-]+$/ });
   requireString(issues, value, "incident_id");
   requireString(issues, value, "policy_decision_id");
+  requireString(issues, value, "policy_id");
+  requireString(issues, value, "policy_version");
+  requireString(issues, value, "approver_type");
+  requireString(issues, value, "approver_id");
   requireString(issues, value, "action");
   requireString(issues, value, "target");
   requireString(issues, value, "scope");

@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { hashPayload, sha256Hex, type ValidationIssue } from "../contracts/common.js";
 import { validateEventEnvelope, type EventEnvelope } from "../contracts/envelope.js";
 import { lookupEventType } from "../contracts/families.js";
@@ -93,7 +93,9 @@ export class EventGateway {
         return this.reject(event, reasons, event.tenant?.tenant_id);
       }
       const expected = createHmac("sha256", producer.secret).update(event.integrity.payload_hash, "utf8").digest("hex");
-      if (event.integrity.signature !== expected || event.integrity.signature_key_id !== producer.key_id) {
+      const a = Buffer.from(expected, "hex");
+      const b = Buffer.from(event.integrity.signature.length === expected.length ? event.integrity.signature : "0".repeat(expected.length), "hex");
+      if (a.length !== b.length || !timingSafeEqual(a, b) || event.integrity.signature_key_id !== producer.key_id) {
         reasons.push({ path: "integrity.signature", code: "signature_invalid", message: "producer signature verification failed" });
         return this.reject(event, reasons, event.tenant?.tenant_id);
       }

@@ -2,6 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { canonicalJson, type ValidationIssue } from "../contracts/common.js";
 import { validateCapabilityClaims, type CapabilityClaims, type CapabilityToken } from "../contracts/capability.js";
 import type { AllowedAction, PolicyDecision } from "../contracts/policy.js";
+import { GLOBAL_ALWAYS_DENY } from "./policy.js";
 
 export interface ApprovalRecord {
   level: string;
@@ -41,6 +42,13 @@ export class CapabilityService {
     approval: ApprovalRecord,
     nowIso: string,
   ): CapabilityToken {
+    // Defense in depth (06): GLOBAL_ALWAYS_DENY is Sentinel's non-negotiable
+    // floor. It is already enforced when PolicyService builds allowed_actions,
+    // but issue() must not simply trust that a decision object came from
+    // PolicyService — re-checking here means a forged or hand-built decision
+    // still can't mint a capability for a globally forbidden action.
+    const globalDenyReason = GLOBAL_ALWAYS_DENY[action.action_type];
+    if (globalDenyReason) throw new Error(`action "${action.action_type}" is globally denied: ${globalDenyReason}`);
     const allowed = decision.allowed_actions.some((entry) => entry.action_type === action.action_type);
     if (!allowed) throw new Error(`action "${action.action_type}" is not allowed by decision ${decision.policy_decision_id}`);
     if (action.requires_approval !== "policy_allowed" && approval.level !== action.requires_approval) {
@@ -52,6 +60,10 @@ export class CapabilityService {
       jti: `cap_${randomUUID().replaceAll("-", "")}`,
       incident_id: decision.incident_id,
       policy_decision_id: decision.policy_decision_id,
+      policy_id: decision.policy_id,
+      policy_version: decision.policy_version,
+      approver_type: approval.approver_type,
+      approver_id: approval.approver_id,
       action: action.action_type,
       target: targetId,
       scope: action.scope,

@@ -1,8 +1,8 @@
-import { clamp01 } from "../contracts/common.js";
 import type { EventEnvelope } from "../contracts/envelope.js";
 import type { EvidenceRecord } from "../contracts/evidence.js";
 import type { Finding } from "../contracts/finding.js";
-import { eventEvidence, featureEvidence, FeatureService } from "./features.js";
+import { clamp01 } from "../contracts/common.js";
+import { eventEvidence, FeatureService, thresholdBurst } from "./features.js";
 import type { NodeOutput } from "./cost.js";
 
 export const DEVICE_ACTIVATIONS_PER_DAY = "license.device_activations_per_day@1.0.0";
@@ -99,48 +99,26 @@ export class SentinelLicenseNode {
   }
 
   private activationAbuse(events: EventEnvelope[], learnCutoff: number): NodeOutput {
-    const findings: Finding[] = [];
-    const evidence: EvidenceRecord[] = [];
-    const relevant = events.filter((event) => event.event_type === "license.device.activated" && Date.parse(event.occurred_at) >= learnCutoff && event.tenant?.tenant_id);
-    const byAccount = new Map<string, EventEnvelope[]>();
-    for (const event of relevant) {
-      const tenantId = event.tenant?.tenant_id;
-      const key = `${tenantId}|${event.tenant?.account_id ?? tenantId}`;
-      byAccount.set(key, [...(byAccount.get(key) ?? []), event]);
-    }
-    for (const [accountKey, accountEvents] of byAccount) {
-      const last = accountEvents[accountEvents.length - 1];
-      if (!last) continue;
-      const [tenantId, accountId] = accountKey.split("|") as [string, string];
-      const scopeKey = `tenant_id=${tenantId}|account_id=${accountId}`;
-      const window = this.features.evaluateWindow(DEVICE_ACTIVATIONS_PER_DAY, scopeKey, last.occurred_at);
-      if (window.value < this.config.activation_abuse_count) continue;
-      const record = featureEvidence(window, "activations/day", { tenant_id: tenantId, account_id: accountId }, false);
-      evidence.push(record);
-      findings.push({
-        finding_id: this.nextFindingId(),
-        finding_type: "license.activation_abuse",
-        node: { name: this.name, version: this.version },
-        subject: { type: "account", id: accountId },
-        tenant_id: tenantId,
-        window: window.window,
-        risk: { likelihood: clamp01(0.35 + 0.05 * window.value), impact: 0.45, confidence: 0.65, evidence_quality: record.quality.score },
-        evidence_ids: [record.evidence_id],
-        source_event_roots: [record.source_event_root],
-        explanation: {
-          summary: `${window.value} device activations in 24h for this account — possible license sharing or trial abuse.`,
-          top_factors: [{ factor: "device_activation_rate", contribution: 1 }],
-          uncertainties: ["A legitimate fleet rollout or device refresh can raise activations."],
-          observed: window.value,
-          expected: 0,
-        },
-        recommendation: { action_class: "RECOMMEND_ONLY", playbook: "PB-LICENSE-ACTIVATION-01" },
-        expires_at: new Date(Date.parse(last.occurred_at) + 24 * 3600 * 1000).toISOString(),
-        correlation_hints: { account_id: accountId },
-        policy_generated_effect: last.control_lineage?.policy_generated_effect === true,
-      });
-    }
-    return { findings, evidence };
+    return thresholdBurst(this.features, {
+      events,
+      learnCutoff,
+      eventType: "license.device.activated",
+      featureRef: DEVICE_ACTIVATIONS_PER_DAY,
+      threshold: this.config.activation_abuse_count,
+      groupField: "account_id",
+      unit: "activations/day",
+      nextFindingId: () => this.nextFindingId(),
+      node: { name: this.name, version: this.version },
+      findingType: "license.activation_abuse",
+      actionClass: "RECOMMEND_ONLY",
+      playbook: "PB-LICENSE-ACTIVATION-01",
+      likelihood: (count) => clamp01(0.35 + 0.05 * count),
+      impact: 0.45,
+      confidence: 0.65,
+      summarize: (count) => `${count} device activations in 24h for this account — possible license sharing or trial abuse.`,
+      subject: (_tenantId, accountId) => ({ type: "account", id: accountId }),
+      correlationHints: (_tenantId, accountId) => ({ account_id: accountId }),
+    });
   }
 
   private rejectedFinding(event: EventEnvelope, record: EvidenceRecord, tenantId: string, accountId: string): Finding {

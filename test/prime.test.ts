@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SentinelPrime, type Finding } from "../src/index.js";
+import { AGENT_DRIFT_COMPOUND, SentinelPrime, type Finding } from "../src/index.js";
 
 function finding(overrides: Partial<Finding> & { finding_id: string; finding_type: string }): Finding {
   return {
@@ -76,7 +76,8 @@ test("an approved change window lowers risk and preserves the conflict (12 bulk 
   const prime = new SentinelPrime();
   prime.registerChangeWindow({
     tenant_id: "ten_a",
-    account_id: "acct_1",
+    subject_field: "account_id",
+    subject_id: "acct_1",
     start: "2026-06-09T00:00:00.000Z",
     end: "2026-06-10T00:00:00.000Z",
     reason: "approved bulk migration",
@@ -89,6 +90,65 @@ test("an approved change window lowers risk and preserves the conflict (12 bulk 
   assert.ok(incident.conflicts.some((conflict) => conflict.includes("approved_change_window")), "conflict is visible, not hidden");
   assert.ok(incident.risk.likelihood < 0.8, "approved window lowers likelihood below containment thresholds");
   assert.equal(incident.recommended_actions.length, 0, "no containment is recommended during an approved window");
+});
+
+test("an unrecognized incident_type gets no recommended actions, not account-compromise's by accident", () => {
+  const unknownRule = {
+    correlation_id: "prime.test_unknown_compound",
+    version: "1.0.0",
+    subject_field: "account_id" as const,
+    window_ms: 2 * 3600 * 1000,
+    supporting: [
+      { finding_type: "cloud.new_api_key", weight: 0.5 },
+      { finding_type: "cloud.new_region", weight: 0.5 },
+    ],
+    independence: { minimum_groups: 2 },
+    emit: { incident_type: "compound.not_yet_wired", playbook: "PB-TEST-01", title: "Unwired test rule", required_authority: ["forge_command_operator"] },
+  };
+  const prime = new SentinelPrime([unknownRule]);
+  prime.submitFindings([
+    finding({ finding_id: "f_key3", finding_type: "cloud.new_api_key", correlation_hints: { account_id: "acct_1", api_key_fingerprint: "sha256:shouldnotbeused" } }),
+    finding({ finding_id: "f_region3", finding_type: "cloud.new_region", source_event_roots: ["root_f_region3"] }),
+  ]);
+  const incidents = prime.correlate(NOW);
+  assert.equal(incidents.length, 1);
+  const incident = incidents[0]!;
+  assert.equal(incident.incident_type, "compound.not_yet_wired");
+  assert.equal(incident.recommended_actions.length, 0, "no incident_type-specific recommendation logic exists for this rule; it must not fall through to account-compromise's");
+});
+
+test("an approved change window also suppresses containment for a non-account-scoped rule (agent drift)", () => {
+  const prime = new SentinelPrime([AGENT_DRIFT_COMPOUND]);
+  prime.registerChangeWindow({
+    tenant_id: "ten_a",
+    subject_field: "agent_fingerprint",
+    subject_id: "agt_forge-smithy",
+    start: "2026-06-09T00:00:00.000Z",
+    end: "2026-06-10T00:00:00.000Z",
+    reason: "approved sandbox drill",
+    approved_by: "op_17",
+  });
+  prime.submitFindings([
+    finding({
+      finding_id: "f_boundary",
+      finding_type: "agent.boundary_violation",
+      subject: { type: "agent", id: "agt_forge-smithy" },
+      risk: { likelihood: 0.6, impact: 0.6, confidence: 0.75, evidence_quality: 0.9 },
+    }),
+    finding({
+      finding_id: "f_patch",
+      finding_type: "agent.patch_burst",
+      subject: { type: "agent", id: "agt_forge-smithy" },
+      source_event_roots: ["root_f_patch"],
+      risk: { likelihood: 0.6, impact: 0.55, confidence: 0.7, evidence_quality: 0.9 },
+    }),
+  ]);
+  const incidents = prime.correlate(NOW);
+  assert.equal(incidents.length, 1);
+  const incident = incidents[0]!;
+  assert.equal(incident.incident_type, "compound.agent_drift");
+  assert.ok(incident.conflicts.some((conflict) => conflict.includes("approved_change_window")), "conflict is visible, not hidden");
+  assert.equal(incident.recommended_actions.length, 0, "no containment recommended: this rule type is no longer exempt from change-window suppression");
 });
 
 test("duplicate incidents merge while preserving all evidence", () => {

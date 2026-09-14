@@ -1,5 +1,5 @@
 import type { Environment } from "./contracts/envelope.js";
-import type { Finding } from "./contracts/finding.js";
+import { validateFinding, type Finding } from "./contracts/finding.js";
 import type { Incident } from "./contracts/incident.js";
 import type { PolicyDecision } from "./contracts/policy.js";
 import type { EvidenceRecord } from "./contracts/evidence.js";
@@ -287,11 +287,31 @@ export class SentinelRuntime {
     for (const record of evidence) {
       this.ledger.append({ kind: "evidence", gateway_version: "feature-service.1.0.0", validation: "accepted", transformation_version: "1.0.0", ...(record.scope["tenant_id"] !== undefined ? { tenant_id: record.scope["tenant_id"] } : {}), body: record });
     }
+    // Evidence-before-inference (doctrine, CLAUDE.md): a finding without a
+    // valid evidence reference must never reach Prime or shape an incident's
+    // risk. Fail fast and log as a rejection rather than trust a node's
+    // output silently — a detector-node bug is a system fault, not noise to
+    // swallow.
+    const acceptedFindings: Finding[] = [];
     for (const finding of findings) {
-      this.ledger.append({ kind: "finding", gateway_version: "node.1.0.0", validation: "accepted", transformation_version: "1.0.0", tenant_id: finding.tenant_id, body: finding });
+      const validation = validateFinding(finding);
+      if (validation.ok) {
+        acceptedFindings.push(finding);
+        this.ledger.append({ kind: "finding", gateway_version: "node.1.0.0", validation: "accepted", transformation_version: "1.0.0", tenant_id: finding.tenant_id, body: finding });
+      } else {
+        this.ledger.append({
+          kind: "rejection",
+          gateway_version: "node.1.0.0",
+          validation: "rejected",
+          rejection_reasons: validation.issues,
+          transformation_version: "1.0.0",
+          tenant_id: finding.tenant_id,
+          body: finding,
+        });
+      }
     }
 
-    this.prime.submitFindings(findings);
+    this.prime.submitFindings(acceptedFindings);
     const incidents = this.prime.correlate(lastIso);
     for (const incident of incidents) {
       this.ledger.append({ kind: "incident", gateway_version: "prime.1.0.0", validation: "accepted", transformation_version: "1.0.0", tenant_id: incident.subject.tenant_id, body: incident });
@@ -302,6 +322,6 @@ export class SentinelRuntime {
       this.ledger.append({ kind: "policy_decision", gateway_version: "policy.1.0.0", validation: "accepted", transformation_version: "1.0.0", body: decision });
     }
 
-    return { replay, findings, evidence, incidents, decisions, shadow: true };
+    return { replay, findings: acceptedFindings, evidence, incidents, decisions, shadow: true };
   }
 }

@@ -2,7 +2,7 @@ import { clamp01 } from "../contracts/common.js";
 import type { EventEnvelope } from "../contracts/envelope.js";
 import type { EvidenceRecord } from "../contracts/evidence.js";
 import type { Finding } from "../contracts/finding.js";
-import { eventEvidence, featureEvidence, FeatureService } from "./features.js";
+import { eventEvidence, FeatureService, thresholdBurst } from "./features.js";
 import type { NodeOutput } from "./cost.js";
 
 export const LOGIN_FAILURES_15M = "cloud.login_failures_15m@1.0.0";
@@ -132,48 +132,25 @@ export class SentinelCloudNode {
   }
 
   private loginFailureBursts(events: EventEnvelope[], learnCutoff: number): NodeOutput {
-    const findings: Finding[] = [];
-    const evidence: EvidenceRecord[] = [];
-    const failures = events.filter((event) => event.event_type === "identity.login.failed" && Date.parse(event.occurred_at) >= learnCutoff);
-    const byAccount = new Map<string, EventEnvelope[]>();
-    for (const event of failures) {
-      const key = `${event.tenant?.tenant_id}/${event.tenant?.account_id}`;
-      byAccount.set(key, [...(byAccount.get(key) ?? []), event]);
-    }
-    for (const [accountKey, accountFailures] of byAccount) {
-      const last = accountFailures[accountFailures.length - 1];
-      if (!last) continue;
-      const [tenantId, accountId] = accountKey.split("/") as [string, string];
-      const scopeKey = `tenant_id=${tenantId}|account_id=${accountId}`;
-      const window = this.features.evaluateWindow(LOGIN_FAILURES_15M, scopeKey, last.occurred_at);
-      if (window.value >= 5) {
-        const record = featureEvidence(window, "failures/15m", { tenant_id: tenantId, account_id: accountId }, false);
-        evidence.push(record);
-        findings.push({
-          finding_id: this.nextFindingId(),
-          finding_type: "cloud.login_failure_burst",
-          node: { name: this.name, version: this.version },
-          subject: { type: "account", id: accountId },
-          tenant_id: tenantId,
-          window: window.window,
-          risk: { likelihood: clamp01(0.4 + 0.03 * window.value), impact: 0.5, confidence: 0.7, evidence_quality: record.quality.score },
-          evidence_ids: [record.evidence_id],
-          source_event_roots: [record.source_event_root],
-          explanation: {
-            summary: `${window.value} failed logins within 15 minutes for this account.`,
-            top_factors: [{ factor: "login_failure_burst", contribution: 1 }],
-            uncertainties: ["Could be a user with a forgotten password rather than credential stuffing."],
-            observed: window.value,
-            expected: 0,
-          },
-          recommendation: { action_class: "RECOMMEND_ONLY" },
-          expires_at: new Date(Date.parse(last.occurred_at) + 24 * 3600 * 1000).toISOString(),
-          correlation_hints: { account_id: accountId },
-          policy_generated_effect: false,
-        });
-      }
-    }
-    return { findings, evidence };
+    return thresholdBurst(this.features, {
+      events,
+      learnCutoff,
+      eventType: "identity.login.failed",
+      featureRef: LOGIN_FAILURES_15M,
+      threshold: 5,
+      groupField: "account_id",
+      unit: "failures/15m",
+      nextFindingId: () => this.nextFindingId(),
+      node: { name: this.name, version: this.version },
+      findingType: "cloud.login_failure_burst",
+      actionClass: "RECOMMEND_ONLY",
+      likelihood: (count) => clamp01(0.4 + 0.03 * count),
+      impact: 0.5,
+      confidence: 0.7,
+      summarize: (count) => `${count} failed logins within 15 minutes for this account.`,
+      subject: (_tenantId, accountId) => ({ type: "account", id: accountId }),
+      correlationHints: (_tenantId, accountId) => ({ account_id: accountId }),
+    });
   }
 
   /**

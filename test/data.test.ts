@@ -55,6 +55,11 @@ test("egress anomaly: an export spike in one hour raises a REQUEST_OPERATOR find
   assert.equal(validateFinding(egress[0]!).ok, true, JSON.stringify(validateFinding(egress[0]!).issues));
   assert.equal(egress[0]!.recommendation.action_class, "REQUEST_OPERATOR");
   assert.equal(egress[0]!.recommendation.playbook, "PB-DATA-EGRESS-01");
+  assert.equal(
+    egress[0]!.correlation_hints.destination,
+    "external",
+    "carries the triggering export's destination so a downstream data_exfiltration incident can recommend an exact-destination block",
+  );
 });
 
 test("a handful of exports does not fire", () => {
