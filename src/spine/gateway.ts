@@ -16,15 +16,20 @@ export interface IngestResult {
 }
 
 /**
- * Idempotency key per 04: producer, native event ID, event type, subject,
- * time bucket, and payload hash. Distinct security events are never
- * collapsed because their text looks similar.
+ * Idempotency key per 04: producer, tenant, native event ID, event type,
+ * subject, time bucket, and payload hash. Distinct security events are never
+ * collapsed because their text looks similar. Tenant is included even though
+ * producers register once per service, not per tenant (finding 2026-09-19):
+ * without it, a same-hour event-id/subject/payload-hash collision from two
+ * different tenants behind one producer would return the *other* tenant's
+ * ledger record as a "duplicate".
  */
 export function dedupeKey(event: EventEnvelope): string {
   const bucket = Math.floor(Date.parse(event.occurred_at) / (60 * 60 * 1000));
   return sha256Hex(
     [
       event.producer.service,
+      event.tenant?.tenant_id ?? "",
       event.event_id,
       event.event_type,
       `${event.subject.subject_type}:${event.subject.subject_id}`,

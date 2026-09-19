@@ -49,10 +49,17 @@ export class CapabilityService {
     // still can't mint a capability for a globally forbidden action.
     const globalDenyReason = GLOBAL_ALWAYS_DENY[action.action_type];
     if (globalDenyReason) throw new Error(`action "${action.action_type}" is globally denied: ${globalDenyReason}`);
-    const allowed = decision.allowed_actions.some((entry) => entry.action_type === action.action_type);
-    if (!allowed) throw new Error(`action "${action.action_type}" is not allowed by decision ${decision.policy_decision_id}`);
-    if (action.requires_approval !== "policy_allowed" && approval.level !== action.requires_approval) {
-      throw new Error(`action "${action.action_type}" requires ${action.requires_approval} approval, got ${approval.level}`);
+    // Trust boundary (finding 2026-09-19): `action` is caller-supplied, so
+    // only `action_type` is used, purely as a lookup key into the policy
+    // decision's own `allowed_actions`. Every field actually signed into the
+    // capability below comes from that matched, trusted entry -- never from
+    // the caller's copy -- so a hand-built `action` with a wider scope,
+    // longer expiry, or a weaker `requires_approval` can't smuggle those
+    // values into a validly-signed token.
+    const entry = decision.allowed_actions.find((candidate) => candidate.action_type === action.action_type);
+    if (!entry) throw new Error(`action "${action.action_type}" is not allowed by decision ${decision.policy_decision_id}`);
+    if (entry.requires_approval !== "policy_allowed" && approval.level !== entry.requires_approval) {
+      throw new Error(`action "${entry.action_type}" requires ${entry.requires_approval} approval, got ${approval.level}`);
     }
     const claims: CapabilityClaims = {
       iss: this.issuer,
@@ -64,12 +71,12 @@ export class CapabilityService {
       policy_version: decision.policy_version,
       approver_type: approval.approver_type,
       approver_id: approval.approver_id,
-      action: action.action_type,
+      action: entry.action_type,
       target: targetId,
-      scope: action.scope,
+      scope: entry.scope,
       max_attempts: 1,
-      rollback_required: action.reversible,
-      exp: Math.floor(Date.parse(nowIso) / 1000) + action.expires_in_seconds,
+      rollback_required: entry.reversible,
+      exp: Math.floor(Date.parse(nowIso) / 1000) + entry.expires_in_seconds,
     };
     return { claims, signature: this.sign(claims), signature_key_id: this.keyId };
   }

@@ -1,4 +1,3 @@
-import type { ActionReceipt } from "../contracts/receipt.js";
 import { CapabilityValidatedAuthority, type PresentedAction } from "./authority-base.js";
 
 /**
@@ -66,41 +65,25 @@ export class YellowJacketAuthority extends CapabilityValidatedAuthority {
     return { result, before, after, rollback_action };
   }
 
-  /** Re-enable path: receipted rollback of a quarantine. */
-  rollback(original: ActionReceipt, nowIso: string): ActionReceipt {
-    if (!original.rollback.supported || original.rollback.action_type !== "yellowjacket.agent_version.reenable") {
-      throw new Error(`receipt ${original.receipt_id} does not support rollback`);
-    }
-    const target = original.action.target_id;
+  /** Re-enable path: applies a validated rollback of a quarantine (capability-checked by the base class). */
+  protected applyRollback(action: string, target: string) {
     const before: Record<string, unknown> = {};
     const after: Record<string, unknown> = {};
     let result: "success" | "failure" = "success";
-    const state = this.agentVersions.get(target);
-    if (state === undefined) {
-      result = "failure";
+
+    if (action === "yellowjacket.agent_version.reenable") {
+      const state = this.agentVersions.get(target);
+      if (state === undefined) {
+        result = "failure";
+      } else {
+        before["agent_version_state"] = state;
+        this.agentVersions.set(target, "active");
+        after["agent_version_state"] = "active";
+      }
     } else {
-      before["agent_version_state"] = state;
-      this.agentVersions.set(target, "active");
-      after["agent_version_state"] = "active";
+      result = "failure";
     }
-    return this.receipts.create(
-      {
-        receipt_type: "sentinel.rollback",
-        incident_id: original.incident_id,
-        decision: original.decision,
-        action: {
-          requested: "yellowjacket.agent_version.reenable",
-          executed: result === "success" ? "yellowjacket.agent_version.reenable" : null,
-          target_id: target,
-          scope: original.action.scope,
-          result: result === "success" ? "rolled_back" : "failure",
-        },
-        before_state: before,
-        after_state: after,
-        rollback: { supported: false, rollback_of: original.receipt_id },
-        ...(original.control_lineage !== undefined ? { control_lineage: original.control_lineage } : {}),
-      },
-      nowIso,
-    );
+
+    return { result, before, after };
   }
 }

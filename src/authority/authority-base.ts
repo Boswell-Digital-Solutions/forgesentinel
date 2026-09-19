@@ -17,6 +17,12 @@ interface AppliedAction {
   rollback_action: string | undefined;
 }
 
+interface AppliedRollback {
+  result: "success" | "failure";
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+}
+
 /**
  * Shared skeleton for capability-validated authority adapters (02): validate
  * the presented action against its capability, apply exactly the approved
@@ -38,6 +44,9 @@ export abstract class CapabilityValidatedAuthority {
 
   /** Applies the presented action's state transition; never receipts directly. */
   protected abstract applyAction(presented: PresentedAction): AppliedAction;
+
+  /** Applies a rollback's state transition once its capability has validated; never receipts directly. */
+  protected abstract applyRollback(action: string, target: string): AppliedRollback;
 
   private decisionFor(token: CapabilityToken): ActionReceipt["decision"] {
     return {
@@ -97,6 +106,65 @@ export abstract class CapabilityValidatedAuthority {
         after_state: after,
         rollback: rollback_action ? { supported: true, action_type: rollback_action } : { supported: false },
         control_lineage: { policy_decision_id: token.claims.policy_decision_id },
+      },
+      nowIso,
+    );
+  }
+
+  /**
+   * Rollback is itself a capability-validated action (finding 2026-09-19:
+   * the original receipt is caller-supplied and TypeScript types don't exist
+   * at runtime, so it must never be trusted on its own — a fresh capability,
+   * scoped to the receipt's own declared rollback action/target, is required
+   * exactly as `execute()` requires one for the forward action).
+   */
+  rollback(token: CapabilityToken, original: ActionReceipt, nowIso: string): ActionReceipt {
+    if (!original.rollback.supported || !original.rollback.action_type) {
+      throw new Error(`receipt ${original.receipt_id} does not support rollback`);
+    }
+    const action = original.rollback.action_type;
+    const target = original.action.target_id;
+    const presented: PresentedAction = { action, target, scope: original.action.scope };
+    const validation = this.capabilities.validate(token, { audience: this.audience, ...presented }, nowIso);
+
+    if (!validation.ok) {
+      return this.receipts.create(
+        {
+          receipt_type: "sentinel.rollback",
+          incident_id: original.incident_id,
+          decision: original.decision,
+          action: {
+            requested: action,
+            executed: null,
+            target_id: target,
+            scope: original.action.scope,
+            result: "rejected",
+            failure_reason: validation.issues.map((issue) => `${issue.code}: ${issue.message}`).join("; "),
+          },
+          rollback: { supported: false, rollback_of: original.receipt_id },
+          ...(original.control_lineage !== undefined ? { control_lineage: original.control_lineage } : {}),
+        },
+        nowIso,
+      );
+    }
+
+    const { result, before, after } = this.applyRollback(action, target);
+    return this.receipts.create(
+      {
+        receipt_type: "sentinel.rollback",
+        incident_id: original.incident_id,
+        decision: original.decision,
+        action: {
+          requested: action,
+          executed: result === "success" ? action : null,
+          target_id: target,
+          scope: original.action.scope,
+          result: result === "success" ? "rolled_back" : "failure",
+        },
+        before_state: before,
+        after_state: after,
+        rollback: { supported: false, rollback_of: original.receipt_id },
+        ...(original.control_lineage !== undefined ? { control_lineage: original.control_lineage } : {}),
       },
       nowIso,
     );
