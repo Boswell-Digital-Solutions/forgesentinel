@@ -165,6 +165,28 @@ test("tenant-scoped producer must carry tenant", () => {
   assert.ok(result.reasons.some((reason) => reason.code === "tenant_required"));
 });
 
+test("dedupe key includes tenant: identical event_id/subject/payload from two tenants never collapse (2026-09-19 finding)", () => {
+  const { gateway, ledger, producers } = setup();
+  const usage = producers["usage-metering"]!;
+  const shared = {
+    event_id: "evt_shared_1",
+    event_type: "usage.tokens.recorded",
+    occurred_at: "2026-06-09T12:00:00.000Z",
+    actor: { actor_type: "service" as const, actor_id: "neuroforge-gateway" },
+    subject: { subject_type: "account" as const, subject_id: "acct_1" },
+    correlation: { trace_id: "trc_shared" },
+    payload: { total_tokens: 1000, route_class: "general_cloud" },
+  };
+  const tenantA = buildEvent(usage, { ...shared, tenant: { tenant_id: "ten_a" } });
+  const tenantB = buildEvent(usage, { ...shared, tenant: { tenant_id: "ten_b" } });
+  const resultA = gateway.ingest(tenantA.event, tenantA.credential);
+  const resultB = gateway.ingest(tenantB.event, tenantB.credential);
+  assert.equal(resultA.status, "accepted");
+  assert.equal(resultB.status, "accepted", "a same-hour collision from a different tenant must not read back as the other tenant's record");
+  assert.notEqual(resultA.dedupe_key, resultB.dedupe_key);
+  assert.equal(ledger.events().length, 2);
+});
+
 test("non-canonical ad hoc event types are rejected", () => {
   const { gateway, producers } = setup();
   const usage = producers["usage-metering"]!;

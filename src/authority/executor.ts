@@ -1,4 +1,3 @@
-import type { ActionReceipt } from "../contracts/receipt.js";
 import { CapabilityValidatedAuthority, type PresentedAction } from "./authority-base.js";
 
 /**
@@ -68,13 +67,8 @@ export class IdentityAuthority extends CapabilityValidatedAuthority {
     return { result, before, after, rollback_action };
   }
 
-  /** Rollback is itself a receipted action referencing what it reverses. */
-  rollback(original: ActionReceipt, nowIso: string): ActionReceipt {
-    if (!original.rollback.supported || !original.rollback.action_type) {
-      throw new Error(`receipt ${original.receipt_id} does not support rollback`);
-    }
-    const action = original.rollback.action_type;
-    const target = original.action.target_id;
+  /** Applies a validated rollback's state transition (capability-checked by the base class). */
+  protected applyRollback(action: string, target: string) {
     const before: Record<string, unknown> = {};
     const after: Record<string, unknown> = {};
     let result: "success" | "failure" = "success";
@@ -96,24 +90,6 @@ export class IdentityAuthority extends CapabilityValidatedAuthority {
       result = "failure";
     }
 
-    return this.receipts.create(
-      {
-        receipt_type: "sentinel.rollback",
-        incident_id: original.incident_id,
-        decision: original.decision,
-        action: {
-          requested: action,
-          executed: result === "success" ? action : null,
-          target_id: target,
-          scope: original.action.scope,
-          result: result === "success" ? "rolled_back" : "failure",
-        },
-        before_state: before,
-        after_state: after,
-        rollback: { supported: false, rollback_of: original.receipt_id },
-        ...(original.control_lineage !== undefined ? { control_lineage: original.control_lineage } : {}),
-      },
-      nowIso,
-    );
+    return { result, before, after };
   }
 }

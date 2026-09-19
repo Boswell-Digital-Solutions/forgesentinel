@@ -31,6 +31,11 @@ const decision: PolicyDecision = {
 };
 const pauseAction: AllowedAction = decision.allowed_actions[0]!;
 const operatorApproval: ApprovalRecord = { level: "single_operator", approver_type: "operator", approver_id: "op_17", approved_at: NOW };
+const rollbackDecision: PolicyDecision = {
+  ...decision,
+  allowed_actions: [{ action_type: "identity.api_key.resume", scope: "single_key", expires_in_seconds: 900, requires_approval: "single_operator", reversible: false }],
+};
+const resumeAction: AllowedAction = rollbackDecision.allowed_actions[0]!;
 
 function setup() {
   const ledger = new EvidenceLedger();
@@ -52,11 +57,38 @@ test("approved action executes with receipt, then rollback restores state with i
   assert.equal(receipt.rollback.action_type, "identity.api_key.resume");
   assert.equal(validateActionReceipt(receipt).ok, true, "receipt satisfies the contract");
 
-  const rollbackReceipt = authority.rollback(receipt, "2026-06-09T18:00:00.000Z");
+  const rollbackAt = "2026-06-09T18:00:00.000Z";
+  const rollbackToken = capabilities.issue(rollbackDecision, resumeAction, KEY_FP, "identity-service", operatorApproval, rollbackAt);
+  const rollbackReceipt = authority.rollback(rollbackToken, receipt, rollbackAt);
   assert.equal(rollbackReceipt.action.result, "rolled_back");
   assert.equal(authority.keyState(KEY_FP), "active");
   assert.equal(rollbackReceipt.rollback.rollback_of, receipt.receipt_id);
   assert.equal(receipts.byIncident("inc_t1").length, 2, "every attempt has a receipt");
+});
+
+test("rollback without a valid capability is rejected, not trusted from the caller-supplied receipt (2026-09-19 finding)", () => {
+  const { authority, capabilities, receipts } = setup();
+  const token = capabilities.issue(decision, pauseAction, KEY_FP, "identity-service", operatorApproval, NOW);
+  const receipt = authority.execute(token, { action: "identity.api_key.pause", target: KEY_FP, scope: "single_key" }, NOW);
+  assert.equal(authority.keyState(KEY_FP), "paused");
+
+  // No capability was ever issued for the rollback action -- a forged token
+  // referencing it must be rejected, and the state must not change.
+  const forgedToken = { ...capabilities.issue(rollbackDecision, resumeAction, KEY_FP, "identity-service", operatorApproval, NOW), signature: "0".repeat(64) };
+  const rejected = authority.rollback(forgedToken, receipt, "2026-06-09T18:00:00.000Z");
+  assert.equal(rejected.action.result, "rejected");
+  assert.match(rejected.action.failure_reason ?? "", /signature_invalid/);
+  assert.equal(authority.keyState(KEY_FP), "paused", "no state change from an unauthenticated rollback attempt");
+  assert.equal(receipts.byIncident("inc_t1").length, 2, "the rejected rollback attempt is still receipted");
+});
+
+test("capability issue() signs the matched decision entry's own fields, not the caller-supplied action object (2026-09-19 finding)", () => {
+  const { capabilities } = setup();
+  const forged: AllowedAction = { ...pauseAction, scope: "all_keys", expires_in_seconds: 999999, reversible: false, requires_approval: "policy_allowed" };
+  const token = capabilities.issue(decision, forged, KEY_FP, "identity-service", operatorApproval, NOW);
+  assert.equal(token.claims.scope, pauseAction.scope, "scope comes from the trusted decision entry, not the caller's forged copy");
+  assert.equal(token.claims.exp, Math.floor(Date.parse(NOW) / 1000) + pauseAction.expires_in_seconds, "expiry comes from the trusted decision entry");
+  assert.equal(token.claims.rollback_required, pauseAction.reversible, "reversible comes from the trusted decision entry");
 });
 
 test("receipt reflects the real decision/approval, not a hardcoded literal", () => {

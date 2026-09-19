@@ -3,7 +3,7 @@
 This document tracks known issues in the Forge Sentinel repository. Record a
 finding here in the same session that you find it. Chat is not durable.
 
-## Authority-layer findings from a fresh security review — 2026-09-19
+## Authority-layer findings from a fresh security review — CLOSED 2026-09-19
 
 A security review (a fresh pass, distinct from the 17 findings PR #14 already fixed on
 2026-09-14) found three real gaps in the capability/executor/gateway layer. All three
@@ -24,7 +24,13 @@ system exists to enforce.
   (`src/authority/cssa-control.ts:192`) does this correctly — it accepts only an opaque
   ID and looks up its own trusted internal state. `IdentityAuthority`/`YellowJacketAuthority`
   should do the same instead of trusting the caller's object.
-  **Status: OPEN.**
+  **Status: FIXED.** `CapabilityValidatedAuthority.rollback()` (`src/authority/authority-base.ts`)
+  now requires a capability token, validated the same way `execute()` validates one for the
+  forward action, scoped to the receipt's own declared rollback action/target. The two
+  adapters no longer implement `rollback()` themselves — they implement only the state
+  transition (`applyRollback()`); the capability check and receipt shape live once in the
+  base class. Covered by `test/capability.test.ts` ("rollback without a valid capability is
+  rejected...").
 
 - **`CapabilityService.issue()` signs caller-supplied fields it never validates.**
   `src/authority/capability.ts:39-72`: it checks that `action.action_type` exists in
@@ -38,7 +44,11 @@ system exists to enforce.
   catch this. Same trust-boundary class PR #14 partially hardened for `GLOBAL_ALWAYS_DENY`
   in this same function, left incomplete for every other field. Not reachable from any
   code in this repo today — only an external operator-console caller would trigger it.
-  **Status: OPEN.**
+  **Status: FIXED.** `issue()` now uses `action.action_type` only as a lookup key into
+  `decision.allowed_actions`; every field actually signed into the capability (`scope`,
+  `expires_in_seconds`, `reversible`, and the `requires_approval` check) comes from that
+  matched, trusted entry, never from the caller's copy. Covered by `test/capability.test.ts`
+  ("capability issue() signs the matched decision entry's own fields...").
 
 - **Gateway dedupe key omits `tenant_id`.** `dedupeKey()`, `src/spine/gateway.ts:23-35`:
   the idempotency key is `producer.service | event_id | event_type | subject |
@@ -48,7 +58,10 @@ system exists to enforce.
   `status: "duplicate"` with `record` pointing at the *other* tenant's ledger entry —
   a real gap against this file's own tenant-isolation invariant, though it requires an
   ID collision from an already-trusted producer to trigger. No test covers this path.
-  **Status: OPEN.**
+  **Status: FIXED.** `dedupeKey()` now includes `event.tenant?.tenant_id` in the hashed
+  key. Covered by `test/gateway.test.ts` ("dedupe key includes tenant...").
+
+**Verification**: `npm test` passes — 294 of 294 tests, exit 0.
 
 ---
 
@@ -93,4 +106,4 @@ items below are fixed.
 
 ---
 
-_Last updated: 2026-09-14_
+_Last updated: 2026-09-19_
