@@ -21,7 +21,8 @@ Forge Sentinel is a governed security-intelligence fabric for the Forge ecosyste
 - `src/spine/` — Wave 1 evidence spine: producer auth, signature checks, schema/version rejection, tenant isolation, idempotency (`gateway.ts`); append-only evidence ledger with corrections and WAL persistence (`ledger.ts`)
 - `src/intel/` — features/baselines, Sentinel-Cost (shadow), Sentinel-Cloud (shadow), and Sentinel Prime (deterministic compound correlation)
 - `src/authority/` — policy decision point (`policy.ts`), capability tokens/executor/receipts (`capability.ts`, `executor.ts`, `receipts.ts`), CSSA control issuer/registry (`cssa-control.ts`)
-- `src/runtime.ts` — modular-monolith wiring for the shadow pipeline; `src/cli.ts` — replay/validate CLI
+- `src/watchdog/` — the CSSA decisions watchdog: deterministic detectors over DataForge's `cloud-security` decisions ledger (`decisions.ts`), durable cursor/detector-state persistence (`worker_state.ts`), and the supervised no-inbound poller (`cssa_worker.ts`, run via `sentinel watch-cssa`)
+- `src/runtime.ts` — modular-monolith wiring for the shadow pipeline (`runShadow` for fixture replay, `ingestSourceFindings` for a live source like the CSSA watchdog); `src/cli.ts` — replay/validate/watch-cssa CLI
 - `fixtures/golden/` — cross-language golden contract fixtures + manifest; `fixtures/replay/` — deterministic end-to-end scenario fixtures (JSONL)
 - `test/` — exit-gate tests covering contracts, gateway, ledger, baselines, prime, policy, capability, CSSA, and end-to-end replay
 - `docs/plans/` — the integrated plan set (source of truth for design intent); `docs/sentinel/implementation-status.md` — implementation status by wave/epic

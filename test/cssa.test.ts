@@ -116,21 +116,23 @@ test("CSSA watchdog finding maps to a source finding without seizing incident li
     schema_version: CLOUD_SECURITY_FINDING_SCHEMA,
     finding_id: "wd_001",
     detector: "broker_bypass_attempt",
-    detected_at: NOW,
-    tenant_id: "ten_demo",
-    subject: { type: "executor", id: "agt_01" },
-    threshold: "any_bypass",
-    policy_bundle_id: "bundle_42",
-    evidence_refs: ["cssa_rec_991"],
-    record_hashes: ["sha256:aa"],
-    originating_scope: "cssa_gate",
-    severity_hint: 0.8,
+    severity: "S3",
+    scope: { tenant_id: "ten_demo", executor_id: "agt_01" },
+    window: { from: "2026-06-09T17:00:00.000Z", to: NOW },
+    evidence_refs: ["dataforge:cssa_decision:dec_991"],
+    metrics: { observed: 4, baseline: 2, threshold: 3 },
+    reason_codes: ["CSSA_WATCHDOG_DENIAL_STREAK"],
+    summary: "4 block/quarantine decisions for executor agt_01 within 15m (threshold 3).",
+    emitted_at: NOW,
+    expires_at: "2026-06-10T17:10:00.000Z",
+    finding_hash: `sha256:${"a".repeat(64)}`,
   };
-  assert.equal(validateCloudSecurityFinding(watchdog).ok, true);
+  assert.equal(validateCloudSecurityFinding(watchdog).ok, true, JSON.stringify(validateCloudSecurityFinding(watchdog).issues));
   const sourceFinding = cssaFindingToSourceFinding(watchdog, NOW);
   assert.equal(validateFinding(sourceFinding).ok, true, "adapter output satisfies the Sentinel finding contract");
   assert.equal(sourceFinding.finding_type, "cssa.broker_bypass_attempt");
   assert.equal(sourceFinding.recommendation.action_class, "RECOMMEND_ONLY", "a source finding recommends, it does not enforce");
+  assert.equal(sourceFinding.policy_generated_effect, false);
 
   const legacy = { ...watchdog, schema_version: "SecurityIncident.v1" };
   assert.equal(validateCloudSecurityFinding(legacy).ok, false, "legacy incidents cannot enter as canonical findings");

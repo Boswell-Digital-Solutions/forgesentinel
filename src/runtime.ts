@@ -43,6 +43,19 @@ export interface ShadowReport {
 }
 
 /**
+ * Result of feeding already-formed findings straight to Prime, bypassing
+ * `runShadow`'s fixture-replay/detector-node path -- there is no separate
+ * `evidence` array here because the caller's own findings already carry
+ * their evidence references (`evidence_ids`/`source_event_roots`).
+ */
+export interface IngestReport {
+  findings: Finding[];
+  incidents: Incident[];
+  decisions: PolicyDecision[];
+  shadow: true;
+}
+
+/**
  * Modular-monolith wiring for the MVP slice (ADR-024). Nodes run in shadow:
  * the pipeline ends at policy decisions; nothing here holds authority
  * credentials or executes actions.
@@ -287,6 +300,36 @@ export class SentinelRuntime {
     for (const record of evidence) {
       this.ledger.append({ kind: "evidence", gateway_version: "feature-service.1.0.0", validation: "accepted", transformation_version: "1.0.0", ...(record.scope["tenant_id"] !== undefined ? { tenant_id: record.scope["tenant_id"] } : {}), body: record });
     }
+    const { acceptedFindings, incidents, decisions } = this.commitFindings(findings, lastIso, "node.1.0.0");
+    return { replay, findings: acceptedFindings, evidence, incidents, decisions, shadow: true };
+  }
+
+  /**
+   * Feed already-formed SOURCE findings (e.g. the CSSA decision watchdog's
+   * output, via `cssaFindingToSourceFinding`) straight to Prime, bypassing
+   * `runShadow`'s fixture-replay/detector-node path entirely -- there is no
+   * `ReplayLine[]` batch to rebuild ledger/gateway state from here, just
+   * findings a caller already produced from a live source. Evidence-before-
+   * inference (doctrine, CLAUDE.md) is still enforced: an invalid finding is
+   * rejected, not silently dropped or trusted.
+   */
+  ingestSourceFindings(findings: Finding[], nowIso: string): IngestReport {
+    const { acceptedFindings, incidents, decisions } = this.commitFindings(findings, nowIso, "watchdog.1.0.0");
+    return { findings: acceptedFindings, incidents, decisions, shadow: true };
+  }
+
+  /**
+   * Shared tail: validate -> ledger-append -> Prime.submitFindings -> correlate
+   * -> policy evaluate -> ledger-append. Both `runShadow` (detector-node
+   * findings) and `ingestSourceFindings` (pre-formed source findings) funnel
+   * through here so the evidence-before-inference and correlation/policy
+   * behavior never diverges between the two entry points.
+   */
+  private commitFindings(
+    findings: Finding[],
+    nowIso: string,
+    gatewayVersion: string,
+  ): { acceptedFindings: Finding[]; incidents: Incident[]; decisions: PolicyDecision[] } {
     // Evidence-before-inference (doctrine, CLAUDE.md): a finding without a
     // valid evidence reference must never reach Prime or shape an incident's
     // risk. Fail fast and log as a rejection rather than trust a node's
@@ -297,11 +340,11 @@ export class SentinelRuntime {
       const validation = validateFinding(finding);
       if (validation.ok) {
         acceptedFindings.push(finding);
-        this.ledger.append({ kind: "finding", gateway_version: "node.1.0.0", validation: "accepted", transformation_version: "1.0.0", tenant_id: finding.tenant_id, body: finding });
+        this.ledger.append({ kind: "finding", gateway_version: gatewayVersion, validation: "accepted", transformation_version: "1.0.0", tenant_id: finding.tenant_id, body: finding });
       } else {
         this.ledger.append({
           kind: "rejection",
-          gateway_version: "node.1.0.0",
+          gateway_version: gatewayVersion,
           validation: "rejected",
           rejection_reasons: validation.issues,
           transformation_version: "1.0.0",
@@ -312,16 +355,16 @@ export class SentinelRuntime {
     }
 
     this.prime.submitFindings(acceptedFindings);
-    const incidents = this.prime.correlate(lastIso);
+    const incidents = this.prime.correlate(nowIso);
     for (const incident of incidents) {
       this.ledger.append({ kind: "incident", gateway_version: "prime.1.0.0", validation: "accepted", transformation_version: "1.0.0", tenant_id: incident.subject.tenant_id, body: incident });
     }
 
-    const decisions = incidents.map((incident) => this.policy.evaluate(incident, { environment: this.environment }, lastIso));
+    const decisions = incidents.map((incident) => this.policy.evaluate(incident, { environment: this.environment }, nowIso));
     for (const decision of decisions) {
       this.ledger.append({ kind: "policy_decision", gateway_version: "policy.1.0.0", validation: "accepted", transformation_version: "1.0.0", body: decision });
     }
 
-    return { replay, findings: acceptedFindings, evidence, incidents, decisions, shadow: true };
+    return { acceptedFindings, incidents, decisions };
   }
 }

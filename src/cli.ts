@@ -8,6 +8,9 @@ import { validateControlDirectiveShape } from "./contracts/cssa.js";
 import type { ValidationResult } from "./contracts/common.js";
 import { loadReplayFile } from "./spine/replay.js";
 import { SentinelRuntime } from "./runtime.js";
+import { DataForgeCssaClient } from "./spine/dataforge_cssa_client.js";
+import { CssaWatchWorker } from "./watchdog/cssa_worker.js";
+import { CssaWorkerStateStore } from "./watchdog/worker_state.js";
 
 const VALIDATORS: Record<string, (value: unknown) => ValidationResult> = {
   event: validateEventEnvelope,
@@ -25,6 +28,12 @@ Usage:
                                              Contracts: ${Object.keys(VALIDATORS).join(", ")}
   sentinel replay <fixture.jsonl>            Replay an event fixture through the full
                                              shadow pipeline and print the report.
+  sentinel watch-cssa [--once]               Poll DataForge's CSSA decisions ledger and run
+                                             the denial-streak/quota-burst detectors, shadow
+                                             only. Requires DATAFORGE_BASE_URL and
+                                             DATAFORGE_CSSA_TOKEN. --once runs a single poll
+                                             cycle, prints status, and exits (exit 1 on error)
+                                             instead of looping forever.
 `);
   process.exit(2);
 }
@@ -89,6 +98,27 @@ if (command === "validate") {
     }
   }
   console.log("\nSHADOW MODE: no actions were executed; findings and decisions are advisory evidence only.");
+} else if (command === "watch-cssa") {
+  const baseUrl = process.env["DATAFORGE_BASE_URL"];
+  const bearerToken = process.env["DATAFORGE_CSSA_TOKEN"];
+  if (!baseUrl || !bearerToken) {
+    console.error("watch-cssa requires DATAFORGE_BASE_URL and DATAFORGE_CSSA_TOKEN environment variables (no credential is baked in).");
+    process.exit(2);
+  }
+  const statePath = process.env["CSSA_WORKER_STATE_PATH"] ?? ".forgesentinel/cssa-worker-state.json";
+  const worker = new CssaWatchWorker({
+    client: new DataForgeCssaClient({ baseUrl, bearerToken }),
+    runtime: new SentinelRuntime("production"),
+    stateStore: new CssaWorkerStateStore(statePath),
+  });
+  if (args.includes("--once")) {
+    await worker.pollOnce();
+    const status = worker.currentStatus();
+    console.log(JSON.stringify(status, null, 2));
+    process.exit(status.lastError ? 1 : 0);
+  } else {
+    await worker.run();
+  }
 } else {
   usage();
 }
