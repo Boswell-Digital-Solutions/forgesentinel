@@ -93,6 +93,62 @@ export interface ApprovedChangeWindow {
   approved_by: string;
 }
 
+/** One finding_type promoted to a standalone, confidence-capped incident when it never joins a compound rule (see `promoteSingles`). */
+interface SingletonPromotionRule {
+  finding_type: string;
+  incident_type: string;
+  title: string;
+  required_authority: string[];
+  missing_telemetry: string;
+  briefing: (finding: Finding) => Incident["briefing"];
+}
+
+const SINGLETON_PROMOTIONS: SingletonPromotionRule[] = [
+  {
+    finding_type: "cost.usage_change_extreme",
+    incident_type: "cost.usage_runaway",
+    title: "Unusual usage growth on one account",
+    required_authority: ["forge_command_operator"],
+    missing_telemetry: "identity telemetry did not corroborate; treat as cost-only signal",
+    briefing: (finding) => ({
+      issue: finding.explanation.summary,
+      where: `Account ${finding.subject.id} (tenant ${finding.tenant_id}).`,
+      recommended_fix: "Monitor and request workload context from the account owner. No suspension is justified by usage alone.",
+      why_now: "A single independent signal crossed the extreme-change threshold.",
+    }),
+  },
+  // The CSSA decisions-watchdog finding_types (src/watchdog/decisions.ts):
+  // decisions-only, shadow-only per Charlie's 2026-09-20 ruling, so these
+  // stay a lone-signal watch, not a compound CorrelationRule, until a second
+  // CSSA-sourced finding_type exists to correlate against.
+  {
+    finding_type: "cssa.denial_streak",
+    incident_type: "cssa.denial_streak_watch",
+    title: "Repeated policy denials for one principal",
+    required_authority: ["forge_command_operator"],
+    missing_telemetry: "no corroborating signal from another node; treat as a decisions-only signal",
+    briefing: (finding) => ({
+      issue: finding.explanation.summary,
+      where: `Principal ${finding.subject.id} (tenant ${finding.tenant_id}).`,
+      recommended_fix: "Review the denied attempts with the principal's owning team. A single decisions-only signal does not justify containment by itself.",
+      why_now: "A single independent signal crossed the denial-streak threshold.",
+    }),
+  },
+  {
+    finding_type: "cssa.quota_exceeded_burst",
+    incident_type: "cssa.quota_exceeded_watch",
+    title: "Repeated quota-exceeded decisions for one principal",
+    required_authority: ["forge_command_operator"],
+    missing_telemetry: "no corroborating signal from another node; treat as a decisions-only signal",
+    briefing: (finding) => ({
+      issue: finding.explanation.summary,
+      where: `Principal ${finding.subject.id} (tenant ${finding.tenant_id}).`,
+      recommended_fix: "Review usage against the principal's quota with the owning team. A single decisions-only signal does not justify containment by itself.",
+      why_now: "A single independent signal crossed the quota-exceeded-burst threshold.",
+    }),
+  },
+];
+
 /**
  * Sentinel Prime (03, SNT-200) — deterministic correlation MVP (ADR-018).
  * Prime correlates findings into incidents, tracks evidence independence,
@@ -336,9 +392,11 @@ export class SentinelPrime {
   }
 
   /**
-   * Deterministic single-finding promotion: a strong cost finding becomes a
-   * monitor-priority incident, but a single source caps confidence — a usage
-   * spike alone never reaches suspension thresholds (12 core scenarios).
+   * Deterministic single-finding promotion: a strong finding of a registered
+   * type becomes a monitor-priority incident on its own, but a single source
+   * caps confidence — one signal alone never reaches suspension thresholds
+   * (12 core scenarios). Extend `SINGLETON_PROMOTIONS` to wire a new
+   * finding_type in rather than adding a second near-identical loop.
    */
   private promoteSingles(nowIso: string): Incident[] {
     const produced: Incident[] = [];
@@ -346,8 +404,10 @@ export class SentinelPrime {
     for (const incident of this.incidents.values()) {
       for (const findingId of incident.finding_ids) covered.add(findingId);
     }
+    const rulesByFindingType = new Map(SINGLETON_PROMOTIONS.map((rule) => [rule.finding_type, rule]));
     for (const finding of this.findings) {
-      if (finding.finding_type !== "cost.usage_change_extreme") continue;
+      const rule = rulesByFindingType.get(finding.finding_type);
+      if (!rule) continue;
       if (finding.policy_generated_effect) continue;
       if (covered.has(finding.finding_id)) continue;
       const risk = {
@@ -359,27 +419,22 @@ export class SentinelPrime {
       this.incidentCounter += 1;
       const incident: Incident = {
         incident_id: `inc_${String(this.incidentCounter).padStart(4, "0")}`,
-        title: "Unusual usage growth on one account",
-        incident_type: "cost.usage_runaway",
+        title: rule.title,
+        incident_type: rule.incident_type,
         status: "open",
         priority: priorityOf(risk) === "critical" ? "high" : priorityOf(risk),
         origin: [finding.node.name],
         subject: { tenant_id: finding.tenant_id, account_id: finding.subject.id },
         risk,
-        briefing: {
-          issue: finding.explanation.summary,
-          where: `Account ${finding.subject.id} (tenant ${finding.tenant_id}).`,
-          recommended_fix: "Monitor and request workload context from the account owner. No suspension is justified by usage alone.",
-          why_now: "A single independent signal crossed the extreme-change threshold.",
-        },
+        briefing: rule.briefing(finding),
         finding_ids: [finding.finding_id],
         evidence_ids: finding.evidence_ids,
         independent_signal_count: 1,
         signals: [finding.finding_type],
-        required_authority: ["forge_command_operator"],
+        required_authority: rule.required_authority,
         recommended_actions: [],
         conflicts: [],
-        missing_telemetry: ["identity telemetry did not corroborate; treat as cost-only signal"],
+        missing_telemetry: [rule.missing_telemetry],
         version: 1,
         created_at: nowIso,
         updated_at: nowIso,

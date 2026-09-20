@@ -65,7 +65,7 @@ function withTempDir<T>(fn: (dir: string) => T): T {
   }
 }
 
-test("end to end: decisions become findings in the ledger, but form no incident under today's correlation rules", () =>
+test("end to end: decisions become findings in the ledger and promote to a lone-signal incident", () =>
   withTempDir(async (dir) => {
     const items = Array.from({ length: DENIAL_STREAK_THRESHOLD }, (_, i) => ({
       payload: decisionAt(minutesAfter(BASE, i), `dec_${i}`),
@@ -90,11 +90,15 @@ test("end to end: decisions become findings in the ledger, but form no incident 
 
     const findingRecords = runtime.ledger.all().filter((r) => r.kind === "finding");
     assert.equal(findingRecords.length, 1, "the finding reached the evidence ledger");
+    const incidentRecords = runtime.ledger.all().filter((r) => r.kind === "incident");
     assert.equal(
-      runtime.ledger.all().filter((r) => r.kind === "incident").length,
-      0,
-      "no incident forms -- neither detector's finding_type is wired into any CorrelationRule or promoteSingles() (see the scoping doc's reconciliation)",
+      incidentRecords.length,
+      1,
+      "cssa.denial_streak is now wired into promoteSingles() -- a lone finding still promotes, capped confidence",
     );
+    const incident = incidentRecords[0]!.body as { incident_type: string; risk: { confidence: number } };
+    assert.equal(incident.incident_type, "cssa.denial_streak_watch");
+    assert.ok(incident.risk.confidence <= 0.7, "a single decisions-only signal caps confidence");
   }));
 
 test("cursor resumes across a restart -- a fresh worker instance continues from the persisted cursor, not from scratch", () =>

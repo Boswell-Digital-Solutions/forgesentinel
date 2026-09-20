@@ -182,6 +182,53 @@ test("a usage spike alone caps confidence and recommends no containment", () => 
   assert.ok(incident.missing_telemetry.length > 0, "missing corroboration is visible");
 });
 
+test("a lone CSSA denial-streak finding promotes to a capped-confidence watch incident", () => {
+  const prime = new SentinelPrime();
+  prime.submitFindings([
+    finding({
+      finding_id: "f_denial",
+      finding_type: "cssa.denial_streak",
+      subject: { type: "principal", id: "usr_watched" },
+      risk: { likelihood: 0.75, impact: 0.75, confidence: 0.9, evidence_quality: 0.95 },
+    }),
+  ]);
+  const incidents = prime.correlate(NOW);
+  assert.equal(incidents.length, 1);
+  const incident = incidents[0]!;
+  assert.equal(incident.incident_type, "cssa.denial_streak_watch");
+  assert.equal(incident.independent_signal_count, 1);
+  assert.ok(incident.risk.confidence <= 0.7, "a single decisions-only signal caps confidence");
+  assert.equal(incident.recommended_actions.length, 0, "recommend-only: no containment from a lone decisions-only signal");
+  assert.ok(incident.missing_telemetry.length > 0, "missing corroboration is visible");
+});
+
+test("a lone CSSA quota-exceeded-burst finding promotes to a capped-confidence watch incident", () => {
+  const prime = new SentinelPrime();
+  prime.submitFindings([
+    finding({
+      finding_id: "f_quota",
+      finding_type: "cssa.quota_exceeded_burst",
+      subject: { type: "principal", id: "usr_watched" },
+      risk: { likelihood: 0.75, impact: 0.75, confidence: 0.9, evidence_quality: 0.95 },
+    }),
+  ]);
+  const incidents = prime.correlate(NOW);
+  assert.equal(incidents.length, 1);
+  assert.equal(incidents[0]!.incident_type, "cssa.quota_exceeded_watch");
+});
+
+test("a policy-generated-effect CSSA finding never self-promotes", () => {
+  const prime = new SentinelPrime();
+  prime.submitFindings([
+    finding({
+      finding_id: "f_denial_effect",
+      finding_type: "cssa.denial_streak",
+      policy_generated_effect: true,
+    }),
+  ]);
+  assert.equal(prime.correlate(NOW).length, 0);
+});
+
 test("lifecycle: dismissal requires a reason and reopen links the prior version", () => {
   const prime = new SentinelPrime();
   prime.submitFindings(compoundSet());
