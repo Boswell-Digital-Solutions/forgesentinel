@@ -217,6 +217,36 @@ test("a lone CSSA quota-exceeded-burst finding promotes to a capped-confidence w
   assert.equal(incidents[0]!.incident_type, "cssa.quota_exceeded_watch");
 });
 
+test("a lone CSSA approval-pending-burst finding promotes to a capped-confidence watch incident", () => {
+  const prime = new SentinelPrime();
+  prime.submitFindings([
+    finding({
+      finding_id: "f_approval",
+      finding_type: "cssa.approval_pending_burst",
+      subject: { type: "principal", id: "usr_watched" },
+      risk: { likelihood: 0.75, impact: 0.75, confidence: 0.9, evidence_quality: 0.95 },
+    }),
+  ]);
+  const incidents = prime.correlate(NOW);
+  assert.equal(incidents.length, 1);
+  assert.equal(incidents[0]!.incident_type, "cssa.approval_pending_watch");
+});
+
+test("a lone CSSA execution-failure-burst finding promotes to a capped-confidence watch incident", () => {
+  const prime = new SentinelPrime();
+  prime.submitFindings([
+    finding({
+      finding_id: "f_exec_failure",
+      finding_type: "cssa.execution_failure_burst",
+      subject: { type: "principal", id: "usr_watched" },
+      risk: { likelihood: 0.75, impact: 0.75, confidence: 0.9, evidence_quality: 0.95 },
+    }),
+  ]);
+  const incidents = prime.correlate(NOW);
+  assert.equal(incidents.length, 1);
+  assert.equal(incidents[0]!.incident_type, "cssa.execution_failure_watch");
+});
+
 test("a policy-generated-effect CSSA finding never self-promotes", () => {
   const prime = new SentinelPrime();
   prime.submitFindings([

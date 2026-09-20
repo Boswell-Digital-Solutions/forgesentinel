@@ -12,3 +12,5 @@ export * from "./feedback.js";
 export * from "./trust.js";
 export * from "./cssa.js";
 export * from "./cssa_decision.js";
+export * from "./cssa_authorization.js";
+export * from "./cssa_outcome.js";

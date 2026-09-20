@@ -1,11 +1,11 @@
 /**
  * Read-only client for DataForge's CSSA cloud-security ledger
- * (`DataForge#70`, `app/api/cloud_security_router.py`). Decisions-only per
- * the 2026-09-20 ruling -- `authorizations`/`outcomes` are not consumed by
- * this slice. `require_bearer` on that endpoint does not currently verify
- * the token (see `DataForge/docs/KNOWN_ISSUES.md`); this client still sends
- * one, since the header is required and a real credential is a separate,
- * later activation decision.
+ * (`DataForge#70`, `app/api/cloud_security_router.py`), covering all three
+ * record families it exposes off the same generic `_make_record_routes`
+ * pattern: `decisions`, `authorizations`, `outcomes`. `require_bearer` on
+ * that endpoint does not currently verify the token (see `DataForge/docs/
+ * KNOWN_ISSUES.md`); this client still sends one, since the header is
+ * required and a real credential is a separate, later activation decision.
  */
 
 export interface DataForgeCssaRecord {
@@ -47,7 +47,19 @@ export class DataForgeCssaClient {
   }
 
   async listDecisions(cursor: string | null, limit = 100): Promise<DataForgeCssaPage> {
-    const url = new URL("/api/v1/cloud-security/decisions", this.opts.baseUrl);
+    return this.listFamily("decisions", cursor, limit);
+  }
+
+  async listAuthorizations(cursor: string | null, limit = 100): Promise<DataForgeCssaPage> {
+    return this.listFamily("authorizations", cursor, limit);
+  }
+
+  async listOutcomes(cursor: string | null, limit = 100): Promise<DataForgeCssaPage> {
+    return this.listFamily("outcomes", cursor, limit);
+  }
+
+  private async listFamily(family: "decisions" | "authorizations" | "outcomes", cursor: string | null, limit: number): Promise<DataForgeCssaPage> {
+    const url = new URL(`/api/v1/cloud-security/${family}`, this.opts.baseUrl);
     if (cursor) url.searchParams.set("cursor", cursor);
     url.searchParams.set("limit", String(limit));
     const response = await this.fetchImpl(url.toString(), {

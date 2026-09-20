@@ -117,10 +117,12 @@ const SINGLETON_PROMOTIONS: SingletonPromotionRule[] = [
       why_now: "A single independent signal crossed the extreme-change threshold.",
     }),
   },
-  // The CSSA decisions-watchdog finding_types (src/watchdog/decisions.ts):
-  // decisions-only, shadow-only per Charlie's 2026-09-20 ruling, so these
-  // stay a lone-signal watch, not a compound CorrelationRule, until a second
-  // CSSA-sourced finding_type exists to correlate against.
+  // The CSSA watchdog finding_types (src/watchdog/decisions.ts,
+  // authorizations.ts, outcomes.ts): shadow-only, all four detectors report
+  // a single node's own boundary observation with nothing else to
+  // corroborate it yet, so these stay a lone-signal watch, not a compound
+  // CorrelationRule, until a second independent CSSA-sourced signal exists
+  // to correlate against.
   {
     finding_type: "cssa.denial_streak",
     incident_type: "cssa.denial_streak_watch",
@@ -145,6 +147,32 @@ const SINGLETON_PROMOTIONS: SingletonPromotionRule[] = [
       where: `Principal ${finding.subject.id} (tenant ${finding.tenant_id}).`,
       recommended_fix: "Review usage against the principal's quota with the owning team. A single decisions-only signal does not justify containment by itself.",
       why_now: "A single independent signal crossed the quota-exceeded-burst threshold.",
+    }),
+  },
+  {
+    finding_type: "cssa.approval_pending_burst",
+    incident_type: "cssa.approval_pending_watch",
+    title: "Repeated approval-pending authorizations for one principal",
+    required_authority: ["forge_command_operator"],
+    missing_telemetry: "no corroborating signal from another node; treat as an authorizations-only signal",
+    briefing: (finding) => ({
+      issue: finding.explanation.summary,
+      where: `Principal ${finding.subject.id} (tenant ${finding.tenant_id}).`,
+      recommended_fix: "Review the pending approval queue with the principal's owning team. A single authorizations-only signal does not justify containment by itself.",
+      why_now: "A single independent signal crossed the approval-pending-burst threshold.",
+    }),
+  },
+  {
+    finding_type: "cssa.execution_failure_burst",
+    incident_type: "cssa.execution_failure_watch",
+    title: "Repeated execution failures for one principal",
+    required_authority: ["forge_command_operator"],
+    missing_telemetry: "no corroborating signal from another node; treat as an outcomes-only signal",
+    briefing: (finding) => ({
+      issue: finding.explanation.summary,
+      where: `Principal ${finding.subject.id} (tenant ${finding.tenant_id}).`,
+      recommended_fix: "Review the failing executions with the principal's owning team. A single outcomes-only signal does not justify containment by itself.",
+      why_now: "A single independent signal crossed the execution-failure-burst threshold.",
     }),
   },
 ];
