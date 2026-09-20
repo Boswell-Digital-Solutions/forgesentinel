@@ -12,23 +12,51 @@ import type { Finding } from "./finding.js";
 export const CLOUD_SECURITY_FINDING_SCHEMA = "cloud_security.finding.v1";
 export const CONTROL_DIRECTIVE_SCHEMA = "cloud_security.control_directive.v1";
 
+/** Forge-Agents `app/security/contracts.py::Severity` (05 §.., canonical). */
+export const CLOUD_SECURITY_SEVERITIES = ["S0", "S1", "S2", "S3", "S4"] as const;
+export type CloudSecuritySeverity = (typeof CLOUD_SECURITY_SEVERITIES)[number];
+
+export interface CloudSecurityFindingScope {
+  tenant_id: string;
+  principal_id?: string;
+  executor_id?: string;
+  app_id?: string;
+  cloud_service?: string;
+}
+
+export interface CloudSecurityFindingWindow {
+  from: string;
+  to: string;
+}
+
+export interface CloudSecurityFindingMetrics {
+  observed: number;
+  baseline: number;
+  threshold: number;
+}
+
 /**
- * CSSA watchdog output (07 §6). It is a SOURCE finding: it cannot create or
- * mutate Sentinel incident lifecycle state directly (ADR-020).
+ * CSSA watchdog output. Canonical wire shape per Forge-Agents'
+ * `app/security/contracts.py::CloudSecurityFinding` (06 §4) — pinned at
+ * Forge-Agents `672cec5`, forgesentinel is a consumer of this contract, not
+ * its owner; a schema_version bump on either side re-opens reconciliation.
+ * It is a SOURCE finding: it cannot create or mutate Sentinel incident
+ * lifecycle state directly (ADR-020).
  */
 export interface CloudSecurityFinding {
   schema_version: typeof CLOUD_SECURITY_FINDING_SCHEMA;
   finding_id: string;
   detector: string;
-  detected_at: string;
-  tenant_id: string;
-  subject: { type: string; id: string };
-  threshold: string;
-  policy_bundle_id: string;
+  severity: CloudSecuritySeverity;
+  scope: CloudSecurityFindingScope;
+  window: CloudSecurityFindingWindow;
   evidence_refs: string[];
-  record_hashes: string[];
-  originating_scope: string;
-  severity_hint: number;
+  metrics: CloudSecurityFindingMetrics;
+  reason_codes: string[];
+  summary: string;
+  emitted_at: string;
+  expires_at: string;
+  finding_hash: string;
 }
 
 export function validateCloudSecurityFinding(value: unknown): ValidationResult {
@@ -43,33 +71,67 @@ export function validateCloudSecurityFinding(value: unknown): ValidationResult {
   }
   requireString(issues, value, "finding_id");
   requireString(issues, value, "detector");
-  requireIsoTimestamp(issues, value, "detected_at");
-  requireString(issues, value, "tenant_id");
-  requireString(issues, value, "threshold");
-  requireString(issues, value, "policy_bundle_id");
+  requireString(issues, value, "severity", { enum: CLOUD_SECURITY_SEVERITIES });
+  const scope = requireObject(issues, value, "scope");
+  if (scope) {
+    requireString(issues, scope, "tenant_id", { prefix: "scope" });
+  }
+  const window = requireObject(issues, value, "window");
+  if (window) {
+    requireIsoTimestamp(issues, window, "from", "window");
+    requireIsoTimestamp(issues, window, "to", "window");
+  }
   if (!Array.isArray(value["evidence_refs"]) || value["evidence_refs"].length === 0) {
     issues.add("evidence_refs", "required_array", "CSSA finding must reference immutable evidence");
   }
-  requireNumber(issues, value, "severity_hint", { min: 0, max: 1 });
+  const metrics = requireObject(issues, value, "metrics");
+  if (metrics) {
+    requireNumber(issues, metrics, "observed", { prefix: "metrics" });
+    requireNumber(issues, metrics, "baseline", { prefix: "metrics" });
+    requireNumber(issues, metrics, "threshold", { prefix: "metrics" });
+  }
+  if (!Array.isArray(value["reason_codes"]) || value["reason_codes"].length === 0) {
+    issues.add("reason_codes", "required_array", "CSSA finding must carry at least one reason code");
+  }
+  requireString(issues, value, "summary");
+  requireIsoTimestamp(issues, value, "emitted_at");
+  requireIsoTimestamp(issues, value, "expires_at");
+  requireString(issues, value, "finding_hash", { pattern: /^sha256:[0-9a-f]{64}$/ });
   return issues.result();
 }
 
+/** S0 (informational) .. S4 (severe) -> a 0-1 risk score (ADR-010: kept separate from confidence/evidence_quality). */
+const SEVERITY_RISK_SCORE: Record<CloudSecuritySeverity, number> = {
+  S0: 0.1,
+  S1: 0.3,
+  S2: 0.55,
+  S3: 0.75,
+  S4: 0.95,
+};
+
 /**
- * Adapter: CSSA watchdog finding -> Sentinel SOURCE finding. Promotion to an
- * incident remains with Sentinel Prime or a deterministic formation rule.
+ * Adapter: CSSA watchdog finding (Forge-Agents §4 wire shape) -> Sentinel
+ * internal SOURCE finding. Promotion to an incident remains with Sentinel
+ * Prime or a deterministic formation rule; this adapter never sets
+ * `policy_generated_effect: true` -- a finding only reaches here once its
+ * producing detector has already excluded policy-generated evidence
+ * (ADR-022), so by construction nothing it emits rests on enforcement
+ * effects.
  */
-export function cssaFindingToSourceFinding(cssa: CloudSecurityFinding, nowIso: string): Finding {
-  const expires = new Date(Date.parse(cssa.detected_at) + 24 * 3600 * 1000).toISOString();
+export function cssaFindingToSourceFinding(cssa: CloudSecurityFinding, _nowIso: string): Finding {
+  const risk = SEVERITY_RISK_SCORE[cssa.severity];
+  const subjectId = cssa.scope.principal_id ?? cssa.scope.executor_id ?? cssa.scope.app_id ?? "unknown";
+  const subjectType = cssa.scope.principal_id ? "principal" : cssa.scope.executor_id ? "executor" : "app";
   return {
     finding_id: `fnd_cssa_${cssa.finding_id}`,
     finding_type: `cssa.${cssa.detector}`,
-    node: { name: "cssa-watchdog-adapter", version: "1.0.0" },
-    subject: cssa.subject,
-    tenant_id: cssa.tenant_id,
-    window: { start: cssa.detected_at, end: cssa.detected_at },
+    node: { name: "cssa-watchdog-adapter", version: "2.0.0" },
+    subject: { type: subjectType, id: subjectId },
+    tenant_id: cssa.scope.tenant_id,
+    window: { start: cssa.window.from, end: cssa.window.to },
     risk: {
-      likelihood: cssa.severity_hint,
-      impact: cssa.severity_hint,
+      likelihood: risk,
+      impact: risk,
       // Deterministic edge detection is high confidence in WHAT it saw; the
       // ecosystem interpretation is Prime's job.
       confidence: 0.9,
@@ -78,13 +140,15 @@ export function cssaFindingToSourceFinding(cssa: CloudSecurityFinding, nowIso: s
     evidence_ids: cssa.evidence_refs,
     source_event_roots: cssa.evidence_refs,
     explanation: {
-      summary: `CSSA watchdog detector "${cssa.detector}" crossed threshold ${cssa.threshold} under policy bundle ${cssa.policy_bundle_id}.`,
-      top_factors: [{ factor: cssa.detector, contribution: 1 }],
+      summary: cssa.summary,
+      top_factors: cssa.reason_codes.map((code) => ({ factor: code, contribution: 1 / cssa.reason_codes.length })),
       uncertainties: ["Source finding from the enforcement boundary; cross-domain interpretation pending correlation."],
+      observed: cssa.metrics.observed,
+      expected: cssa.metrics.baseline,
     },
     recommendation: { action_class: "RECOMMEND_ONLY" },
-    expires_at: expires,
-    correlation_hints: {},
+    expires_at: cssa.expires_at,
+    correlation_hints: cssa.scope.principal_id ? { actor_id: cssa.scope.principal_id } : {},
     policy_generated_effect: false,
   };
 }
