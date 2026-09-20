@@ -65,22 +65,32 @@ system exists to enforce.
 
 ---
 
-## doc/system layout does not match the audit tool
+## doc/system layout does not match the audit tool — CLOSED 2026-09-20
 
-- **Location**: `doc/system/` — the seven numbered subdirectories
-- **Status**: OPEN. Do not change the layout without an operator decision.
-- **Impact**: Low. `scripts/audit_doc_system_shape.py` reports `needs_update`
-  for this repository.
-- **Cause**: BDS Documentation Protocol v2.0 section 5.3 requires flat
-  `NN-kebab-case.md` files directly under `doc/system/`. This repository uses
-  numbered subdirectories instead.
-- **Evidence**: The build markers all pass. `marker_gaps` is empty for
-  `_index.md`, `BUILD.sh`, and `validate_snapshots.sh`. `bash doc/system/BUILD.sh`
-  runs clean and makes no change to `doc/SNTSYSTEM.md`.
-
-Most Forge repositories use the same subdirectory layout. The tool and the
-protocol look stale, not the repositories. A fleet-wide decision must come
-first. Do not migrate this repository alone.
+- **Location**: `doc/system/` — was the seven numbered subdirectories.
+- **Status**: CLOSED. Migrated to the flat `NN-kebab-case.md` layout directly
+  under `doc/system/`.
+- **Cause**: The numbered-subdirectory convention was never the real standard.
+  `forge`'s own `scripts/audit_doc_system_shape.py` (see its module docstring
+  and `git log`) records that the subdirectory shape was introduced
+  2026-06-22 from a same-day snapshot of ForgeAgents used as an "exemplar,"
+  was never part of the documented compliance gate, and contradicted both
+  `docs/canonical/documentation_protocol_v1.md` and the company-wide BDS
+  Documentation Protocol v2.0. PR #141 (`forge`, merged 2026-09-11) retired
+  that standard in the root repo and the tooling itself; this repository (and
+  most others) had already copied the erroneous convention before the
+  correction and were never migrated back.
+- **Fix**: Moved each `NN-*.md` section file out of its subdirectory to
+  `doc/system/` directly, removed the empty subdirectories, updated
+  `BUILD.sh` to glob `doc/system/[0-9][0-9]-*.md` at depth 1 instead of
+  requiring the seven named subfolders, and updated `_index.md`'s section
+  table to the flat paths. `bash doc/system/BUILD.sh` passes; the only diff
+  in the compiled `doc/SNTSYSTEM.md` is the version/date header and the
+  table's file-path column.
+- **Note for other repos**: this was a single-repo migration to bring
+  forgesentinel in line with the tooling's actual (corrected) standard, not a
+  fleet-wide migration. Other repos still carrying the subdirectory
+  convention remain open work, tracked separately.
 
 ---
 
@@ -106,4 +116,4 @@ items below are fixed.
 
 ---
 
-_Last updated: 2026-09-19_
+_Last updated: 2026-09-20_
