@@ -3,8 +3,18 @@ name: CI
 on:
   push:
     branches: [master]
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!doc/**'
+      - '!**/*.md'
   pull_request:
     branches: [master]
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!doc/**'
+      - '!**/*.md'
   workflow_dispatch:
     inputs:
       target_sha:
