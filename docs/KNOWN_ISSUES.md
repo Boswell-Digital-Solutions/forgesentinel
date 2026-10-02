@@ -117,3 +117,8 @@ items below are fixed.
 ---
 
 _Last updated: 2026-09-20_
+
+## No secret scan or dependency audit in CI — OPEN 2026-10-02
+
+Found while scoping CI to the change type. `.github/workflows/ci.yml` is the only workflow. It runs `npm ci --ignore-scripts`, `npm run build` and `node --test dist/test/*.test.js`. No workflow runs a secret scan, a dependency audit (`npm audit`), CodeQL, or an egress check. For the security layer of the ecosystem this is a gap in the evidence, not in the tests. The CI-scope change does not add or remove any scan: it filters `ci.yml` only, and `doc/system/06-verification.md` states that a future secret scan must run on every change.
+Status: OPEN. Closed when a secret scan that runs on every change is added, and the owner decides about the other scans.
