@@ -6,7 +6,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildEvent } from "../src/spine/build.js";
-import { standardProducers } from "../src/runtime.js";
+import { fixtureProducers } from "../test/support/producers.js";
 import type { ReplayLine } from "../src/spine/replay.js";
 import { validateEventEnvelope } from "../src/contracts/envelope.js";
 import { validateFinding } from "../src/contracts/finding.js";
@@ -19,7 +19,7 @@ const ROOT = new URL("../..", import.meta.url).pathname;
 const REPLAY_DIR = join(ROOT, "fixtures", "replay");
 const GOLDEN_DIR = join(ROOT, "fixtures", "golden");
 
-const producers = Object.fromEntries(standardProducers("production").map((producer) => [producer.service, producer]));
+const producers = Object.fromEntries(fixtureProducers("production").map((producer) => [producer.service, producer]));
 const TENANT = { tenant_id: "ten_demo", account_id: "acct_2041" };
 const NEW_KEY_FP = "sha256:0a1b2c3d4e5f60718293a4b5c6d7e8f9aabbccddeeff00112233445566aa7fa2";
 

@@ -8,6 +8,8 @@ import { validateControlDirectiveShape } from "./contracts/cssa.js";
 import type { ValidationResult } from "./contracts/common.js";
 import { loadReplayFile } from "./spine/replay.js";
 import { SentinelRuntime } from "./runtime.js";
+import { ENVIRONMENTS, type Environment } from "./contracts/envelope.js";
+import { PRODUCER_SECRETS_FILE_ENV, ProducerSecretsError, loadProducerRegistrations } from "./spine/producer_secrets.js";
 import { DataForgeCssaClient } from "./spine/dataforge_cssa_client.js";
 import { CssaWatchWorker } from "./watchdog/cssa_worker.js";
 import { CssaWorkerStateStore } from "./watchdog/worker_state.js";
@@ -28,6 +30,10 @@ Usage:
                                              Contracts: ${Object.keys(VALIDATORS).join(", ")}
   sentinel replay <fixture.jsonl>            Replay an event fixture through the full
                                              shadow pipeline and print the report.
+                                             Requires ${PRODUCER_SECRETS_FILE_ENV}. The
+                                             environment is SENTINEL_ENVIRONMENT
+                                             (default production). Each line must carry
+                                             credentials made with the configured secrets.
   sentinel watch-cssa [--once]               Poll DataForge's CSSA decisions ledger and run
                                              the denial-streak/quota-burst detectors, shadow
                                              only. Requires DATAFORGE_BASE_URL and
@@ -62,7 +68,20 @@ if (command === "validate") {
 } else if (command === "replay") {
   const [file] = args;
   if (!file) usage();
-  const runtime = new SentinelRuntime("production");
+  const environment = process.env["SENTINEL_ENVIRONMENT"] ?? "production";
+  if (!(ENVIRONMENTS as readonly string[]).includes(environment)) {
+    console.error(`SENTINEL_ENVIRONMENT must be one of: ${ENVIRONMENTS.join(", ")}`);
+    process.exit(2);
+  }
+  let runtime: SentinelRuntime;
+  try {
+    const env = environment as Environment;
+    runtime = new SentinelRuntime(env, { producers: loadProducerRegistrations(env) });
+  } catch (error) {
+    if (!(error instanceof ProducerSecretsError)) throw error;
+    console.error(`replay refused: ${error.message}`);
+    process.exit(2);
+  }
   const report = runtime.runShadow(loadReplayFile(file));
 
   console.log("=== Forge Sentinel shadow replay ===");
@@ -108,7 +127,9 @@ if (command === "validate") {
   const statePath = process.env["CSSA_WORKER_STATE_PATH"] ?? ".forgesentinel/cssa-worker-state.json";
   const worker = new CssaWatchWorker({
     client: new DataForgeCssaClient({ baseUrl, bearerToken }),
-    runtime: new SentinelRuntime("production"),
+    // watch-cssa feeds watchdog findings to Prime and never uses the event
+    // gateway, so it registers no producers: the gateway refuses every event.
+    runtime: new SentinelRuntime("production", { producers: [] }),
     stateStore: new CssaWorkerStateStore(statePath),
   });
   if (args.includes("--once")) {

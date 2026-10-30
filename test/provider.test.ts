@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SentinelProviderNode, buildEvent, standardProducers, validateFinding, type ModelFingerprint, type TrustVector } from "../src/index.js";
+import { SentinelProviderNode, buildEvent, validateFinding, type ModelFingerprint, type TrustVector } from "../src/index.js";
+import { byService, testProducers } from "./support/producers.js";
 
 const NOW = "2026-06-09T12:00:00.000Z";
 
@@ -86,7 +87,8 @@ test("re-observing the same fingerprint emits nothing", () => {
 });
 
 test("node consumes neuroforge.model_fingerprint.changed events from the ledger", () => {
-  const producers = Object.fromEntries(standardProducers("production").map((producer) => [producer.service, producer]));
+  const PRODUCERS = testProducers("production");
+const producers = byService(PRODUCERS);
   const node = new SentinelProviderNode();
   node.setTrust(normalTrust("fp_old", "typescript.type_fix"));
   const { event } = buildEvent(producers["neuroforge"]!, {

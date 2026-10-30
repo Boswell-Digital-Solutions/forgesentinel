@@ -174,4 +174,12 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
   5. The Ed25519 change that ADR-026 requires is verified separately.
 - **Authorization**: The correction needs its own narrowly scoped authorization. Any new ingress or deployment waits for that correction. This record does not authorize either.
 - **No change made**: This record does not rotate, change, or remove a secret or code.
+- **Correction implemented (2026-10-30, unverified)**: The operator authorized a narrowly scoped correction (branch `fix/producer-secrets-from-config`). It does these things:
+  1. `src/runtime.ts` no longer holds producer secrets. `SentinelRuntime` takes its producer registrations from the caller, with no default environment and no built-in producers.
+  2. `src/spine/producer_secrets.ts` loads secrets for each environment from the file named by `SENTINEL_PRODUCER_SECRETS_FILE`. It refuses a missing variable, an unreadable file, a group- or world-accessible file (POSIX), a file for another environment, and a missing or unknown producer.
+  3. The runtime and the loader refuse, in `production` and `staging`: a secret with the published `test-secret-` prefix, a secret shorter than 32 bytes, and one secret shared by two producers. There is no fallback to a hardcoded or missing credential.
+  4. The fixed fixture secrets are only in `test/support/producers.ts`. Tests use fresh random secrets and re-sign the committed fixtures.
+  5. `test/producer_secrets.test.ts` has the negative tests. Forged producer events are rejected: an event signed with the published secret, and a billing event with a forged signature. A runtime with no producers rejects every event.
+  6. `sentinel replay` reads `SENTINEL_ENVIRONMENT` (default `production`). This answers proposed item 3: the label is now set explicitly, and the CLI fails closed without configured secrets. `sentinel watch-cssa` registers no producers.
+  Not in this correction: the ADR-026 change to Ed25519 needs its own verification, by operator ruling. No secret was rotated; the published values stay public and are now refused. Deployment and new ingress stay blocked until this correction is verified.
 - **Status**: Open — recorded, unresolved until the correction is verified.

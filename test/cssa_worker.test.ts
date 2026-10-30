@@ -123,7 +123,7 @@ test("end to end: decisions become findings in the ledger and promote to a lone-
       record_hash: `sha256:${i}`,
     }));
     const { fetch } = mockFetch({ decisions: { start: { items, count: items.length, next_cursor: null } } });
-    const runtime = new SentinelRuntime("test");
+    const runtime = new SentinelRuntime("test", { producers: [] });
     const worker = new CssaWatchWorker({
       client: new DataForgeCssaClient({ baseUrl: "http://dataforge.invalid", bearerToken: "test-token", fetchImpl: fetch }),
       runtime,
@@ -159,7 +159,7 @@ test("end to end: an approval-pending burst in authorizations promotes to a lone
       record_hash: `sha256:${i}`,
     }));
     const { fetch } = mockFetch({ authorizations: { start: { items, count: items.length, next_cursor: null } } });
-    const runtime = new SentinelRuntime("test");
+    const runtime = new SentinelRuntime("test", { producers: [] });
     const worker = new CssaWatchWorker({
       client: new DataForgeCssaClient({ baseUrl: "http://dataforge.invalid", bearerToken: "t", fetchImpl: fetch }),
       runtime,
@@ -192,7 +192,7 @@ test("end to end: an outcome resolves its subject through a previously observed 
       authorizations: { start: { items: authItems, count: authItems.length, next_cursor: null } },
       outcomes: { start: { items: outcomeItems, count: outcomeItems.length, next_cursor: null } },
     });
-    const runtime = new SentinelRuntime("test");
+    const runtime = new SentinelRuntime("test", { producers: [] });
     const worker = new CssaWatchWorker({
       client: new DataForgeCssaClient({ baseUrl: "http://dataforge.invalid", bearerToken: "t", fetchImpl: fetch }),
       runtime,
@@ -223,7 +223,7 @@ test("an outcome whose authorization was never observed is counted unattributed,
     const events: Record<string, unknown>[] = [];
     const worker = new CssaWatchWorker({
       client: new DataForgeCssaClient({ baseUrl: "http://dataforge.invalid", bearerToken: "t", fetchImpl: fetch }),
-      runtime: new SentinelRuntime("test"),
+      runtime: new SentinelRuntime("test", { producers: [] }),
       stateStore: new CssaWorkerStateStore(join(dir, "state.json")),
       log: (event) => events.push(event),
       clock: () => BASE,
@@ -247,7 +247,7 @@ test("cursors resume across a restart, independently per family", () =>
     const { fetch: fetch1 } = mockFetch({ decisions: { start: firstPage } });
     const worker1 = new CssaWatchWorker({
       client: new DataForgeCssaClient({ baseUrl: "http://dataforge.invalid", bearerToken: "t", fetchImpl: fetch1 }),
-      runtime: new SentinelRuntime("test"),
+      runtime: new SentinelRuntime("test", { producers: [] }),
       stateStore: new CssaWorkerStateStore(statePath),
       log: () => {},
       clock: () => BASE,
@@ -260,7 +260,7 @@ test("cursors resume across a restart, independently per family", () =>
     const { fetch: fetch2, calls } = mockFetch({ decisions: { cursor_1: secondPage } });
     const worker2 = new CssaWatchWorker({
       client: new DataForgeCssaClient({ baseUrl: "http://dataforge.invalid", bearerToken: "t", fetchImpl: fetch2 }),
-      runtime: new SentinelRuntime("test"),
+      runtime: new SentinelRuntime("test", { producers: [] }),
       stateStore: new CssaWorkerStateStore(statePath),
       log: () => {},
       clock: () => minutesAfter(BASE, 1),
@@ -276,7 +276,7 @@ test("a caught-up page (next_cursor: null) does not reset the cursor -- polling 
     const { fetch } = mockFetch({ decisions: { start: page } });
     const worker = new CssaWatchWorker({
       client: new DataForgeCssaClient({ baseUrl: "http://dataforge.invalid", bearerToken: "t", fetchImpl: fetch }),
-      runtime: new SentinelRuntime("test"),
+      runtime: new SentinelRuntime("test", { producers: [] }),
       stateStore: new CssaWorkerStateStore(join(dir, "state.json")),
       log: () => {},
       clock: () => BASE,
@@ -296,7 +296,7 @@ test("a malformed decision is rejected and logged, not fatal to the poll cycle",
     const events: Record<string, unknown>[] = [];
     const worker = new CssaWatchWorker({
       client: new DataForgeCssaClient({ baseUrl: "http://dataforge.invalid", bearerToken: "t", fetchImpl: fetch }),
-      runtime: new SentinelRuntime("test"),
+      runtime: new SentinelRuntime("test", { producers: [] }),
       stateStore: new CssaWorkerStateStore(join(dir, "state.json")),
       log: (event) => events.push(event),
       clock: () => BASE,
@@ -314,7 +314,7 @@ test("a DataForge fetch failure is caught, logged, and reflected in status -- ne
     const failingFetch: FetchLike = async () => ({ ok: false, status: 503, json: async () => ({}), text: async () => "unavailable" });
     const worker = new CssaWatchWorker({
       client: new DataForgeCssaClient({ baseUrl: "http://dataforge.invalid", bearerToken: "t", fetchImpl: failingFetch }),
-      runtime: new SentinelRuntime("test"),
+      runtime: new SentinelRuntime("test", { producers: [] }),
       stateStore: new CssaWorkerStateStore(join(dir, "state.json")),
       log: () => {},
       clock: () => BASE,

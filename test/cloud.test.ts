@@ -1,13 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  SentinelRuntime,
   buildEvent,
-  standardProducers,
   validateFinding,
   type ReplayLine,
   type ShadowReport,
 } from "../src/index.js";
+import { byService, productionRuntime, testProducers } from "./support/producers.js";
 
 /**
  * Wave 3 (Sentinel-Cloud) completion: implausible travel, session replay, and
@@ -16,12 +15,13 @@ import {
  */
 
 const RECOMMEND_CLASSES = new Set(["OBSERVE", "RECOMMEND_ONLY", "REQUEST_OPERATOR"]);
-const producers = Object.fromEntries(standardProducers("production").map((producer) => [producer.service, producer]));
+const PRODUCERS = testProducers("production");
+const producers = byService(PRODUCERS);
 const identity = producers["identity-service"]!;
 const TENANT = { tenant_id: "ten_cloud", account_id: "acct_cloud_1" };
 
 function run(lines: ReplayLine[]): ShadowReport {
-  return new SentinelRuntime("production").runShadow(lines);
+  return productionRuntime(PRODUCERS).runShadow(lines);
 }
 
 function sessionEvent(

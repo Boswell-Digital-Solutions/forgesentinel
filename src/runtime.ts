@@ -4,6 +4,7 @@ import type { Incident } from "./contracts/incident.js";
 import type { PolicyDecision } from "./contracts/policy.js";
 import type { EvidenceRecord } from "./contracts/evidence.js";
 import { ProducerRegistry, type ProducerRegistration } from "./spine/producers.js";
+import { assertProducerSecretsAllowed } from "./spine/producer_secrets.js";
 import { EvidenceLedger } from "./spine/ledger.js";
 import { EventGateway } from "./spine/gateway.js";
 import { replayInto, type ReplayLine, type ReplaySummary } from "./spine/replay.js";
@@ -22,15 +23,9 @@ import { ReceiptService } from "./authority/receipts.js";
 const DAY_MS = 24 * 3600 * 1000;
 const HOUR_MS = 3600 * 1000;
 
-export function standardProducers(environment: Environment): ProducerRegistration[] {
-  return [
-    { service: "identity-service", environment, key_id: "key_identity_01", secret: "test-secret-identity", signature_required: false, allowed_event_prefixes: ["identity."], tenant_scope: "required" },
-    { service: "usage-metering", environment, key_id: "key_usage_01", secret: "test-secret-usage", signature_required: false, allowed_event_prefixes: ["usage."], tenant_scope: "required" },
-    { service: "neuroforge", environment, key_id: "key_neuroforge_01", secret: "test-secret-neuroforge", signature_required: false, allowed_event_prefixes: ["neuroforge."], tenant_scope: "required" },
-    { service: "billing-service", environment, key_id: "key_billing_01", secret: "test-secret-billing", signature_required: true, allowed_event_prefixes: ["billing.", "license."], tenant_scope: "required" },
-    { service: "cssa", environment, key_id: "key_cssa_01", secret: "test-secret-cssa", signature_required: true, allowed_event_prefixes: ["cssa."], tenant_scope: "required" },
-    { service: "forgeagents", environment, key_id: "key_agents_01", secret: "test-secret-agents", signature_required: false, allowed_event_prefixes: ["agent.", "data."], tenant_scope: "required" },
-  ];
+export interface SentinelRuntimeOptions {
+  producers: readonly ProducerRegistration[];
+  walPath?: string;
 }
 
 export interface ShadowReport {
@@ -76,11 +71,19 @@ export class SentinelRuntime {
   readonly policy = new PolicyService();
   readonly receipts: ReceiptService;
 
-  constructor(readonly environment: Environment = "production", walPath?: string) {
-    this.ledger = new EvidenceLedger(walPath);
+  /**
+   * The caller supplies the producer registrations. Production code loads
+   * them with `loadProducerRegistrations`; there is no built-in default. An
+   * empty list is valid and makes the gateway refuse every event. The
+   * constructor throws ProducerSecretsError when a registration is not
+   * allowed in `environment` (KI-SENTINEL-20261030-002).
+   */
+  constructor(readonly environment: Environment, options: SentinelRuntimeOptions) {
+    assertProducerSecretsAllowed(environment, options.producers);
+    this.ledger = new EvidenceLedger(options.walPath);
     this.gateway = new EventGateway(this.registry, this.ledger);
     this.receipts = new ReceiptService(this.ledger);
-    for (const producer of standardProducers(environment)) this.registry.register(producer);
+    for (const producer of options.producers) this.registry.register(producer);
 
     this.features.register({
       feature_id: "cost.tokens_per_day",

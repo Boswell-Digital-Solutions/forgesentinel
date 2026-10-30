@@ -1,13 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  SentinelRuntime,
   buildEvent,
-  standardProducers,
   validateFinding,
   type ReplayLine,
   type ShadowReport,
 } from "../src/index.js";
+import { byService, productionRuntime, testProducers } from "./support/producers.js";
 
 /**
  * Wave 2 (Sentinel-Cost) completion: cache collapse, billing/usage divergence,
@@ -17,7 +16,8 @@ import {
 const DAY = 24 * 3600 * 1000;
 const BASE = Date.parse("2026-05-20T12:00:00.000Z");
 const RECOMMEND_ONLY = new Set(["RECOMMEND_ONLY", "REQUEST_OPERATOR"]);
-const producers = Object.fromEntries(standardProducers("production").map((producer) => [producer.service, producer]));
+const PRODUCERS = testProducers("production");
+const producers = byService(PRODUCERS);
 const TENANT = { tenant_id: "ten_cost", account_id: "acct_cost_1" };
 
 function iso(ms: number): string {
@@ -25,7 +25,7 @@ function iso(ms: number): string {
 }
 
 function run(lines: ReplayLine[]): ShadowReport {
-  return new SentinelRuntime("production").runShadow(lines);
+  return productionRuntime(PRODUCERS).runShadow(lines);
 }
 
 function cacheUsage(id: string, occurredAt: string, hits: number, misses: number): ReplayLine {
