@@ -166,5 +166,12 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
   3. Decide whether `sentinel replay` must run with the `"production"` label, or with `"test"`.
   4. Do the ADR-026 change to Ed25519 before any ingress is added.
   The values are already public. Thus rotation alone does not correct this defect. The correction is to stop the use of fixed values outside tests.
+- **Operator ruling (2026-10-30, preliminary)**: The operator accepts this as a pre-deployment security blocker. The operator also ruled that the proposed correction is directionally sound. The ruling records that an attacker who knows the HMAC key can forge authentication, but must still have a path to submit an event. The present lack of network ingress lowers immediate exploitability. It does not make the authentication design acceptable for deployment. Before any production use, these are required:
+  1. Secrets for each environment come from protected configuration.
+  2. The runtime refuses to start when `production` or `staging` would use test secrets.
+  3. Production has no fallback to hardcoded or missing credentials.
+  4. Negative tests show that forged producer events are rejected.
+  5. The Ed25519 change that ADR-026 requires is verified separately.
+- **Authorization**: The correction needs its own narrowly scoped authorization. Any new ingress or deployment waits for that correction. This record does not authorize either.
 - **No change made**: This record does not rotate, change, or remove a secret or code.
 - **Status**: Open — recorded, unresolved until the correction is verified.
