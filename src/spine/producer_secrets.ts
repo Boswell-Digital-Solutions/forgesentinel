@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readFileSync } from "node:fs";
 import { ENVIRONMENTS, type Environment } from "../contracts/envelope.js";
 import type { ProducerRegistration } from "./producers.js";
 
@@ -11,6 +11,11 @@ import type { ProducerRegistration } from "./producers.js";
 export const PRODUCER_SECRETS_FILE_ENV = "SENTINEL_PRODUCER_SECRETS_FILE";
 export const PRODUCER_SECRETS_SCHEMA = "forgesentinel.producer_secrets.v1";
 export const MIN_PRODUCER_SECRET_BYTES = 32;
+/** Fewest distinct characters a protected-environment secret may have. A random 32-byte hex secret has 16. */
+export const MIN_PRODUCER_SECRET_DISTINCT_CHARS = 10;
+/** Printable ASCII with no space: the only characters a protected-environment secret may use. */
+const PROTECTED_SECRET_PATTERN = /^[!-~]+$/;
+const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;
 /** Prefix of the fixed fixture secrets published in git history before this change. */
 export const PUBLISHED_TEST_SECRET_PREFIX = "test-secret-";
 /** Environments where a weak or published producer secret is refused. */
@@ -55,12 +60,23 @@ export function assertProducerSecretsAllowed(environment: Environment, registrat
     if (typeof registration.secret !== "string" || registration.secret.length === 0) {
       throw new ProducerSecretsError(`${who} has no secret`);
     }
+    // HMAC pads a short key with NUL bytes, so a secret of NUL bytes is the
+    // empty key. Control characters are refused in every environment.
+    if (CONTROL_CHARACTER.test(registration.secret)) {
+      throw new ProducerSecretsError(`${who} secret contains a control character`);
+    }
     if (!isProtectedEnvironment(environment)) continue;
     if (registration.secret.startsWith(PUBLISHED_TEST_SECRET_PREFIX)) {
       throw new ProducerSecretsError(`${who} uses a published test secret; "${environment}" refuses it`);
     }
-    if (Buffer.byteLength(registration.secret, "utf8") < MIN_PRODUCER_SECRET_BYTES) {
+    if (!PROTECTED_SECRET_PATTERN.test(registration.secret)) {
+      throw new ProducerSecretsError(`${who} secret must use printable ASCII with no spaces; "${environment}" refuses it`);
+    }
+    if (registration.secret.length < MIN_PRODUCER_SECRET_BYTES) {
       throw new ProducerSecretsError(`${who} secret is shorter than ${MIN_PRODUCER_SECRET_BYTES} bytes; "${environment}" refuses it`);
+    }
+    if (new Set(registration.secret).size < MIN_PRODUCER_SECRET_DISTINCT_CHARS) {
+      throw new ProducerSecretsError(`${who} secret has fewer than ${MIN_PRODUCER_SECRET_DISTINCT_CHARS} distinct characters; "${environment}" refuses it`);
     }
     const other = seen.get(registration.secret);
     if (other !== undefined) {
@@ -69,6 +85,9 @@ export function assertProducerSecretsAllowed(environment: Environment, registrat
     seen.set(registration.secret, registration.service);
   }
 }
+
+const TOP_LEVEL_FIELDS: readonly string[] = ["schema", "environment", "producers"];
+const ENTRY_FIELDS: readonly string[] = ["key_id", "secret"];
 
 export interface LoadProducerSecretsOptions {
   /** Defaults to process.env. */
@@ -79,9 +98,11 @@ export interface LoadProducerSecretsOptions {
 
 /**
  * Load the standard producer registrations for `environment` from the
- * protected secrets file. Fails closed: a missing variable, an unreadable or
- * group/world-accessible file, a different environment, a missing or unknown
- * producer, or a refused secret throws ProducerSecretsError.
+ * protected secrets file. Fails closed: a missing variable; a file that is a
+ * symlink, not a regular file, unreadable, or (POSIX) group/world-accessible
+ * or owned by another user; a different environment; an unknown field; a
+ * missing or unknown producer; a shared key_id; or a refused secret throws
+ * ProducerSecretsError. Windows has no permission check.
  */
 export function loadProducerRegistrations(environment: Environment, options: LoadProducerSecretsOptions = {}): ProducerRegistration[] {
   const env = options.env ?? process.env;
@@ -91,16 +112,37 @@ export function loadProducerRegistrations(environment: Environment, options: Loa
     throw new ProducerSecretsError(`${PRODUCER_SECRETS_FILE_ENV} is not set; producer secrets have no built-in default`);
   }
 
-  let mode: number;
+  // Open once and check the open descriptor, so the file checked is the file
+  // read. O_NOFOLLOW refuses a symlink and O_NONBLOCK keeps a FIFO from
+  // blocking the open (POSIX). fstat then refuses anything but a regular file.
+  const posix = platform !== "win32";
+  const flags = constants.O_RDONLY | (posix ? (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0) : 0);
   let content: string;
+  let fd: number | undefined;
   try {
-    mode = statSync(path).mode;
-    content = readFileSync(path, "utf8");
-  } catch {
-    throw new ProducerSecretsError(`cannot read the producer secrets file named by ${PRODUCER_SECRETS_FILE_ENV}`);
-  }
-  if (platform !== "win32" && (mode & 0o077) !== 0) {
-    throw new ProducerSecretsError(`the producer secrets file must not be readable or writable by group or others (mode ${(mode & 0o777).toString(8)})`);
+    try {
+      fd = openSync(path, flags);
+    } catch {
+      throw new ProducerSecretsError(`cannot open the producer secrets file named by ${PRODUCER_SECRETS_FILE_ENV} (a symlink is refused)`);
+    }
+    const stat = fstatSync(fd);
+    if (!stat.isFile()) {
+      throw new ProducerSecretsError("the producer secrets file must be a regular file");
+    }
+    if (posix && (stat.mode & 0o077) !== 0) {
+      throw new ProducerSecretsError(`the producer secrets file must not be readable or writable by group or others (mode ${(stat.mode & 0o777).toString(8)})`);
+    }
+    const uid = process.getuid?.();
+    if (posix && uid !== undefined && stat.uid !== uid) {
+      throw new ProducerSecretsError("the producer secrets file must be owned by the user that runs Sentinel");
+    }
+    try {
+      content = readFileSync(fd, "utf8");
+    } catch {
+      throw new ProducerSecretsError(`cannot read the producer secrets file named by ${PRODUCER_SECRETS_FILE_ENV}`);
+    }
+  } finally {
+    if (fd !== undefined) closeSync(fd);
   }
 
   let document: unknown;
@@ -113,6 +155,9 @@ export function loadProducerRegistrations(environment: Environment, options: Loa
     throw new ProducerSecretsError("the producer secrets file must hold a JSON object");
   }
   const record = document as Record<string, unknown>;
+  for (const field of Object.keys(record)) {
+    if (!TOP_LEVEL_FIELDS.includes(field)) throw new ProducerSecretsError(`the producer secrets file has unknown field "${field}"`);
+  }
   if (record["schema"] !== PRODUCER_SECRETS_SCHEMA) {
     throw new ProducerSecretsError(`the producer secrets file schema must be "${PRODUCER_SECRETS_SCHEMA}"`);
   }
@@ -138,12 +183,20 @@ export function loadProducerRegistrations(environment: Environment, options: Loa
     if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
       throw new ProducerSecretsError(`the producer secrets file has no entry for producer "${profile.service}"`);
     }
+    for (const field of Object.keys(entry)) {
+      if (!ENTRY_FIELDS.includes(field)) throw new ProducerSecretsError(`producer "${profile.service}" has unknown field "${field}"`);
+    }
     const { key_id, secret } = entry as Record<string, unknown>;
     if (typeof key_id !== "string" || typeof secret !== "string") {
       throw new ProducerSecretsError(`producer "${profile.service}" needs string key_id and secret`);
     }
     return { ...profile, allowed_event_prefixes: [...profile.allowed_event_prefixes], environment, key_id, secret };
   });
+  const keyIds = new Set<string>();
+  for (const registration of registrations) {
+    if (keyIds.has(registration.key_id)) throw new ProducerSecretsError(`key_id "${registration.key_id}" is used by more than one producer`);
+    keyIds.add(registration.key_id);
+  }
   assertProducerSecretsAllowed(environment, registrations);
   return registrations;
 }

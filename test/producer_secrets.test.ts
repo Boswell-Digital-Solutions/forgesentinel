@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   MIN_PRODUCER_SECRET_BYTES,
   PRODUCER_SECRETS_FILE_ENV,
   PRODUCER_SECRETS_SCHEMA,
+  ProducerRegistry,
   ProducerSecretsError,
   STANDARD_PRODUCER_PROFILES,
   SentinelRuntime,
@@ -18,7 +19,7 @@ import {
   type ProducerRegistration,
   type ReplayLine,
 } from "../src/index.js";
-import { byService, fixtureProducers, testProducers } from "./support/producers.js";
+import { byService, fixtureProducers, resign, testProducers } from "./support/producers.js";
 
 /**
  * KI-SENTINEL-20261030-002: producer secrets come from protected
@@ -129,7 +130,7 @@ test("loader refuses when the secrets file variable is not set", () => {
 });
 
 test("loader refuses an unreadable file", () => {
-  assert.throws(() => load("production", join(tmpdir(), "no-such-sentinel-secrets.json")), /cannot read/);
+  assert.throws(() => load("production", join(tmpdir(), "no-such-sentinel-secrets.json")), /cannot open/);
 });
 
 test("loader refuses malformed JSON and a wrong schema", () => {
@@ -230,4 +231,74 @@ test("the committed replay fixtures are signed with the test-only fixture secret
       assert.equal(line.credential.token, producerToken(producer.secret, line.event.integrity.payload_hash), `${name}: token`);
     }
   }
+});
+
+// Review findings (independent review of PR #21) ------------------------------
+
+function withSecret(environment: Environment, index: number, secret: string): ProducerRegistration[] {
+  return testProducers(environment).map((producer, i) => (i === index ? { ...producer, secret } : producer));
+}
+
+test("every environment refuses a NUL-padded secret, which HMAC treats as the empty key", () => {
+  assert.equal(producerToken("", "h"), producerToken("\u0000".repeat(32), "h"));
+  for (const environment of ["production", "staging", "test", "development", "local"] as const) {
+    assert.throws(() => new SentinelRuntime(environment, { producers: withSecret(environment, 0, "\u0000".repeat(40)) }), /control character/);
+  }
+});
+
+test("production refuses whitespace, non-ASCII and low-variety secrets", () => {
+  assert.throws(() => new SentinelRuntime("production", { producers: withSecret("production", 0, " ".repeat(40)) }), /printable ASCII/);
+  assert.throws(() => new SentinelRuntime("production", { producers: withSecret("production", 0, "\u{1F511}".repeat(10)) }), /printable ASCII/);
+  assert.throws(() => new SentinelRuntime("production", { producers: withSecret("production", 0, "a".repeat(31) + "b") }), /distinct characters/);
+});
+
+test("a registration added after construction is checked too", () => {
+  const runtime = new SentinelRuntime("production", { producers: testProducers("production") });
+  const published = fixtureProducers("production")[1]!;
+  assert.throws(() => runtime.registry.register(published), /already registered/);
+  assert.throws(() => runtime.registry.register({ ...published, key_id: "key_usage_99" }), /published test secret/);
+  const line = usageLine(published, "evt_post_construction");
+  assert.equal(runtime.gateway.ingest(line.event, line.credential).status, "rejected");
+});
+
+test("a bare registry refuses an empty secret and a mismatched environment", () => {
+  const registry = new ProducerRegistry("production");
+  const producer = testProducers("production")[0]!;
+  assert.throws(() => registry.register({ ...producer, secret: "" }), /has no secret/);
+  assert.throws(() => registry.register(testProducers("staging")[0]!), /registered for "staging"/);
+});
+
+test("loader refuses unknown fields and a key_id shared by two producers", () => {
+  const producers = testProducers("production");
+  const document = secretsDocument("production", producers) as { producers: Record<string, Record<string, unknown>> };
+  assert.throws(() => load("production", writeSecrets({ ...document, extra: true })), /unknown field "extra"/);
+  const entryField = structuredClone(document);
+  entryField.producers[producers[0]!.service]!["signature_required"] = false;
+  assert.throws(() => load("production", writeSecrets(entryField)), /unknown field "signature_required"/);
+  const sharedKey = structuredClone(document);
+  sharedKey.producers[producers[1]!.service]!["key_id"] = producers[0]!.key_id;
+  assert.throws(() => load("production", writeSecrets(sharedKey)), /used by more than one producer/);
+});
+
+test("loader refuses a path that is not a regular file", () => {
+  assert.throws(() => load("production", tmpdir()), ProducerSecretsError);
+});
+
+test("loader refuses a symlink to the secrets file (POSIX)", { skip: process.platform === "win32" ? "symlinks need extra privilege on Windows" : false }, () => {
+  const target = writeSecrets(secretsDocument("production", testProducers("production")));
+  const link = `${target}.link`;
+  symlinkSync(target, link);
+  assert.throws(() => load("production", link, POSIX), /symlink is refused/);
+});
+
+test("resign re-signs a signature-required event so it authenticates with the new secret only", () => {
+  const producers = testProducers("production");
+  const signed = billingLine(byService(fixtureProducers("production"))["billing-service"]!, "evt_resign_billing");
+  assert.ok(signed.event.integrity.signature, "the fixture billing event carries a signature");
+  const runtime = new SentinelRuntime("production", { producers });
+  assert.equal(runtime.gateway.ingest(signed.event, signed.credential).status, "rejected");
+  const [resigned] = resign([signed], producers);
+  assert.notEqual(resigned!.event.integrity.signature, signed.event.integrity.signature);
+  assert.equal(resigned!.event.integrity.payload_hash, signed.event.integrity.payload_hash);
+  assert.equal(runtime.gateway.ingest(resigned!.event, resigned!.credential).status, "accepted");
 });

@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Environment } from "../contracts/envelope.js";
+import { ProducerSecretsError, assertProducerSecretsAllowed } from "./producer_secrets.js";
 
 /**
  * Producer registration (02, SNT-010). Producers authenticate to the
@@ -31,8 +32,20 @@ export function producerToken(secret: string, payloadHash: string): string {
 export class ProducerRegistry {
   private readonly producers = new Map<string, ProducerRegistration>();
 
+  /**
+   * Every registration is checked against `environment` when it is added, not
+   * only at construction (KI-SENTINEL-20261030-002). A registry is bound to
+   * one environment. A key that is already registered cannot be replaced.
+   */
+  constructor(readonly environment: Environment) {}
+
   register(registration: ProducerRegistration): void {
-    this.producers.set(`${registration.service}:${registration.key_id}`, registration);
+    const key = `${registration.service}:${registration.key_id}`;
+    if (this.producers.has(key)) {
+      throw new ProducerSecretsError(`producer "${registration.service}" key "${registration.key_id}" is already registered`);
+    }
+    assertProducerSecretsAllowed(this.environment, [...this.producers.values(), registration]);
+    this.producers.set(key, registration);
   }
 
   get(service: string, keyId: string): ProducerRegistration | undefined {

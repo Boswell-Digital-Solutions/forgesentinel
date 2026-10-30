@@ -62,9 +62,12 @@ npm run fixtures        # regenerate deterministic fixtures
 #   node dist/src/cli.js replay <lines.jsonl>
 # Each line must carry credentials made with the configured secrets. The
 # committed fixtures under fixtures/replay/ are signed with the published
-# fixture secrets, so a production or staging replay rejects them. The
-# end-to-end tests (test/e2e.replay.test.ts) re-sign them with random secrets
-# and run the compound-compromise, spike-only and agent-drift scenarios.
+# fixture secrets and declare the "production" environment. No CLI
+# configuration replays them: production and staging refuse the fixture
+# secrets, and any other environment rejects their events at the environment
+# boundary. The end-to-end tests (test/e2e.replay.test.ts) re-sign them with
+# random secrets and run the compound-compromise, spike-only and agent-drift
+# scenarios.
 
 # Validate documents against contracts:
 node dist/src/cli.js validate event fixtures/golden/event.usage_tokens_recorded.json

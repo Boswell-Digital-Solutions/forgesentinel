@@ -56,7 +56,7 @@ export interface IngestReport {
  * credentials or executes actions.
  */
 export class SentinelRuntime {
-  readonly registry = new ProducerRegistry();
+  readonly registry: ProducerRegistry;
   readonly ledger: EvidenceLedger;
   readonly gateway: EventGateway;
   readonly features = new FeatureService();
@@ -80,6 +80,7 @@ export class SentinelRuntime {
    */
   constructor(readonly environment: Environment, options: SentinelRuntimeOptions) {
     assertProducerSecretsAllowed(environment, options.producers);
+    this.registry = new ProducerRegistry(environment);
     this.ledger = new EvidenceLedger(options.walPath);
     this.gateway = new EventGateway(this.registry, this.ledger);
     this.receipts = new ReceiptService(this.ledger);
