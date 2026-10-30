@@ -54,16 +54,20 @@ npm install
 npm test                # build + 182 tests against plan exit gates
 npm run fixtures        # regenerate deterministic fixtures
 
-# Replay the end-to-end scenario from the plan (new key + new region +
-# usage spike + failed logins -> compound incident -> REQUEST_OPERATOR):
-node dist/src/cli.js replay fixtures/replay/compound_account_compromise.jsonl
-
-# A usage spike alone must stay advisory:
-node dist/src/cli.js replay fixtures/replay/usage_spike_only.jsonl
-
-# Agent drift: patch burst + denials + boundary violation -> stop run +
-# quarantine the exact agent version (re-enable path receipted):
-node dist/src/cli.js replay fixtures/replay/agent_drift.jsonl
+# The replay CLI needs producer secrets from protected configuration. It has
+# no built-in secrets (KI-SENTINEL-20261030-002). The file must not be
+# readable by group or others:
+#   SENTINEL_PRODUCER_SECRETS_FILE=/path/to/producers.json
+#   SENTINEL_ENVIRONMENT=production   (the default)
+#   node dist/src/cli.js replay <lines.jsonl>
+# Each line must carry credentials made with the configured secrets. The
+# committed fixtures under fixtures/replay/ are signed with the published
+# fixture secrets and declare the "production" environment. No CLI
+# configuration replays them: production and staging refuse the fixture
+# secrets, and any other environment rejects their events at the environment
+# boundary. The end-to-end tests (test/e2e.replay.test.ts) re-sign them with
+# random secrets and run the compound-compromise, spike-only and agent-drift
+# scenarios.
 
 # Validate documents against contracts:
 node dist/src/cli.js validate event fixtures/golden/event.usage_tokens_recorded.json

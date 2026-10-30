@@ -1,14 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  SentinelRuntime,
   buildEvent,
-  standardProducers,
   validateFinding,
   AGENT_FORBIDDEN_ACTIONS,
   type ReplayLine,
   type ShadowReport,
 } from "../src/index.js";
+import { byService, productionRuntime, testProducers } from "./support/producers.js";
 
 /**
  * Wave 5 (Sentinel-Agent): patch burst, repository/permission boundary
@@ -17,7 +16,8 @@ import {
  */
 
 const RECOMMEND_CLASSES = new Set(["RECOMMEND_ONLY", "REQUEST_OPERATOR"]);
-const producers = Object.fromEntries(standardProducers("production").map((producer) => [producer.service, producer]));
+const PRODUCERS = testProducers("production");
+const producers = byService(PRODUCERS);
 const agents = producers["forgeagents"]!;
 const TENANT = { tenant_id: "ten_agent", account_id: "acct_agent_1" };
 const BASE = Date.parse("2026-06-09T12:00:00.000Z");
@@ -27,7 +27,7 @@ function iso(ms: number): string {
 }
 
 function run(lines: ReplayLine[]): ShadowReport {
-  return new SentinelRuntime("production").runShadow(lines);
+  return productionRuntime(PRODUCERS).runShadow(lines);
 }
 
 function patchApplied(id: string, occurredAt: string, agentId: string): ReplayLine {

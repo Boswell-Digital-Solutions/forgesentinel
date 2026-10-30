@@ -2,24 +2,28 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import {
-  SentinelRuntime,
   loadReplayFile,
   buildEvent,
-  standardProducers,
   validateFinding,
   validateIncident,
   COST_FORBIDDEN_ACTIONS,
   type ReplayLine,
   type ShadowReport,
 } from "../src/index.js";
+import { byService, productionRuntime, resign, testProducers } from "./support/producers.js";
 
 const FIXTURES = join(process.cwd(), "fixtures", "replay");
-const COMPOUND = loadReplayFile(join(FIXTURES, "compound_account_compromise.jsonl"));
-const SPIKE_ONLY = loadReplayFile(join(FIXTURES, "usage_spike_only.jsonl"));
-const AGENT_DRIFT = loadReplayFile(join(FIXTURES, "agent_drift.jsonl"));
+// The committed fixtures are signed with the published fixture secrets. A
+// production runtime refuses those, so the tests re-sign the fixtures with
+// fresh random secrets (KI-SENTINEL-20261030-002).
+const PRODUCERS = testProducers("production");
+const producers = byService(PRODUCERS);
+const COMPOUND = resign(loadReplayFile(join(FIXTURES, "compound_account_compromise.jsonl")), PRODUCERS);
+const SPIKE_ONLY = resign(loadReplayFile(join(FIXTURES, "usage_spike_only.jsonl")), PRODUCERS);
+const AGENT_DRIFT = resign(loadReplayFile(join(FIXTURES, "agent_drift.jsonl")), PRODUCERS);
 
 function run(lines: ReplayLine[]): ShadowReport {
-  return new SentinelRuntime("production").runShadow(lines);
+  return productionRuntime(PRODUCERS).runShadow(lines);
 }
 
 test("end-to-end compound compromise: evidence -> findings -> incident -> REQUEST_OPERATOR (12 scenario)", () => {
@@ -119,7 +123,6 @@ test("duplicated fixture lines are safe (idempotent ingestion)", () => {
 });
 
 test("policy-caused denials do not feed back as fresh compromise evidence (ADR-022, Gate D proof)", () => {
-  const producers = Object.fromEntries(standardProducers("production").map((producer) => [producer.service, producer]));
   const lineage = {
     control_origin: "sentinel_policy" as const,
     sentinel_incident_id: "inc_0001",
@@ -167,7 +170,6 @@ test("Sentinel-Cost cannot recommend forbidden commercial actions (03)", () => {
 });
 
 test("cold-start account produces no spike finding (05 cold start)", () => {
-  const producers = Object.fromEntries(standardProducers("production").map((producer) => [producer.service, producer]));
   const newAccount: ReplayLine[] = [0, 1, 2].map((index) =>
     buildEvent(producers["usage-metering"]!, {
       event_id: `evt_cold_${index}`,
@@ -186,7 +188,7 @@ test("cold-start account produces no spike finding (05 cold start)", () => {
 });
 
 test("every finding and incident is reconstructable from ledger evidence (definition of done)", () => {
-  const runtime = new SentinelRuntime("production");
+  const runtime = productionRuntime(PRODUCERS);
   const report = runtime.runShadow(COMPOUND);
   const ledgerEvidenceIds = new Set(
     runtime.ledger
@@ -208,7 +210,7 @@ test("every finding and incident is reconstructable from ledger evidence (defini
 });
 
 test("evidence-before-inference is enforced on the real production path, not only the CLI validate command", () => {
-  const runtime = new SentinelRuntime("production");
+  const runtime = productionRuntime(PRODUCERS);
   const evidenceFreeFinding = {
     finding_id: "fnd_bad_00001",
     finding_type: "agent.patch_burst",

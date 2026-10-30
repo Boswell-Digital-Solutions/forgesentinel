@@ -1,5 +1,6 @@
 export * from "./contracts/index.js";
 export * from "./spine/producers.js";
+export * from "./spine/producer_secrets.js";
 export * from "./spine/ledger.js";
 export * from "./spine/gateway.js";
 export * from "./spine/build.js";

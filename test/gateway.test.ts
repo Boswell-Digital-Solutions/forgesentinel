@@ -6,14 +6,14 @@ import {
   ProducerRegistry,
   buildEvent,
   producerToken,
-  standardProducers,
   type ProducerRegistration,
 } from "../src/index.js";
+import { testProducers } from "./support/producers.js";
 
 function setup(): { gateway: EventGateway; ledger: EvidenceLedger; producers: Record<string, ProducerRegistration> } {
-  const registry = new ProducerRegistry();
+  const registry = new ProducerRegistry("production");
   const producers: Record<string, ProducerRegistration> = {};
-  for (const producer of standardProducers("production")) {
+  for (const producer of testProducers("production")) {
     registry.register(producer);
     producers[producer.service] = producer;
   }

@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Environment } from "../contracts/envelope.js";
+import { ProducerSecretsError, assertProducerSecretsAllowed } from "./producer_secrets.js";
 
 /**
  * Producer registration (02, SNT-010). Producers authenticate to the
@@ -29,14 +30,37 @@ export function producerToken(secret: string, payloadHash: string): string {
 }
 
 export class ProducerRegistry {
-  private readonly producers = new Map<string, ProducerRegistration>();
+  readonly #producers = new Map<string, Readonly<ProducerRegistration>>();
+
+  /**
+   * Every registration is checked against `environment` when it is added, not
+   * only at construction (KI-SENTINEL-20261030-002). A registry is bound to
+   * one environment. A key that is already registered cannot be replaced.
+   * The registry checks and keeps a frozen copy, so a caller cannot change a
+   * registration after the check.
+   */
+  constructor(readonly environment: Environment) {}
 
   register(registration: ProducerRegistration): void {
-    this.producers.set(`${registration.service}:${registration.key_id}`, registration);
+    const copy: Readonly<ProducerRegistration> = Object.freeze({
+      service: registration.service,
+      environment: registration.environment,
+      key_id: registration.key_id,
+      secret: registration.secret,
+      signature_required: registration.signature_required,
+      allowed_event_prefixes: Object.freeze([...registration.allowed_event_prefixes]) as string[],
+      tenant_scope: registration.tenant_scope,
+    });
+    const key = `${copy.service}:${copy.key_id}`;
+    if (this.#producers.has(key)) {
+      throw new ProducerSecretsError(`producer "${copy.service}" key "${copy.key_id}" is already registered`);
+    }
+    assertProducerSecretsAllowed(this.environment, [...this.#producers.values(), copy]);
+    this.#producers.set(key, copy);
   }
 
-  get(service: string, keyId: string): ProducerRegistration | undefined {
-    return this.producers.get(`${service}:${keyId}`);
+  get(service: string, keyId: string): Readonly<ProducerRegistration> | undefined {
+    return this.#producers.get(`${service}:${keyId}`);
   }
 
   authenticate(credential: ProducerCredential, payloadHash: string): ProducerRegistration | undefined {

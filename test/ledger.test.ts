@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CrossTenantAccessDenied, EvidenceLedger, buildEvent, standardProducers } from "../src/index.js";
+import { CrossTenantAccessDenied, EvidenceLedger, buildEvent } from "../src/index.js";
+import { byService, testProducers } from "./support/producers.js";
 
-const producers = Object.fromEntries(standardProducers("production").map((producer) => [producer.service, producer]));
+const PRODUCERS = testProducers("production");
+const producers = byService(PRODUCERS);
 
 function appendEvent(ledger: EvidenceLedger, overrides: { sensitivity?: "internal" | "confidential" | "restricted"; content?: boolean; cloudAllowed?: boolean; lane?: "local" | "cloud"; payload?: Record<string, unknown>; tenant?: string }) {
   const { event } = buildEvent(producers["forgeagents"]!, {
