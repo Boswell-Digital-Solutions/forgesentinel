@@ -302,3 +302,17 @@ test("resign re-signs a signature-required event so it authenticates with the ne
   assert.equal(resigned!.event.integrity.payload_hash, signed.event.integrity.payload_hash);
   assert.equal(runtime.gateway.ingest(resigned!.event, resigned!.credential).status, "accepted");
 });
+
+test("changing a registration object after it is registered has no effect", () => {
+  const producers = testProducers("production");
+  const runtime = new SentinelRuntime("production", { producers });
+  const published = fixtureProducers("production")[1]!;
+  producers[1]!.secret = published.secret;
+  producers[1]!.allowed_event_prefixes.push("billing.");
+  const forged = usageLine(published, "evt_mutated_registration");
+  assert.equal(runtime.gateway.ingest(forged.event, forged.credential).status, "rejected");
+  const stored = runtime.registry.get(producers[1]!.service, producers[1]!.key_id)!;
+  assert.ok(Object.isFrozen(stored));
+  assert.notEqual(stored.secret, published.secret);
+  assert.deepEqual(stored.allowed_event_prefixes, ["usage."]);
+});

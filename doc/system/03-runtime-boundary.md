@@ -17,13 +17,13 @@ The Event Gateway (`src/spine/gateway.ts`) is an in-process class. It has no net
 Producer secrets come from protected configuration (KI-SENTINEL-20261030-002). The source holds only the non-secret producer profiles (`STANDARD_PRODUCER_PROFILES` in `src/spine/producer_secrets.ts`).
 
 - `SentinelRuntime` takes its producer registrations from the caller. It has no built-in default.
-- `ProducerRegistry` is bound to one environment. It checks each registration when it is added, including a registration added after the runtime is built. It refuses to replace a key that is already registered.
+- `ProducerRegistry` is bound to one environment. It checks each registration when it is added, including a registration added after the runtime is built. It refuses to replace a key that is already registered. It keeps a frozen copy of each registration, so a caller cannot change a registration after the check.
 - An empty list is valid. The gateway then refuses every event. `sentinel watch-cssa` uses an empty list, because it does not use the gateway.
 - `loadProducerRegistrations(environment)` reads the file named by `SENTINEL_PRODUCER_SECRETS_FILE`. The file has the schema `forgesentinel.producer_secrets.v1`, an `environment`, and one `key_id` and `secret` for each standard producer.
 - The loader opens the file once and checks the open file. It refuses these and throws `ProducerSecretsError`:
   - a missing variable;
-  - a symlink, a path that is not a regular file, or a file that cannot be read;
-  - on POSIX, a file that group or others can read or write, or a file owned by another user (Windows has no permission check);
+  - a path that is not a regular file, or a file that cannot be read;
+  - on POSIX, a symlink, a file that group or others can read or write, or a file owned by another user (Windows follows symlinks and has no permission or owner check);
   - a file for another environment, or an unknown field at the top level or in a producer entry;
   - a missing producer, an unknown producer, or one `key_id` used by two producers.
 - Every environment refuses a secret that contains a control character. HMAC pads a short key with NUL bytes, so a secret of NUL bytes is the empty key.

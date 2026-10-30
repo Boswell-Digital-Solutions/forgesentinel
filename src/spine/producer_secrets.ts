@@ -102,7 +102,8 @@ export interface LoadProducerSecretsOptions {
  * symlink, not a regular file, unreadable, or (POSIX) group/world-accessible
  * or owned by another user; a different environment; an unknown field; a
  * missing or unknown producer; a shared key_id; or a refused secret throws
- * ProducerSecretsError. Windows has no permission check.
+ * ProducerSecretsError. On Windows, symlinks are followed and there is no
+ * permission or owner check.
  */
 export function loadProducerRegistrations(environment: Environment, options: LoadProducerSecretsOptions = {}): ProducerRegistration[] {
   const env = options.env ?? process.env;
