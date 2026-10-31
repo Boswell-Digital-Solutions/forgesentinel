@@ -123,6 +123,17 @@ _Last updated: 2026-09-20_
 Found while scoping CI to the change type. `.github/workflows/ci.yml` is the only workflow. It runs `npm ci --ignore-scripts`, `npm run build` and `node --test dist/test/*.test.js`. No workflow runs a secret scan, a dependency audit (`npm audit`), CodeQL, or an egress check. For the security layer of the ecosystem this is a gap in the evidence, not in the tests. The CI-scope change does not add or remove any scan: it filters `ci.yml` only, and `doc/system/06-verification.md` states that a future secret scan must run on every change.
 Status: OPEN. Closed when a secret scan that runs on every change is added, and the owner decides about the other scans.
 
+## KI-SENTINEL-20261030-003: The fixture generator fails on Windows — OPEN 2026-10-30
+
+- **Classification**: Tooling defect. Not a security defect. It has no effect on the runtime or on CI, which runs on Linux.
+- **Discovery source**: forgesentinel PR #21 (the KI-SENTINEL-20261030-002 correction). The operator ruled that it is filed separately.
+- **Verified at**: `6ca9ce981a48706df1708bb31cffe6a884f93f38` (`origin/master`), 2026-10-30, on Windows 11 with Node 22.17.1.
+- **Evidence**: `tools/gen-fixtures.ts:18` sets `const ROOT = new URL("../..", import.meta.url).pathname;`. On Windows, `pathname` is `/C:/Forge/...`, and `join` then makes `C:\C:\Forge\...`.
+- **Observed behavior**: `npm run fixtures` fails before it writes a file, with `ENOENT: no such file or directory, mkdir 'C:\C:\Forge\...\fixtures\replay'`. On Linux, `pathname` is a valid path, and the generator works.
+- **Proposed correction**: Use `fileURLToPath(new URL("../..", import.meta.url))` from `node:url`. Then confirm that `npm run fixtures` on Windows and on Linux makes no change under `fixtures/`.
+- **No change made**: This record changes no code.
+- **Status**: Open — recorded, unresolved until the correction is verified.
+
 ## KI-SENTINEL-20261030-001: doc/system does not describe the Event Gateway or the ingress surface — OPEN 2026-10-30
 
 - **Classification**: Documentation drift. This entry does not claim a runtime defect.
