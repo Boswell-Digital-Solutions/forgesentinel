@@ -183,4 +183,42 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
   6. `sentinel replay` reads `SENTINEL_ENVIRONMENT` (default `production`). This answers proposed item 3: the label is now set explicitly, and the CLI fails closed without configured secrets. `sentinel watch-cssa` registers no producers.
   7. An independent security review of head `8c7c15d` found no blocking defect. Within the same scope, this correction then also: refuses control characters (a NUL-padded secret is the empty HMAC key) in every environment; refuses non-ASCII, whitespace and low-variety secrets in production and staging; checks every registration in `ProducerRegistry`, not only at runtime construction, keeps a frozen copy of it, and refuses to replace a registered key; opens the secrets file once and refuses a non-regular file and, on POSIX, a symlink and a file owned by another user (Windows follows symlinks and has no permission check); and refuses unknown fields and a shared `key_id`.
   Not in this correction: the ADR-026 change to Ed25519 needs its own verification, by operator ruling. No secret was rotated; the published values stay public and are now refused. Deployment and new ingress stay blocked until this correction is verified.
+- **Merged (2026-10-30)**: PR #21 merged as `2669e74156be1f3492c039b6c75d16bd04878630`, on operator authorization. Its tree is identical to the reviewed head `ebcb073542736976cf63f962bb9f23c7b5a6b5f4`. Three independent review rounds found no blocking defect, and Linux CI passed at that head. The residual findings are KI-SENTINEL-20261030-004, -005 and -006.
+- **Still required to close**: operational verification, and credential remediation. The operator ruled that merging is not deployment authorization, and that no credential rotation is authorized yet.
+- **Status**: Open — the code correction is merged; unresolved until operational verification and credential remediation are complete.
+
+## KI-SENTINEL-20261030-004: Code in the same process can replace the Event Gateway's producer registry — OPEN 2026-10-30 — security — high-priority follow-up
+
+- **Classification**: Security, in-process only. The operator rated it a high-priority follow-up.
+- **Discovery source**: independent security review of forgesentinel PR #21, round 3.
+- **Verified at**: `2669e74156be1f3492c039b6c75d16bd04878630` (`origin/master`), by code reading. The reviewer executed it at `ebcb073`, which has the same tree.
+- **Evidence**: `src/spine/gateway.ts:51-52`: `EventGateway` receives its registry as `private readonly registry: ProducerRegistry`. A TypeScript `private` is not private at run time, and nothing checks the type of the object.
+- **Observed behavior**: Code in the same process sets `runtime.gateway["registry"]` to another object. That object can be another `ProducerRegistry`, or any object with `authenticate` and `allowsEventType` methods. A production runtime then accepts a forged event signed with the published fixture secret.
+- **Reachability**: Not reachable through `sentinel replay`, `sentinel watch-cssa`, or any external event path. The gateway has no network ingress (KI-SENTINEL-20261030-001). An attacker must already run code inside the Sentinel process.
+- **Proposed correction**: Hold the registry in a true private field (`#registry`). Refuse a registry that is not a `ProducerRegistry` instance. Add a negative test for both cases.
+- **No change made**: This record changes no code.
 - **Status**: Open — recorded, unresolved until the correction is verified.
+
+## KI-SENTINEL-20261030-005: A producer registration with an empty event prefix allows every event type — OPEN 2026-10-30 — security — high-priority follow-up
+
+- **Classification**: Security, in-process only. The operator rated it a high-priority follow-up.
+- **Discovery source**: independent security review of forgesentinel PR #21, round 3.
+- **Verified at**: `2669e74156be1f3492c039b6c75d16bd04878630` (`origin/master`), by code reading. The reviewer executed it at `ebcb073`.
+- **Evidence**: `src/spine/producers.ts:76-77`: `allowsEventType` returns true when `eventType.startsWith(prefix)`. Every string starts with `""`. `ProducerRegistry.register` (`src/spine/producers.ts:44-60`) does not check `allowed_event_prefixes`.
+- **Observed behavior**: A library caller registers a usage producer with `allowed_event_prefixes: [""]`. That producer can then emit `billing.subscription.changed`, and the gateway accepts it.
+- **Reachability**: Not reachable through the secrets file. `loadProducerRegistrations` always uses the fixed `STANDARD_PRODUCER_PROFILES` prefixes. A caller that builds registrations in code can reach it.
+- **Proposed correction**: In `register()`, refuse an empty prefix list, an empty prefix, and a prefix that does not end in `.`. Add a negative test.
+- **No change made**: This record changes no code.
+- **Status**: Open — recorded, unresolved until the correction is verified.
+
+## KI-SENTINEL-20261030-006: Low-priority residual items from the PR #21 review — OPEN 2026-10-30
+
+- **Discovery source**: independent security review of forgesentinel PR #21, rounds 1-3. These items were present before PR #21, or are residual assumptions. Each carries the operator's disposition from 2026-10-30.
+- **Verified at**: `2669e74156be1f3492c039b6c75d16bd04878630` (`origin/master`), by code reading.
+- **Items**:
+  1. **Uppercase token acceptance** (low-priority compatibility and security review). `src/spine/producers.ts:69-73`: the token is decoded with `Buffer.from(..., "hex")`, which accepts upper- and lower-case hex. One HMAC therefore has more than one accepted text form. This is malleability, not forgery. Decide whether to require lower-case hex.
+  2. **A missing replay credential crashes the replay** (low-priority error-handling correction). `src/spine/replay.ts:33` passes `line.credential` to the gateway with no check. A line with a `null` credential or token throws a `TypeError`, which stops the whole replay instead of rejecting that one line.
+  3. **Symlinked parent directories are followed** (document the residual filesystem trust assumption). `src/spine/producer_secrets.ts:117-125`: `O_NOFOLLOW` refuses a symlink only as the last path component. On POSIX, a path whose parent directory is a symlink is followed. The type, mode and owner checks still apply to the file itself. Windows follows symlinks and has no permission check. Document in `doc/system/03-runtime-boundary.md` that the directory path to the secrets file must be trusted.
+- **Related**: the fixture generator's Windows path bug is tracked separately as KI-SENTINEL-20261030-003.
+- **No change made**: This record changes no code.
+- **Status**: Open — recorded, unresolved until each item is corrected or explicitly accepted.
