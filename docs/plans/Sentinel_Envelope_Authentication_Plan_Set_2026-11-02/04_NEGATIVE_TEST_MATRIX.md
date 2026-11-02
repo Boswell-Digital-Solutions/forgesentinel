@@ -203,9 +203,9 @@ adversarial cases carry the rest.
 | ADV-H05 | A value that is the complete text of a later record. | The two byte strings differ. |
 | ADV-H06 | An absent field against a present empty string, for each optional field. | The bytes differ for every field. |
 | ADV-H07 | A lineage array of 2 ids against one of 3 where the third is empty. | The count record differs, so the bytes differ. |
-| ADV-H08 | Two envelopes that differ only in `integrity.signature` or `integrity.signature_key_id`, on an event that needs no signature. | **The bytes must differ once finding F3 is corrected.** Until then both envelopes are accepted by a real gateway, so this is a live collision and not correct behaviour. |
-| ADV-H10 | An absent optional parent object against a present empty one, for `tenant`, `resource` and `control_lineage`. | The bytes must differ (finding F2). |
-| ADV-H11 | `sentinel_finding_ids` as `["a","b"]`, as `"ab"`, and as `{0:"a",1:"b",length:2}`. | The encoder refuses the second and the third. The bytes for the first differ from any refusal (finding F1). |
+| ADV-H08 | Two envelopes that differ only in `integrity.signature` or `integrity.signature_key_id`. | **Updated by ruling R1-A (2026-11-02).** Split the case by family. On an event that needs **no** signature, both envelopes are **refused**, because R1-A refuses the two fields outright, so there is no pair to compare. On an event that **requires** a signature, the fields may appear and are bound, so the bytes must differ. Before the correction both envelopes are accepted by a real gateway, so this is a live collision and not correct behaviour. |
+| ADV-H10 | An absent optional parent object against a present empty one. | **Updated by ruling R1-B (2026-11-02).** Two parents, not three. For `resource`, and for `tenant` on a system-scoped family, the presence record makes the bytes differ (finding F2). For `control_lineage` the assertion is different: `validateEventEnvelope` already refuses a present empty one, verified at `4225489`, so that member asserts a validator refusal and not a byte difference. It gets no presence record. |
+| ADV-H11 | `sentinel_finding_ids` as `["a","b"]`, as `"ab"`, and as `{0:"a",1:"b",length:2}`. | The encoder refuses the second and the third. The bytes for the first differ from any refusal (finding F1). **Under ruling R1-C the validator also refuses the second and the third**, so the case asserts refusal at both boundaries, and `Array.isArray` is the only check that separates the three. |
 | ADV-H09 | A string with an unpaired surrogate. | The encoder refuses it. It never produces bytes. |
 
 **ADV-H08 was wrong in review round 1, and it is corrected here.** It
@@ -291,9 +291,9 @@ reach any decision about storage, access or retention.
 | Case | Construction | Today | Required | Reason code |
 |---|---|---|---|---|
 | NEG-L01 | Change the payload **and** recompute `integrity.payload_hash` to match, then ingest with the original credential. | accepted | rejected | `producer_auth_failed` |
-| NEG-L02 | Add `integrity.signature` and `signature_key_id` to an event that needs no signature. | accepted and stored | rejected | `signature_invalid` or `unknown_envelope_field`, per the F3 ruling |
-| NEG-L03 | `sentinel_finding_ids` as a string, and as an array-like object. | accepted | rejected | `envelope_not_encodable` |
-| NEG-L04 | A present empty `tenant`, `resource` or `control_lineage` against the absent parent. | accepted | rejected | `producer_auth_failed` |
+| NEG-L02 | Add `integrity.signature` and `signature_key_id` to an event that needs no signature. | accepted and stored | rejected | A validation refusal, per ruling R1-A. **Not `unknown_envelope_field`**: both are known fields, which is review finding F16's lesson. Slice S2 chooses and records the exact code. |
+| NEG-L03 | `sentinel_finding_ids` as a string, and as an array-like object. | accepted | rejected | `envelope_not_encodable` at the encoder, and a validation refusal at `validateEventEnvelope` under ruling R1-C. Both boundaries refuse it. |
+| NEG-L04 | A present empty `resource`, or a present empty `tenant` on a system-scoped family, against the absent parent. | accepted | rejected | Two codes, per rulings R1-B and R1-C. An altered envelope gives `producer_auth_failed`, because the presence record changes the authenticated bytes. A legitimately submitted empty parent gives a validation refusal, because R1-C requires `resource_type` and `resource_id` when `resource` is present. `control_lineage` leaves this case: a present empty one is already refused today. |
 | NEG-L05 | A raw replay line with a duplicate JSON key. | the later value wins silently | refused at intake | a new intake code |
 | NEG-L06 | A `key_id` containing the HKDF `info` separator, registered for two producers. | registration accepted | the registry refuses the second registration | `ProducerRegistrationError` |
 | NEG-L07 | Ingest a signed event, then ingest it verbatim through a fresh gateway over the same ledger. | accepted | duplicate, or a stated non-goal | — |

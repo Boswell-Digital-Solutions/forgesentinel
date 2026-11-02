@@ -104,14 +104,20 @@ Round 1 does not propose rulings. These are the decisions it surfaced.
 
 **Two are ruled (2026-11-02): R1-D and R1-E.** `06` holds both rulings, and an
 amendment to R1-E's wording, which did not reach the denial record in
-`KI-SENTINEL-20261102-016`. Six stay open: R1-A, R1-B, R1-C, R1-F, R1-G and
-R1-H. Round 1's findings and its verdict are unchanged by those two rulings.
+`KI-SENTINEL-20261102-016`. R1-A, R1-B and R1-C followed on the same day, so
+**five are ruled and three stay open: R1-F, R1-G and R1-H**. Amendment 3 in `06`
+raises D-2's bound record count from 41 to 43, which R1-B forces.
+
+Round 1's findings and its verdict are unchanged by those rulings. The verdict
+stands: not safe to proceed to implementation authorization as written. The
+rulings say what the corrections are. No correction is implemented, so F1, F2
+and F3 are settled in design and open in fact.
 
 | ID | Decision |
 |---|---|
-| R1-A | F3: refuse `integrity.signature` and `signature_key_id` on an event that needs no signature, or bind both in every context. |
-| R1-B | F2: add a presence record for each optional parent object, or refuse a present empty parent in the validator. The first keeps injectivity in the encoding. |
-| R1-C | F1 and F5: how far the validator's type rules go, and whether the drift test compares types as well as names. |
+| R1-A | **RULED, see `06`.** F3: refuse `integrity.signature` and `signature_key_id` on an event that needs no signature, or bind both in every context. Ruled: **both**, because binding alone leaves `KI-SENTINEL-20261102-014` open. |
+| R1-B | **RULED, see `06`.** F2: add a presence record for each optional parent object, or refuse a present empty parent in the validator. The first keeps injectivity in the encoding. Ruled: presence records **and** the validator rules, for the **two** affected parents — `resource` and `tenant`. `control_lineage` needs none, because a present empty one is already refused. |
+| R1-C | **RULED, see `06`.** F1 and F5: how far the validator's type rules go, and whether the drift test compares types as well as names. Ruled: **every declared field** is type-validated, and the drift test compares types as well as names. Measured at `4225489`: 18 of 18 declared optional fields admit a wrong-typed value today. |
 | R1-D | **RULED, see `06`.** F33, F31, F34: whether this track carries the `src/spine/ledger.ts` changes, or a separate authorized change does. Gate 5 cannot be met without them. Ruled: a separate change, as slice SL, sequenced before S4. |
 | R1-E | **RULED, see `06`.** F34: a new `LedgerRecord` provenance field, or a rule that a rejection record carries no `tenant_id`. Ruled: the omission rule, bound on unauthenticated provenance rather than on the `rejection` kind, with the claimed tenant held in metadata. |
 | R1-F | F12: confirm that refusing `-0` is a deliberate divergence from `forge_contract_core`, and accept the ADR-025 cross-language consequence. |
@@ -120,7 +126,9 @@ R1-H. Round 1's findings and its verdict are unchanged by those two rulings.
 
 ## What round 2 must cover
 
-1. The candidate fixes for F1, F2 and F3, re-attacked.
+1. The ruled fixes for F1, F2 and F3, re-attacked. R1-A, R1-B and R1-C name
+   them, so round 2 attacks an implementation and not a candidate. The two new
+   presence records and the 43-record count are part of the target.
 2. The decoder round trip that replaces PROP-H02.
 3. The gate-5 record shape, once chosen, against `src/spine/ledger.ts`. R1-D
    moves that file to slice SL, before S4, so round 2 assesses the shape against

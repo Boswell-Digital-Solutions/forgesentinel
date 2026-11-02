@@ -11,8 +11,25 @@ before implementation. See `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md`.
 **Review round 1 found three blocking defects in this document.** The format as
 specified here is **not** one to one, and two admitted fields are not bound.
 `07_REVIEW_ROUND_1_FINDINGS.md` holds the findings, each reproduced by
-execution. The defects are marked in place below. Do not implement this
-document until the owner rules on the candidate fixes.
+execution. The defects are marked in place below.
+
+**The owner ruled all three fixes on 2026-11-02** — R1-A for F3, R1-B for F2 and
+R1-C for F1 and F5. Each marking below now states the ruled fix.
+`06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` is the authoritative record.
+
+**This document is not yet corrected to match those rulings, and implementation
+stays unauthorized.** Three consequences are outstanding, and slice S1 must
+produce them:
+
+1. The bound record count moves from 41 to **43**, because R1-B adds a presence
+   record for `tenant` and one for `resource`. Ruling D-2 fixed the count at 41,
+   so D-2 is amended by R1-B. Amendment 3 in `06` records that.
+2. The worked example below — 41 records and 1479 bytes — is **superseded**. It
+   must be regenerated, and the round-1 reviewer reproduced the old value byte
+   for byte, so the new value needs the same independent reproduction.
+3. The golden vector changes with it.
+
+Do not read the byte counts in this document as current.
 
 ## Format name and version tag
 
@@ -90,12 +107,32 @@ same authenticated bytes. The same holds for `tenant` on a system-scoped
 family. Two different supported events therefore share one signature, which is
 what gate 2 forbids.
 
-Candidate fix, **not ruled**: add one presence record for each optional parent
-object — `tenant`, `resource` and `control_lineage` — with tag `b` and the
-value `true` or `false`. The parent's presence then changes the bytes. The
-alternative, refusing a present empty parent in the validator, is weaker: it
-leaves the format relying on the validator for injectivity rather than on the
-encoding.
+**RULED, R1-B (2026-11-02).** Add a presence record for the affected optional
+parent objects, with tag `b` and the value `true` or `false`, **and** tighten
+the validator under R1-C. Both, not one: gate 2 requires the *encoding* to be
+injective, so that property must not depend on the validator behaving.
+
+**Two parents are affected, not three.** The earlier candidate fix named
+`tenant`, `resource` and `control_lineage`. Verified by execution at `4225489`:
+
+| Parent | Absent | Present `{}` | Presence record |
+|---|---|---|---|
+| `resource` | admitted | **admitted** | **Required** |
+| `tenant`, system-scoped family | admitted | **admitted** | **Required** |
+| `control_lineage` | admitted | refused | Not required |
+
+`control_lineage` needs none. `validateEventEnvelope` already requires
+`control_origin` and `policy_generated_effect` when `control_lineage` is
+present, so a present empty one cannot pass, and an absent parent already
+differs from a present valid one in the `control_origin` record. A presence
+record there would distinguish nothing.
+
+So the count rises by two, from 41 to 43, which amends D-2.
+
+The alternative, refusing a present empty parent in the validator alone, is
+refused as insufficient. For `resource` it **cannot** work on its own:
+`validateEventEnvelope` never reads `resource` at any depth today, so that
+option silently depends on the R1-C type rules anyway.
 
 A present empty string uses the tag `s` with the length `0`. An absent field and
 a present empty string therefore have different bytes. This difference matters:
@@ -115,12 +152,36 @@ the event with the reason code `envelope_not_encodable`:
   then give the same bytes, so the encoding would stop being one to one;
 - a bound object field that is present but is not an object;
 - a `sentinel_finding_ids` that is not an array, or an array with an element
-  that is not a string. **This rule is new, from review finding F1.** The
-  earlier text refused only a bad element, so a value that merely behaves like
-  an array passed. A string and an array-like object both have `length` and
-  index access, so `["a","b"]`, `"ab"` and `{0:"a",1:"b",length:2}` all encoded
-  identically, and `validateEventEnvelope` admits all three. `Array.isArray`
-  is the check.
+  that is not a string. **This rule is new, from review finding F1, and the
+  owner ruled it under R1-C.** The earlier text refused only a bad element, so a
+  value that merely behaves like an array passed. A string and an array-like
+  object both have `length` and index access, so `["a","b"]`, `"ab"` and
+  `{0:"a",1:"b",length:2}` all encoded identically, and `validateEventEnvelope`
+  admits all three. `Array.isArray` is the check, because it is the only one of
+  those properties that separates the three. Verified at `4225489`: all three
+  give `length=2`, `[0]="a"` and `[1]="b"`, and only `Array.isArray` differs.
+
+**RULED, R1-C (2026-11-02).** The encoder rule above is necessary and not
+sufficient. `validateEventEnvelope` must type-validate **every declared field**,
+and the R-5 drift test must compare **types as well as names**.
+
+Measured at `4225489`: a wrong-typed value is admitted in **18 of 18** declared
+optional fields. The cause is structural rather than a single missing check.
+`validateEventEnvelope` never reads `resource` at any depth, never reads
+`integrity.signature` or `integrity.signature_key_id`, never reads
+`control_lineage.sentinel_finding_ids`, and never reads `tenant.account_id`,
+`actor.session_id`, `actor.api_key_fingerprint`, `correlation.run_id`,
+`correlation.parent_event_id`, `location.region` or `location.country`. So
+`resource: "not-an-object"`, `location.country: 44` and
+`resource.classification: "banana"` are all admitted today.
+
+Two reasons the ruling goes this far. First, the encoder must refuse an
+unencodable value in any case, so a permissive validator only converts a clean
+validation error into a runtime `envelope_not_encodable` rejection — review
+finding F5's contract-valid but unencodable class. Validating up front makes
+"passes validation, therefore encodable" an invariant that S1 and S2 can rely
+on. Second, a drift test that compares names only lets a later change loosen a
+type and reopen F1 without failing CI.
 
 ## The field list and the order
 
@@ -191,12 +252,24 @@ was a non-hex signature with a numeric key id. A corrected gateway built from
 this document would still accept both, because nothing binds or refuses them.
 `KI-SENTINEL-20261102-014` records the current-code defect.
 
-Candidate fixes, **not ruled**: (a) refuse both fields on an event that
-requires no signature, and bind them in the `credential` context when a
-signature is required; or (b) bind both in every context, with the absent tag
-when they are not present. Option (a) keeps the bytes shorter and makes the
-refusal explicit. Either way the unknown-field refusal cannot help here,
-because both are known fields.
+**RULED, R1-A (2026-11-02).** Do both, not one of the two.
+
+1. **Refuse** `integrity.signature` and `integrity.signature_key_id` on an event
+   whose family requires no signature. `validateEventEnvelope` already resolves
+   the family entry, so the condition costs nothing.
+2. **Bind** both fields in every context where they may legitimately appear,
+   with the absent tag when they are not present.
+
+The two measures close different holes, which is why the ruling takes both.
+Binding alone stops a third party adding or altering the fields, but on a
+no-signature family an unverified value is still stored as accepted evidence, so
+`KI-SENTINEL-20261102-014` would stay open. Refusal closes that, because the
+field cannot be present at all. Refusal alone would leave the
+signature-required case resting on the verification path rather than on the
+credential binding.
+
+The unknown-field refusal cannot help either way, because both are known
+fields.
 
 ### A future authenticated field needs a versioned format change
 
@@ -305,9 +378,10 @@ because ADR-025 makes cross-language parity a contract property.
 
 ### Where the rule applies
 
-**No bound field is typed as a number.** The 41 fixed records are strings,
+**No bound field is typed as a number.** The fixed records are strings,
 booleans and one count, each finding-id record is a string, and the encoder
-produces the count from the array length.
+produces the count from the array length. R1-B raises the fixed count from 41 to
+43 and both new records are booleans, so this statement still holds.
 
 That is a statement about the format, not about what the envelope admits.
 Review finding F14 corrected an earlier, stronger sentence here. Verified by
@@ -435,12 +509,23 @@ control_lineage.control_id\x1f-\x1f0\x1f\x1e
 control_lineage.sentinel_finding_ids.count\x1f-\x1f0\x1f\x1e
 ```
 
-This example has 41 records and 1479 bytes. It has 41 because the golden event
-carries no control lineage: an event with a lineage array adds one record for
-each finding id, so 41 is the floor and not the count for every event. A
-planning script produced the example from the committed fixture. It is illustrative. The implementation slice commits the
-authoritative vector as a golden fixture, with the bytes, the digest and the
-HMAC over a published test key (see `03_COMPATIBILITY_AND_CALLER_IMPACT.md`).
+**SUPERSEDED by ruling R1-B (2026-11-02). Do not use these numbers.** The
+example above has 41 records and 1479 bytes. R1-B adds a presence record for
+`tenant` and one for `resource`, so a corrected example has **43** fixed records
+and a different byte count. The example is not regenerated here, because that is
+encoder work and slice S1 owns it.
+
+The round-1 reviewer reproduced the 1479-byte value byte for byte before making
+any claim, which is why the stale value is called out rather than quietly left.
+The regenerated example needs the same independent reproduction.
+
+For the record of what the old numbers meant: it had 41 because the golden event
+carries no control lineage, and an event with a lineage array adds one record
+for each finding id, so the fixed count is a floor and not the count for every
+event. A planning script produced the example from the committed fixture, and it
+was illustrative. The implementation slice commits the authoritative vector as a
+golden fixture, with the bytes, the digest and the HMAC over a published test key
+(see `03_COMPATIBILITY_AND_CALLER_IMPACT.md`).
 
 ## Why the format is one to one
 
@@ -458,6 +543,12 @@ findings F1, F2 and F3 are corrected**. As this document stands, that claim is
 false: review round 1 produced distinct, validator-admitted, gateway-accepted
 envelope pairs that encode identically. The property is the intent and the
 subject of gate 2. It is not yet established.
+
+**The fixes are ruled and not yet applied.** R1-A, R1-B and R1-C (2026-11-02)
+settle what the corrections are. The property becomes establishable when slice
+S1 implements them, and it is established only when review round 2 re-attacks
+them against a frozen commit. A ruling is not a correction, and gate 2 stays
+open until then.
 
 The closed field list has one condition: the envelope must carry no field
 outside the list. `validateEventEnvelope` does not refuse an unknown field
@@ -487,6 +578,10 @@ a convenience.
 
 Two known fields are unbound today, which is review finding F3. Until that is
 corrected, this document must not claim that every field is bound.
+
+R1-A rules the correction: refuse both fields on an event that requires no
+signature, and bind both where they may legitimately appear. The claim becomes
+true when slice S1 implements it, not when the ruling is recorded.
 
 ## Related finding
 
