@@ -336,10 +336,24 @@ chooses the shape; it implements this one.
 **Consistency with R1-E.** R1-E already ruled that a record of unauthenticated
 provenance carries no top-level `tenant_id`. This ruling is consistent with it
 and goes further, because it also forbids *routing* on the purported tenant,
-not only storing it. The gateway interpolates the purported tenant into every
-rejection today — each failure path calls
-`this.reject(event, reasons, event.tenant?.tenant_id)` — so an authentication
-failure must stop doing that. Slice SL carries the ledger side under R1-D.
+not only storing it.
+
+**What the gateway does today, measured.** `src/spine/gateway.ts` has **ten**
+`this.reject(` call sites. **Eight** pass `event.tenant?.tenant_id`. **Two**
+pass `undefined`: line 140, the contract-validation failure, and line 175, the
+`tenant_required` refusal. Counted with
+`grep -n "this\.reject(" src/spine/gateway.ts` at `58723e2`.
+
+An earlier version of this section said the gateway interpolates the purported
+tenant into *every* rejection, and that *each* failure path passes it. Both are
+false, and an independent reviewer caught them. The correction matters in a
+specific way: the contract-validation path — the one ruling 5's rationale
+leans on hardest — is already one of the two that pass `undefined`. So the
+authentication paths are the weaker ones here, not the contract path.
+
+The work is therefore narrower than the earlier text implied: eight call sites
+change, not ten, and the two that already pass `undefined` are the model. Slice
+SL carries the ledger side under R1-D.
 
 **This case is now settled — see "Ruling 5" below.** An earlier version of this
 section left open whether the quarantine shape governs a **contract**-failure
@@ -396,8 +410,22 @@ authentication relies on the digest. Merging S0 alone is insufficient.
 
 ## Owner rulings on the PR #39 review (2026-11-02)
 
-The owner reviewed PR #39 on GitHub and recorded a third set of rulings. The
-disposition is: **accept the security direction, retain the new finding, and
+**Provenance, stated exactly.** The owner inspected PR #39 through GitHub and
+reported its state — open, draft, mergeable, documentation-only, head
+`361b7e6`, four changed files — then **recorded this third set of rulings in the
+operator session, not on the pull request.** No GitHub comment and no GitHub
+review was submitted on PR #39: `gh pr view 39 --json comments,reviews` returns
+zero of each. That is consistent with the rest of this track, where `06`
+already records that no GitHub review has ever been submitted.
+
+So the durable artifact for these rulings is this document and the matching
+entry in `docs/KNOWN_ISSUES.md`. A reader who looks for them on the pull request
+will not find them. An earlier version of this section said "the owner reviewed
+PR #39 on GitHub and recorded a third set of rulings", which misstated where the
+rulings were recorded; an independent reviewer caught it, and this is the
+correction.
+
+The disposition is: **accept the security direction, retain the new finding, and
 keep the implementation hold.** Two further rulings close the two items that
 PR #39 had left open or unclear.
 
@@ -442,14 +470,35 @@ the envelope than the authentication path becomes the cheaper way to get
 attacker-chosen metadata into the evidence ledger. The weaker path then sets the
 real boundary, and the stricter one is decoration.
 
-This reaches more code than ruling 1 did. Every failure path in
-`EventGateway.ingest` currently calls
-`this.reject(event, reasons, event.tenant?.tenant_id)`, and the contract-failure
-paths run before any authentication. Slice SL carries the ledger side under
-R1-D. Group K in `04` must assert the shape for each pre-authentication failure
-class, not only for `producer_auth_failed`.
+This reaches more code than ruling 1 did, though not as much as an earlier
+version of this section claimed. That text said every failure path in
+`EventGateway.ingest` passes the purported tenant to `this.reject`, and that
+the contract-failure paths do so before any authentication. **Both are false.**
+Measured at `58723e2`: ten `this.reject(` call sites, eight passing
+`event.tenant?.tenant_id`, and two passing `undefined` — line 140, the
+contract-validation failure, and line 175, the `tenant_required` refusal.
+
+So the contract path, which this rationale leaned on, already behaves. The
+ruling still stands on its principle, and the principle is what makes it a
+ruling: a malformed envelope is not more trustworthy than one with an invalid
+token, so the rule must be stated for the whole pre-authentication class rather
+than discovered path by path. But the evidence for it is the eight
+authentication-side sites, not a universal defect.
+
+Slice SL carries the ledger side under R1-D. Group K in `04` must assert the
+shape for each pre-authentication failure class, not only for
+`producer_auth_failed`, and it must not assume that every class is wrong today.
 
 ### Ruling 6: correct `KI-SENTINEL-20261102-017` structurally, not by pattern alone
+
+> **Merge-order dependency.** This document **cites**
+> `KI-SENTINEL-20261102-017` and does not **define** it. The finding record
+> lives in `docs/KNOWN_ISSUES.md`, in a separate pull request, because the owner
+> instructed that the finding records and the plan-set ruling records be split.
+> **That pull request must merge first.** If this document reaches `master`
+> alone, `master` carries a ruling against a finding that does not exist there,
+> and the finding-id sequence holes at `-017`. An independent reviewer raised
+> this; it is a sequencing constraint, not a defect in either change.
 
 The owner accepted the finding and ruled the shape of its correction. **Do not
 rely exclusively on field-pattern restrictions.** A pattern that forbids the
@@ -519,8 +568,9 @@ A second round is needed after the owner rules on the candidate fixes. Nothing
 in this plan set may be read as an approved design.
 
 **Status of that condition (2026-11-02):** the owner has ruled on the fixes for
-all three format defects — R1-A, R1-B and R1-C — and on R1-D and R1-E. Three
-decisions stay open: R1-F, R1-G and R1-H. The rulings are recorded below.
+all three format defects — R1-A, R1-B and R1-C — and on R1-D and R1-E, and
+later on R1-H. **Two** decisions stay open: R1-F and R1-G. The rulings are
+recorded below.
 
 Round 2 is still required, and the rulings do not reduce what it must do.
 
@@ -534,15 +584,17 @@ R1-C type rules, the regenerated field table, the worked example and the derived
 record count. Whether a later round also re-attacks the running implementation is
 a separate question, and the gate-2 proof in `04` covers that at S1.
 
-R1-H is one of the three open decisions, and it governs whether `07` satisfies
-recommendation 3 or a submitted GitHub review is also required. No GitHub review
-has ever been submitted on this track.
+**R1-H is ruled**, in "Ruling 3" above: the owner authorized the independent
+design review without requiring a submitted GitHub review, so `07` satisfies
+recommendation 3. No GitHub review has ever been submitted on this track, and
+none is required. An earlier version of this paragraph called R1-H open, which
+contradicted the ruling recorded in the same file.
 
 ## Owner rulings on review round 1 (2026-11-02)
 
 Independent review round 1 surfaced eight open decisions, R1-A to R1-H, in
-`07_REVIEW_ROUND_1_FINDINGS.md`. The owner ruled five of them. Three stay open:
-R1-F, R1-G and R1-H.
+`07_REVIEW_ROUND_1_FINDINGS.md`. The owner ruled **six** of them — R1-A to R1-E,
+and R1-H. **Two** stay open: R1-F and R1-G.
 
 R1-D and R1-E were ruled first, and R1-A, R1-B and R1-C followed on the same
 day. A ruling settles what the correction is. It does not authorize the
@@ -906,9 +958,10 @@ Three boundaries, in order. Each needs its own explicit authorization.
    it, and neither did the rulings.
 2. **Implementation authorization.** Each slice in `05` needs the owner's
    explicit authorization. Design approval is not implementation authorization.
-3. **Production deployment authorization.** Separate again. The gateway stays
-   shadow-only, with no network ingress, until the correction is implemented
-   and independently verified.
+3. **Deployment authorization.** Separate again. The gateway stays shadow-only,
+   with no network ingress, until the correction is implemented and
+   independently verified. The workspace rule is "deployed", never "production"
+   or "live", so this boundary is named for the act and not for an environment.
 
 ## Evidence standard
 
