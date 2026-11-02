@@ -212,7 +212,8 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
   2. `ProducerRegistry` freezes its instance, so `authenticate` or `allowsEventType` cannot be shadowed by an own property. `SentinelRuntime` freezes its own fields, so its `registry`, `gateway` and `ledger` cannot be replaced.
   3. `test/registry_integrity.test.ts` checks through the gateway that a forged event stays rejected after each attempt, with a genuine event as a positive control. On unpatched `origin/master`, the tests for this entry fail.
   The operator ruled that this guards against accidental change in the same process, and is not a security boundary against hostile code in the same process. Such code can still change `ProducerRegistry.prototype`.
-- **Status**: Open — recorded, unresolved until the correction is verified.
+- **Merged (2026-11-02)**: PR #24 merged as `4d2d9f5165a822eda72a5fcfa3e7f8b8d2c8b556`, on operator authorization. Its tree is identical to the reviewed head `b46f65ef6c0d5c353346bf631ab401fabc3ca226`. Three independent review rounds found one blocking defect in round 1, which was fixed, and no blocking defect at the merged head. Linux CI passed at that head. The operator ruled that this entry stays open until post-merge verification. The accepted boundary is protection against accidental change in the same process, not against hostile code in the same process. Residual notes: KI-SENTINEL-20261102-001, -002 and -003.
+- **Status**: Open — the code correction is merged; unresolved until post-merge verification.
 
 ## KI-SENTINEL-20261030-005: A producer registration with an empty event prefix allows every event type — OPEN 2026-10-30 — security — high-priority follow-up
 
@@ -224,7 +225,8 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Reachability**: Not reachable through the secrets file. `loadProducerRegistrations` always uses the fixed `STANDARD_PRODUCER_PROFILES` prefixes. A caller that builds registrations in code can reach it.
 - **Proposed correction**: In `register()`, refuse an empty prefix list, an empty prefix, and a prefix that does not end in `.`. Add a negative test.
 - **Correction implemented (2026-11-01, unverified)**: Same branch as KI-SENTINEL-20261030-004. `ProducerRegistry.register` copies the prefix list once, element by element, into a new frozen plain array. It then refuses, with `ProducerRegistrationError`, a missing or empty list and any prefix that is not lowercase dotted segments ending in `.`. A getter, a custom iterator, an `Array` subclass or `Symbol.species` cannot pass the check with one list and store another. `test/registry_integrity.test.ts` checks the refusals, and checks through the gateway that a producer cannot emit an event outside its prefixes (`event_type_not_allowed`). The tests for the refusals fail on unpatched `origin/master`.
-- **Status**: Open — recorded, unresolved until the correction is verified.
+- **Merged (2026-11-02)**: PR #24 merged as `4d2d9f5165a822eda72a5fcfa3e7f8b8d2c8b556`, on operator authorization. Its tree is identical to the reviewed head `b46f65ef6c0d5c353346bf631ab401fabc3ca226`. Three independent review rounds found one blocking defect in round 1, which was fixed, and no blocking defect at the merged head. Linux CI passed at that head. The operator ruled that this entry stays open until post-merge verification. The accepted boundary is protection against accidental change in the same process, not against hostile code in the same process. Residual notes: KI-SENTINEL-20261102-001, -002 and -003.
+- **Status**: Open — the code correction is merged; unresolved until post-merge verification.
 
 ## KI-SENTINEL-20261030-006: Low-priority residual items from the PR #21 review — OPEN 2026-10-30
 
@@ -237,3 +239,37 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Related**: the fixture generator's Windows path bug is tracked separately as KI-SENTINEL-20261030-003.
 - **No change made**: This record changes no code.
 - **Status**: Open — recorded, unresolved until each item is corrected or explicitly accepted.
+
+## KI-SENTINEL-20261102-001: A huge sparse prefix list is copied in full before it is checked — OPEN 2026-11-02 — resource exhaustion — follow-up
+
+- **Classification**: Resource-exhaustion hardening. Not an authorization bypass. The operator deferred it to follow-up work, and asked that it be prioritized if untrusted input can ever reach this path.
+- **Discovery source**: independent review of forgesentinel PR #24, round 3 (note N1).
+- **Verified at**: `4d2d9f5165a822eda72a5fcfa3e7f8b8d2c8b556` (`origin/master`), by code reading. The reviewer executed it at `b46f65e`, which has the same tree.
+- **Evidence**: `src/spine/producers.ts:79-80`: `register()` reads `rawPrefixes.length`, then copies every index into a new array before it checks the first element.
+- **Observed behavior**: An array with `length = 5e6` took about 116 ms, then was refused. With `length = 2**32 - 1`, the loop would try about 4.3 billion pushes before the check. That is a hang or an out-of-memory error, which fails safe. A Proxy that reports a huge length behaves the same way.
+- **Reachability**: Only a library caller that builds a registration in code. The secrets file always uses the fixed standard profiles.
+- **Proposed correction**: Refuse a prefix list longer than a small bound (for example 64) before the copy, or check each element as it is copied. Add a negative test.
+- **No change made**: This record changes no code.
+- **Status**: Open — deferred to follow-up work; unresolved until the correction is verified.
+
+## KI-SENTINEL-20261102-002: The Symbol.species half of a registry test does not show the old bypass — OPEN 2026-11-02 — test quality — follow-up
+
+- **Classification**: Test quality. The operator deferred it to a separate PR.
+- **Discovery source**: independent review of forgesentinel PR #24, round 3 (note N2).
+- **Verified at**: `4d2d9f5165a822eda72a5fcfa3e7f8b8d2c8b556` (`origin/master`), by code reading. The reviewer executed it at `6bcc336` and `b46f65e`.
+- **Evidence**: `test/registry_integrity.test.ts:233-252`, the test "a prefix list cannot be swapped through an Array subclass or Symbol.species". Its species object (`:244`) has `some` and `length`, but no `Symbol.iterator`.
+- **Observed behavior**: Against `6bcc336`, before the fix, the species half fails with `TypeError: copy.allowed_event_prefixes is not iterable`. It does not fail by storing a list that differs from the checked list. Its assertions are valid at the merged head. The `Array`-subclass half of the same test does fail for the intended reason.
+- **Proposed correction**: Give the species object an iterator that yields `"usage."` and a `some` that returns true. Then confirm that, against `6bcc336`, the test fails because `allowsEventType(..., "billing.subscription.changed")` returns true.
+- **No change made**: This record changes no code.
+- **Status**: Open — deferred to a separate PR; unresolved until the correction is verified.
+
+## KI-SENTINEL-20261102-003: The public allowsEventType trusts the registration it is given — ACCEPTED 2026-11-02
+
+- **Classification**: Accepted within the documented boundary, by operator ruling.
+- **Discovery source**: independent review of forgesentinel PR #24, round 3.
+- **Verified at**: `4d2d9f5165a822eda72a5fcfa3e7f8b8d2c8b556` (`origin/master`), by code reading.
+- **Evidence**: `src/spine/producers.ts:122`: `ProducerRegistry.allowsEventType(registration, eventType)` is public, and it checks the prefixes of whatever registration object it receives. `allowsEventType({ allowed_event_prefixes: [""] }, ...)` returns true.
+- **Why it is accepted**: The gateway passes only the frozen copy that the registry itself returned from `authenticate`. No caller outside the gateway uses the method for an authorization decision. The gateway's contract is that it calls the method with validated input only.
+- **Condition**: Reconsider this entry if a caller outside the gateway starts to use `allowsEventType`, or if external callers are added.
+- **No change made**: This record changes no code.
+- **Status**: Accepted — no correction planned while the condition holds.
