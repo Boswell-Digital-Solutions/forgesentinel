@@ -229,3 +229,24 @@ test("a prefix list is read once: a getter or iterator cannot change it after th
   assert.deepEqual([...stored.allowed_event_prefixes], ["usage."]);
   assert.equal(registry.allowsEventType(stored, "billing.subscription.changed"), false);
 });
+
+test("a prefix list cannot be swapped through an Array subclass or Symbol.species", () => {
+  const registry = new ProducerRegistry("production");
+  class Evil extends Array<string> {
+    override *[Symbol.iterator](): ArrayIterator<string> {
+      yield "usage.";
+    }
+  }
+  const subclassed = Evil.from([""]) as unknown as string[];
+  assert.throws(() => registry.register({ ...testProducers("production")[1]!, key_id: "key_usage_subclass", allowed_event_prefixes: subclassed }), ProducerRegistrationError);
+
+  const species = ["usage."] as string[] & { constructor: unknown };
+  species.constructor = { [Symbol.species]: function () { return { some: () => true, length: 1, 0: "usage." }; } };
+  registry.register({ ...testProducers("production")[1]!, key_id: "key_usage_species", allowed_event_prefixes: species });
+  const stored = registry.get("usage-metering", "key_usage_species")!;
+  assert.ok(Array.isArray(stored.allowed_event_prefixes));
+  assert.equal(Object.getPrototypeOf(stored.allowed_event_prefixes), Array.prototype);
+  assert.ok(Object.isFrozen(stored.allowed_event_prefixes));
+  assert.equal(registry.allowsEventType(stored, "billing.subscription.changed"), false);
+  assert.equal(registry.allowsEventType(stored, "usage.tokens.recorded"), true);
+});

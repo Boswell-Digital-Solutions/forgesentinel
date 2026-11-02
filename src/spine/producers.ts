@@ -70,8 +70,15 @@ export class ProducerRegistry {
     // Read each field once into a copy, then check and freeze that copy, so a
     // getter or iterator cannot return one value to the check and another to
     // the store.
+    // Copy element by element into a new plain array. slice() or spread would
+    // honour Symbol.species or a subclass iterator, so the stored list could
+    // differ from the list that was checked.
     const rawPrefixes: unknown = registration.allowed_event_prefixes;
-    const prefixes: unknown[] = Array.isArray(rawPrefixes) ? Array.prototype.slice.call(rawPrefixes) : [];
+    const prefixes: unknown[] = [];
+    if (Array.isArray(rawPrefixes)) {
+      const length = rawPrefixes.length;
+      for (let index = 0; index < length; index++) prefixes.push(rawPrefixes[index]);
+    }
     const copy: Readonly<ProducerRegistration> = Object.freeze({
       service: registration.service,
       environment: registration.environment,
@@ -84,7 +91,8 @@ export class ProducerRegistry {
     if (copy.allowed_event_prefixes.length === 0) {
       throw new ProducerRegistrationError(`producer "${copy.service}" has no allowed event prefixes`);
     }
-    for (const prefix of copy.allowed_event_prefixes as readonly unknown[]) {
+    for (let index = 0; index < copy.allowed_event_prefixes.length; index++) {
+      const prefix: unknown = copy.allowed_event_prefixes[index];
       if (typeof prefix !== "string" || !EVENT_PREFIX_PATTERN.test(prefix)) {
         throw new ProducerRegistrationError(`producer "${copy.service}" has a malformed event prefix ${JSON.stringify(prefix)}; a prefix is lowercase dotted segments that end in "."`);
       }
