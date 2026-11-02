@@ -198,6 +198,42 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Still required to close**: operational verification, and credential remediation. The operator ruled that merging is not deployment authorization, and that no credential rotation is authorized yet.
 - **Status**: Open — the code correction is merged; unresolved until operational verification and credential remediation are complete.
 
+## KI-SENTINEL-20261102-008: The producer credential authenticates only the payload hash, so a signed event can be re-targeted to another tenant, account, actor or subject — OPEN 2026-11-02 — security — high priority
+
+- **Classification**: Security, event authentication. High priority, by owner ruling. The exposure is latent while the gateway runs in shadow mode with no network ingress (KI-SENTINEL-20261030-001). The owner ruled that the gateway stays in shadow mode, without network ingress, until this is corrected and independently verified.
+- **Discovery source**: independent review of forgesentinel PR #29, round 2 (finding R3). The author confirmed it independently.
+- **Verified at**: `3b17efe` (`origin/master`), by execution, on a production `SentinelRuntime` with strong configured producer secrets.
+- **Evidence**:
+  - `src/spine/producers.ts:35`: `producerToken(secret, payloadHash)` is HMAC-SHA256 over the payload hash only.
+  - `src/spine/build.ts:69`: a producer's credential is built from that token.
+  - `src/spine/gateway.ts:92`: the gateway authenticates the credential against `event.integrity.payload_hash` only. The signature that signature-required producers and families add is the same HMAC over the same hash.
+  - No other part of the envelope is covered by the credential or the signature.
+- **Observed behavior**: A usage event was built and signed for a production runtime. Each field below was then changed in the event alone, and the event was ingested with its original credential:
+
+  | Field changed | Result |
+  |---|---|
+  | `tenant.tenant_id` (`ten_demo` to `ten_other`) | accepted |
+  | `tenant.account_id` | accepted |
+  | `actor.actor_id` | accepted |
+  | `subject.subject_id` | accepted |
+  | `event_id` | accepted |
+  | `occurred_at` (moved earlier) | accepted |
+  | `observed_at` | accepted |
+  | `event_type`, within the producer's prefix (`usage.tokens.recorded` to `usage.retry.recorded`) | accepted |
+  | `correlation.trace_id` | accepted |
+  | `occurred_at` moved after `observed_at` | rejected, `clock_order` (a contract check, not authentication) |
+  | payload field (control) | rejected, `payload_hash_mismatch` |
+
+- **Impact**: Anyone who holds one validly signed event can re-target it to another tenant or account, attribute it to another actor or subject, change its event type within the producer's prefix, change its times, or replay it under a new `event_id`, which also defeats de-duplication. The ledger records the altered event as accepted, authenticated evidence. This breaks the event's claimed identity and authorization context without any payload change, so it is more consequential than KI-SENTINEL-20261102-006. Bounds: there is no network ingress, the pipeline is shadow-only, and the actor must hold a signed event.
+- **Remediation requirements** (owner ruling; not authorized by this record):
+  1. Authenticate the security-relevant envelope, not only `payload_hash`. At minimum, bind `tenant_id`, `account_id`, `actor_id`, `subject_id`, `event_id`, `event_type`, `occurred_at` and the payload digest.
+  2. Use a versioned, deterministic authentication format.
+  3. Preserve producer authorization boundaries. Reject altered and cross-tenant events.
+  4. Add independent negative tests before any production enforcement.
+  - The correction is a separate security remediation track. It must also account for KI-SENTINEL-20261102-006, because a deterministic format cannot rest on the current canonical form, and for the Ed25519 move that ADR-026 requires.
+- **Note**: The clean review and green CI of PR #29 do not show that event authentication is secure. PR #29 corrects rejection-record fidelity only.
+- **Status**: Open — recorded, unresolved until a correction is authorized, implemented and independently verified.
+
 ## KI-SENTINEL-20261030-004: Code in the same process can replace the Event Gateway's producer registry — CLOSED 2026-11-02 — security
 
 - **Classification**: Security, in-process only. The operator rated it a high-priority follow-up.
