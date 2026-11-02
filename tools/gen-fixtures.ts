@@ -5,6 +5,7 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildEvent } from "../src/spine/build.js";
 import { fixtureProducers } from "../test/support/producers.js";
 import type { ReplayLine } from "../src/spine/replay.js";
@@ -15,7 +16,8 @@ import { validateActionReceipt } from "../src/contracts/receipt.js";
 import { validateControlDirectiveShape } from "../src/contracts/cssa.js";
 import { hashPayload } from "../src/contracts/common.js";
 
-const ROOT = new URL("../..", import.meta.url).pathname;
+// fileURLToPath gives a valid path on Windows too; URL.pathname gives "/C:/..." there (KI-SENTINEL-20261030-003).
+const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const REPLAY_DIR = join(ROOT, "fixtures", "replay");
 const GOLDEN_DIR = join(ROOT, "fixtures", "golden");
 

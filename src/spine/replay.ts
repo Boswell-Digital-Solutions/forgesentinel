@@ -28,9 +28,17 @@ export function loadReplayFile(path: string): ReplayLine[] {
   return parseReplayJsonl(readFileSync(path, "utf8"));
 }
 
-/** Deterministic replay: identical input fixtures produce identical ledgers. */
+/**
+ * Deterministic replay: identical input fixtures produce identical ledgers.
+ * A malformed line (for example `null`, or one with no credential) becomes
+ * a rejection of that line; it does not stop the replay
+ * (KI-SENTINEL-20261030-006 item 2).
+ */
 export function replayInto(gateway: EventGateway, lines: ReplayLine[]): ReplaySummary {
-  const results = lines.map((line) => gateway.ingest(line.event, line.credential));
+  const results = lines.map((line) => {
+    const entry = (typeof line === "object" && line !== null ? line : {}) as Partial<ReplayLine>;
+    return gateway.ingest(entry.event, entry.credential as ProducerCredential);
+  });
   return {
     total: results.length,
     accepted: results.filter((result) => result.status === "accepted").length,

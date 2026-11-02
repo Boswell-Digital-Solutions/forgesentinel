@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { hashPayload, sha256Hex, type ValidationIssue } from "../contracts/common.js";
 import { validateEventEnvelope, type EventEnvelope } from "../contracts/envelope.js";
 import { lookupEventType } from "../contracts/families.js";
-import { ProducerRegistry, type ProducerCredential } from "./producers.js";
+import { HMAC_HEX_PATTERN, ProducerRegistry, isWellFormedCredential, type ProducerCredential } from "./producers.js";
 import { EvidenceLedger, type LedgerRecord } from "./ledger.js";
 
 export const GATEWAY_VERSION = "1.0.0";
@@ -83,6 +83,12 @@ export class EventGateway {
       return this.reject(event, reasons, event.tenant?.tenant_id);
     }
 
+    // A missing or malformed credential is a rejection of this event, not an
+    // exception that stops a whole replay (KI-SENTINEL-20261030-006 item 2).
+    if (!isWellFormedCredential(credential)) {
+      reasons.push({ path: "credential", code: "producer_credential_malformed", message: "producer credential must have string service, key_id and token" });
+      return this.reject(event, reasons, event.tenant?.tenant_id);
+    }
     const producer = this.#registry.authenticate(credential, event.integrity.payload_hash);
     if (!producer) {
       reasons.push({ path: "producer", code: "producer_auth_failed", message: `producer "${credential.service}" failed authentication for key "${credential.key_id}"` });
@@ -112,10 +118,11 @@ export class EventGateway {
         reasons.push({ path: "integrity.signature", code: "signature_required", message: `high-value event type "${event.event_type}" requires a producer signature` });
         return this.reject(event, reasons, event.tenant?.tenant_id);
       }
-      const expected = createHmac("sha256", producer.secret).update(event.integrity.payload_hash, "utf8").digest("hex");
-      const a = Buffer.from(expected, "hex");
-      const b = Buffer.from(event.integrity.signature.length === expected.length ? event.integrity.signature : "0".repeat(expected.length), "hex");
-      if (a.length !== b.length || !timingSafeEqual(a, b) || event.integrity.signature_key_id !== producer.key_id) {
+      // Only 64 lowercase hex characters are a signature, as for the token.
+      const wellFormed = typeof event.integrity.signature === "string" && HMAC_HEX_PATTERN.test(event.integrity.signature);
+      const expected = Buffer.from(createHmac("sha256", producer.secret).update(event.integrity.payload_hash, "utf8").digest("hex"), "hex");
+      const presented = Buffer.from(wellFormed ? event.integrity.signature : "0".repeat(64), "hex");
+      if (!wellFormed || expected.length !== presented.length || !timingSafeEqual(expected, presented) || event.integrity.signature_key_id !== producer.key_id) {
         reasons.push({ path: "integrity.signature", code: "signature_invalid", message: "producer signature verification failed" });
         return this.reject(event, reasons, event.tenant?.tenant_id);
       }
@@ -147,7 +154,9 @@ export class EventGateway {
       rejection_reasons: reasons,
       transformation_version: "ingest.1.0.0",
       ...(tenantId !== undefined ? { tenant_id: tenantId } : {}),
-      body: rawEvent,
+      // A missing event is recorded as null: JSON has no undefined, and the
+      // ledger hashes the body (KI-SENTINEL-20261030-006 item 2).
+      body: rawEvent === undefined ? null : rawEvent,
     });
     const eventId =
       typeof rawEvent === "object" && rawEvent !== null && typeof (rawEvent as Record<string, unknown>)["event_id"] === "string"
