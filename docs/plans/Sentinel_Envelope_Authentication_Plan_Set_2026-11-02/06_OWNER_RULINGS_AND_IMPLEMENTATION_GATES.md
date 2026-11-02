@@ -411,6 +411,95 @@ validation, therefore encodable" an invariant that S1 and S2 rely on. And a
 drift test that compares names only lets a later change loosen a type and reopen
 F1 without failing CI.
 
+#### R1-C, further owner rulings (2026-11-02)
+
+Three rulings extend R1-C after the measurement correction. Each one is the
+owner's. The author's supporting record follows them, and is marked.
+
+**1. The measurement is a baseline, and not a test inventory.** The 15 of 17
+figure records the state at `4225489`. It does not define what the test covers.
+Slice S2 validates **every declared field, including required nested fields**.
+
+**2. `integrity.signature` needs syntax validation, and not a string-type check
+alone.** The field is validated against an explicitly approved representation.
+The validator checks the **encoding, the length and the canonical form** against
+that representation. An arbitrary hex-only rule must not go in while a
+cryptographic format is unsettled. The representation comes first, and the
+syntax rule follows it.
+
+**3. Sequencing against S6 is a staged implementation dependency, and not a
+weakened validation requirement.** Slice S2 may be implemented before slice S6
+only while its contract validation stays fail-closed. Five conditions hold:
+
+1. All **51** declared fields are inside S2's validation scope and inside its
+   drift-test scope.
+2. `integrity.signature` must be validated against an explicitly approved
+   representation **before any event that carries it is accepted**.
+3. No provisional hex-only rule is authorized, and no permissive string fallback
+   is authorized.
+4. If S6 establishes the final Ed25519 representation, S2 must enforce that
+   representation before a signature-bearing event becomes admissible.
+5. No security gate counts as satisfied by a skipped test, a deferred test or an
+   expected-failing test.
+
+This separates implementation scheduling from security acceptance. The purpose
+is to let development continue where that is safe, and to stop an unfinished
+signature contract from becoming an authentication bypass.
+
+**Neither slice gains authorization from this ruling.** S2 stays unauthorized,
+and R1-F, R1-G, R1-H and the independent design boundary come first. This
+sequencing ruling grants S6 no new implementation authorization.
+
+**The author's record: the declared field total is 51.** Measured at `4225489`,
+with the field list extracted from `src/contracts/envelope.ts` and not written by
+hand. `envelope.ts` declares **51** fields: **34** required and **17** optional.
+
+| Measure | Count |
+|---|---|
+| Declared fields | **51** — 34 required, 17 optional |
+| Admit a wrong-typed value | **17** — 15 optional, 2 required |
+| Already refuse a wrong-typed value | **34** — 32 required, 2 optional parents |
+
+The 2 required fields that admit a wrong-typed value are
+`resource.resource_type` and `resource.resource_id`. Each one is reachable only
+through the optional `resource` parent, which the validator never reads, so this
+is a parent-reachability gap and not an optional-field gap. The 2 optional
+fields that already refuse are the `tenant` and `control_lineage` parents.
+
+**The author's record: an approved representation already exists, per
+algorithm.** `02_SIGNATURE_BINDING.md` states the text form for each algorithm,
+so condition 2 is satisfiable for the current algorithm, and S2 does not wait on
+S6 for it.
+
+| Algorithm | Text form | Where | State |
+|---|---|---|---|
+| HMAC-SHA256 | 64 lowercase hex | `02`, "The text form stays 64 lowercase hex characters" | Approved and enforced |
+| Ed25519 | 128 lowercase hex | `02`, "Ed25519 under ADR-026" | Specified, not implemented |
+
+`HMAC_HEX_PATTERN` is `/^[0-9a-f]{64}$/` (`src/spine/producers.ts:62`), and the
+gateway applies it to `integrity.signature` today (`src/spine/gateway.ts:186`).
+So the 64-hex form is not provisional and it is not arbitrary. It is the stated
+form of the approved algorithm, which D-4 puts under the gateway's control.
+Condition 3 therefore does not bar it. Condition 4 binds S6, and `02` already
+records that one pattern constant cannot express both lengths.
+
+**The author's record: three consequences S2 must carry.**
+
+- **Seven families require a signature**: `billing`, `license`, `cssa`,
+  `sentinel`, `operator`, `hermes` and `smith`
+  (`SIGNATURE_REQUIRED_FAMILIES`, `src/contracts/families.ts:28`). A rule that
+  refused every signature-bearing event would make all seven inadmissible, so
+  condition 2 must be met by enforcing the HMAC form, and not by blanket
+  refusal.
+- **No golden event fixture carries `integrity.signature`.** The two golden
+  fixtures that carry a `signature` are *directives*, which
+  `validateControlDirectiveShape` validates. The three replay fixtures carry
+  none. So this rule breaks no existing event fixture.
+- **The constant must not be duplicated.** `HMAC_HEX_PATTERN` lives in
+  `src/spine/producers.ts`, and `validateEventEnvelope` lives in
+  `src/contracts/`. S2 must choose where one shared constant lives, because two
+  copies drift, and risk R-5 names that drift.
+
 ### R1-D: a separate change carries `src/spine/ledger.ts`, before S4
 
 **Ruled.** A separate authorized change carries the `src/spine/ledger.ts`

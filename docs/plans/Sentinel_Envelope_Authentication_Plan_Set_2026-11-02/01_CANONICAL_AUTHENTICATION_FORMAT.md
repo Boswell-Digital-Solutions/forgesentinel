@@ -171,9 +171,21 @@ the event with the reason code `envelope_not_encodable`:
 sufficient. `validateEventEnvelope` must type-validate **every declared field**,
 and the R-5 drift test must compare **types as well as names**.
 
+**The scope is all 51 declared fields, by a further R1-C ruling.** `envelope.ts`
+declares 51 fields, which is 34 required and 17 optional. The measurement below
+is a baseline at `4225489`, and it is not a test inventory. `integrity.signature`
+also gets syntax validation, for encoding, length and canonical form, against the
+approved representation for the algorithm in force. `02` states that form: 64
+lowercase hex for HMAC-SHA256, and 128 lowercase hex for Ed25519. A permissive
+string fallback is not authorized. `06` holds all three rulings and the five
+fail-closed conditions that let S2 precede S6.
+
 **The measurement, stated precisely.** `EventEnvelope` and its member interfaces
 declare **17** optional fields. At `4225489`, **15 of those 17 admit a
-wrong-typed value**. That is the figure to cite.
+wrong-typed value**. That is the figure to cite. Two further admissions sit in
+`resource.resource_type` and `resource.resource_id`, which `EventResource`
+declares **required**, so 17 of the 51 declared fields admit a wrong-typed value
+in total.
 
 The two that hold are the `tenant` and `control_lineage` **parents**, which the
 validator type-checks: `tenant: 123` and `control_lineage: "x"` both fail
