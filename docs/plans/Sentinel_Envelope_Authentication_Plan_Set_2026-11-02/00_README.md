@@ -5,7 +5,8 @@
 - **Date:** 2026-11-02
 - **Owner and decision authority:** Charlie Boswell
 - **Priority:** P0 security, by owner ruling of 2026-11-02
-- **Status:** Design approved conditionally by the owner; **independent review round 1 returned blocking defects.** Merge not authorized. Implementation not authorized.
+- **Status:** Design approved conditionally by the owner; **independent review round 1 returned blocking defects.** **Implementation not authorized.**
+- **Merged:** 2026-11-02, as `79698ac`, a squash of PR #32, on the owner's instruction. The merge lands documentation. It is not implementation authorization, and it closes none of the review findings.
 
 This plan set is a design document. It is not an authorization to change code.
 Each implementation slice needs its own explicit authorization from the owner.
