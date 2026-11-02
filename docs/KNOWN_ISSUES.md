@@ -284,3 +284,26 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Condition**: Reconsider this entry if a caller outside the gateway starts to use `allowsEventType`, or if external callers are added.
 - **No change made**: This record changes no code.
 - **Status**: Accepted — no correction planned while the condition holds.
+
+## KI-SENTINEL-20261102-004: A wrapped malformed-input rejection has the same body and hash as a rejection of the literal wrapper object — OPEN 2026-11-02 — ledger forensics — non-blocking
+
+- **Classification**: Non-blocking. It affects how rejection records read in an investigation only. It is not an authorization defect.
+- **Discovery source**: independent review of forgesentinel PR #27, round 2 (note N5). Confirmed by the post-merge verification at `1d3d8859`.
+- **Verified at**: `1d3d8859371206f65648c783d5cafc2501b2692a` (`origin/master`), by execution.
+- **Evidence**: `src/spine/gateway.ts:161` stores a rejection whose input is not an object as `{ malformed_input: <input> }`. The ledger hashes the body with `hashPayload` (`src/spine/ledger.ts:74`).
+- **Observed behavior**: Ingesting the number `5` and ingesting the object `{ "malformed_input": 5 }` produce rejection records with the same body and the same `source_hash`. `null` and `{ "malformed_input": null }` collide the same way. A reader of the ledger cannot tell which input was received.
+- **Bounds**: Only `rejection` records are affected. A wrapper object fails envelope validation, so it can never become an accepted event.
+- **Proposed correction**: Mark the wrapper in a way that real input cannot produce, for example a separate record field such as `malformed_input: true` outside `body`, or a wrapper key that the envelope schema forbids. Add a test that the two inputs produce different records.
+- **Status**: Open — recorded, unresolved until the correction is verified or the owner accepts it.
+
+## KI-SENTINEL-20261102-005: Function, Symbol and BigInt inputs from a library caller are not recorded faithfully — OPEN 2026-11-02 — library-only input handling — non-blocking
+
+- **Classification**: Non-blocking. A JSON replay file cannot produce these inputs; only a library caller in the same process can. This is inside the accepted in-process boundary.
+- **Discovery source**: independent review of forgesentinel PR #27, round 2. Confirmed for all three inputs at `1d3d8859`.
+- **Verified at**: `1d3d8859371206f65648c783d5cafc2501b2692a` (`origin/master`), by execution. A function and a Symbol input each gave a rejection whose `source_hash` equals `hashPayload({})`. A BigInt input threw `TypeError`, and the next record took `ledger_seq` 4 after 2, so 3 was skipped.
+- **Evidence**: `src/spine/gateway.ts:161` wraps a non-object input. `canonicalJson` (`src/contracts/common.ts:140-154`) uses `JSON.stringify`. `EvidenceLedger.append` increments the sequence number (`src/spine/ledger.ts:72`) before it computes `source_hash` (`:74`).
+- **Observed behavior**:
+  1. A function or Symbol input is rejected, but `JSON.stringify` drops it, so the record hashes as `{}`. The value is lost.
+  2. A BigInt input makes `JSON.stringify` throw, so `gateway.ingest` throws. The sequence number was already incremented, so the ledger skips one `ledger_seq`.
+- **Proposed correction**: In `EventGateway.reject`, record the input's `typeof` for a value that JSON cannot represent, instead of the value. In `EvidenceLedger.append`, compute the hash before the sequence number is incremented, so a hashing failure cannot leave a gap. Add tests for function, Symbol and BigInt input.
+- **Status**: Open — recorded, unresolved until the correction is verified or the owner accepts it.
