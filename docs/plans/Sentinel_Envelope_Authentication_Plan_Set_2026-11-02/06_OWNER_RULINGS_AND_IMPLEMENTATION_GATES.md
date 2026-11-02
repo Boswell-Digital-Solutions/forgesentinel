@@ -416,9 +416,11 @@ F1 without failing CI.
 Three rulings extend R1-C after the measurement correction. Each one is the
 owner's. The author's supporting record follows them, and is marked.
 
-**1. The measurement is a baseline, and not a test inventory.** The 15 of 17
-figure records the state at `4225489`. It does not define what the test covers.
-Slice S2 validates **every declared field, including required nested fields**.
+**1. The measurement is a baseline, and not a test inventory.** The measured
+admit count records the state at `4225489`, and it does not define what the test
+covers. Slice S2 validates **every declared field, including required nested
+fields**. The count is a **range** and not a constant, so do not cite "15 of 17"
+or any other single figure on its own. The matrix below states it.
 
 **2. `integrity.signature` needs syntax validation, and not a string-type check
 alone.** The field is validated against an explicitly approved representation.
@@ -484,7 +486,14 @@ Two axes move the count:
   branch checks only `isRecord(tenant)` and never reads `tenant_id`
   (`:158-160`), so `tenant.tenant_id: 123` is admitted. That is the third
   admitting required field in the two system-scoped rows, and `tenant_id` is the
-  tenant isolation key.
+  tenant isolation key. **Three** families are system-scoped — `sentinel`,
+  `centipede` and `yellowjacket` (`SYSTEM_SCOPED_FAMILIES`,
+  `src/contracts/families.ts:29`) — which is **14 of the 119 canonical event
+  types**. Count the families and the types separately here: 14 is also the
+  total family count, so "14 families" reads plausibly and is wrong.
+  `KI-SENTINEL-20261102-019` records this gap as a security finding, because the
+  correction belongs to the validator and not to this measurement. R1-C already
+  covers it, so it needs no new ruling.
 
 The other 2 required fields that admit are `resource.resource_type` and
 `resource.resource_id`. Each is reachable only through the optional `resource`
