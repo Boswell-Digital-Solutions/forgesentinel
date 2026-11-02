@@ -3,18 +3,19 @@
 - Plan ID: **BDS-SNT-ENVELOPE-AUTH-001**
 - Finding: **KI-SENTINEL-20261102-008**
 - Generated: **2026-11-02**
-- Revision: **owner rulings applied; counts corrected; four owner recommendations recorded pending ruling**
+- Revision: **independent review round 1 applied; format defects marked; verdict: not safe to proceed as written**
 - Base commit: **432337c**
-- Markdown documents: **7**
+- Markdown documents: **8**
 
 | File | Bytes | SHA-256 |
 |---|---:|---|
-| `00_README.md` | 10032 | `8dae31763de7ecf7918d18c88d6d8898be8c645ab8411cc9040d5956c81c3257` |
-| `01_CANONICAL_AUTHENTICATION_FORMAT.md` | 20247 | `a551b32d041252845fc274d3709ba1ed06d3046d963b392b2916b9f438060a2b` |
-| `02_SIGNATURE_BINDING.md` | 11966 | `1752939f3151e3d43e802f74642e5b3256bcc56c2f0a069a92322c06ff0b4494` |
-| `03_COMPATIBILITY_AND_CALLER_IMPACT.md` | 8268 | `d7ac12f645d4d09c734284ab8bd17be96c68131d759962a9082cb9a6eb7bcd52` |
-| `04_NEGATIVE_TEST_MATRIX.md` | 21540 | `9b06114dd1e47b4ec35038e82b1a0cab766905b60b36f81caf2729a42868398c` |
-| `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | 15658 | `528d073de7e8738493c36b4cee9053448a0f9b57bc3a8832276db83508d834e5` |
-| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | 14796 | `f4c7133ab4996458d6d3bec63ac82500206efe4c4bdc6f4ffb4d193eff75d19f` |
+| `00_README.md` | 10733 | `661f37df28c49f838ffefe81f5282f503163760f7e8b76d68985685b4efab46e` |
+| `01_CANONICAL_AUTHENTICATION_FORMAT.md` | 26417 | `7f2bea8a8358222d5158c19de1214bf2eb05ab283c05d0291666224ef7b3604b` |
+| `02_SIGNATURE_BINDING.md` | 13763 | `0a3229eba0d78777121061ff126f48ecb865c6dc6dca927ae7082c5a28aa47d1` |
+| `03_COMPATIBILITY_AND_CALLER_IMPACT.md` | 9388 | `3027d11c10a7d9794b6555cd41f164da77317c334a27f6436fe8f6a93332935c` |
+| `04_NEGATIVE_TEST_MATRIX.md` | 27281 | `d9946371ca2549fb39f2e010fa3e17e534ee0b586ca5de7a3e314b69a3512dc2` |
+| `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | 17246 | `e226cb66b544b009930ed9b3a99f1f787980ee06b7c29dad35c44a21a5341063` |
+| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | 16639 | `c3ec0f3a51c4119880e693b437c896aee5aeb7f23d8b4554c770d5b38947ce54` |
+| `07_REVIEW_ROUND_1_FINDINGS.md` | 11618 | `7201d4765cc3512d105b04929ae39978b660abac06a498e790f79a36b1f9579c` |
 
-Regenerate the digests after a change to any document in this plan set.
+Round 2 must run against a frozen commit, named in `07_REVIEW_ROUND_1_FINDINGS.md` before the review starts (review finding F0).

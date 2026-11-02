@@ -58,12 +58,20 @@ second change merges. The golden vector in this plan exists for that purpose.
 | `src/spine/build.ts` | `buildEvent` builds the token and the signature from the encoder. The envelope is assembled first, then signed, because the signature covers the whole envelope. |
 | `src/contracts/envelope.ts` | `validateEventEnvelope` refuses an unknown field, at the top level and in each bound object (ruling D-5). Without this, an unbound field stays malleable. |
 | `src/index.ts` | Exports the new module. |
+| `src/spine/ledger.ts` | **Added to scope by review finding F33.** Gate 5 and the owner's recommendation 1 cannot be implemented without it. `cloudProjection` skips every data-policy check for a record whose kind is not `event` (`KI-SENTINEL-20261102-011`), `queryByTenant` filters on a `tenant_id` that a rejection took from an unauthenticated envelope (`KI-SENTINEL-20261102-012`), and `LedgerRecord` has no field in which a value can be marked observed and untrusted (review finding F34). The owner must rule on whether this track carries those changes or a separate one does. |
 
 `src/spine/replay.ts` needs no change. The `ReplayLine` shape, `{ event,
 credential }`, stays as it is.
 
 `src/runtime.ts` needs no change. It wires the registry, the gateway and the
 ledger, and it signs nothing.
+
+`src/spine/gateway.ts` carries one further change that review finding F30
+requires: the authentication-failure message must stop interpolating
+`credential.service` and `credential.key_id`, which are unbounded,
+unvalidated caller input today (`KI-SENTINEL-20261102-013`). The D-3 ruling
+already forbids a caller message that names a field or a value, and the
+current message breaks it.
 
 ## Fixture changes
 
@@ -73,7 +81,7 @@ ledger, and it signs nothing.
 | `fixtures/replay/usage_spike_only.jsonl` | 35 lines. Same change. |
 | `fixtures/replay/agent_drift.jsonl` | 24 lines. Same change. |
 | `fixtures/golden/event.usage_tokens_recorded.json` | No change. The file holds an envelope with no credential and no signature. |
-| `fixtures/golden/directive.*.json` | No change. A control directive is signed by `src/authority/cssa-control.ts` with the control-directive key. This plan does not change that signature. |
+| `fixtures/golden/directive.*.json` | No change. A control directive carries a placeholder signature: `tools/gen-fixtures.ts:284` writes 64 zero characters and the generator never imports `src/authority/`. The conclusion stands, and the earlier reason — that `src/authority/cssa-control.ts` signed it — was false (review finding F25). |
 | `fixtures/assurance/EAS-*.json` | No change. They carry no credential. The CI step that records their SHA-256 digests stays valid. |
 | `fixtures/golden/event_auth.v1.vector.json` (new) | The authoritative vector: the envelope, the context, the key id, the authenticated bytes as hex, the SHA-256 of those bytes, and the HMAC under a named test key. `fixtures/golden/manifest.json` gains its entry. |
 

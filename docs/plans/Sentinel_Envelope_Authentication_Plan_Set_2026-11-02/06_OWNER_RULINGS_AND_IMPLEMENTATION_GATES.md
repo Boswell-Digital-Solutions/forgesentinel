@@ -97,9 +97,12 @@ token.
 
 Two different supported events must never give the same authenticated bytes.
 
-- The format gives the property by construction: an explicit byte length for
+- The format intends the property by construction: an explicit byte length for
   every value, constant field names, a closed field list, and a tag that
-  separates an absent field from a present empty string.
+  separates an absent field from a present empty string. **Review round 1
+  showed the property does not hold as specified** — findings F1, F2 and F3 —
+  so this gate is open, and the length-prefix core is sound while the field set
+  and the type rules are not.
 - Proof: group H in `04`. It has a property test over a seeded generator and
   adversarial cases. The repository has no property-testing dependency, and it
   stays dependency-free, so the generator is a small seeded function in the
@@ -136,13 +139,30 @@ producer-identity and control-lineage substitution.
 An authentication failure must produce protected security telemetry. The
 telemetry must not expose a credential or a sensitive payload.
 
-- **Verified today:** the rejection record stores the rejected envelope and not
-  the credential. `EventGateway.reject` receives `rawEvent` only, so no token
-  reaches `rejectionBody`.
+- **Corrected, review finding F30.** An earlier version of this section said
+  the record stores the envelope and not the credential. The *token* does not
+  reach it, which is right. But `src/spine/gateway.ts:158` interpolates
+  `credential.service` and `credential.key_id` into the failure message, which
+  goes into `rejection_reasons` **and** back to the caller. Both fields are
+  unbounded, unvalidated caller input. Verified by execution: a 200-character
+  `key_id` with a NUL byte reached both. That also breaks the D-3 condition
+  that the caller's message name no field and no value.
+  `KI-SENTINEL-20261102-013` records it.
 - **Open design item, with a recommended shape:** the rejection record stores
   the whole envelope, including the payload. For an authentication failure the
   envelope is unauthenticated, so its `data_policy` is unauthenticated too. A
   `restricted` payload can therefore be stored under a forged `internal` label.
+- **Worse than that framing, review findings F31 to F33.** Three verified
+  defects sit under this gate, and none needs a forged label:
+  `cloudProjection` skips every data-policy check for a record whose kind is
+  not `event`, so an honestly labelled `restricted`, `cloud_allowed: false`
+  payload is published in full whenever an event is rejected
+  (`KI-SENTINEL-20261102-011`); a rejection takes its `tenant_id` from the
+  unauthenticated envelope and `queryByTenant` trusts it
+  (`KI-SENTINEL-20261102-012`); and `LedgerRecord` has no field in which a
+  value can be marked observed and untrusted, while `tenant_id` is the one
+  field used for access control (review finding F34). All three live in
+  `src/spine/ledger.ts`, which `03` now lists in scope.
   Recommendation 1 below states the recommended record shape. It is a
   recommendation, not a ruling, so the slice must still state the chosen shape,
   and `doc/system/03-runtime-boundary.md` must describe it.
@@ -229,10 +249,17 @@ S0 note.
 
 ### Review status, stated precisely
 
-Independent design review is **requested and not complete**. No
-pull-request review is submitted on GitHub. Nothing in this plan set may be
-read as a completed review, and the design direction being sound enough to
-proceed to review is not the same as a review having been done.
+Independent design review **round 1 is complete**, and its verdict is **not
+safe to proceed to implementation authorization as written**.
+`07_REVIEW_ROUND_1_FINDINGS.md` holds the findings, the verdict and what this
+author re-verified. No pull-request review is submitted on GitHub, so the
+review of record is that document and not a GitHub review state; the owner
+decides whether it satisfies recommendation 3.
+
+Round 1 found three blocking defects in the format, four in the test matrix and
+the rejection-record axis, and two false statements of present code behaviour.
+A second round is needed after the owner rules on the candidate fixes. Nothing
+in this plan set may be read as an approved design.
 
 ## Findings disposition
 

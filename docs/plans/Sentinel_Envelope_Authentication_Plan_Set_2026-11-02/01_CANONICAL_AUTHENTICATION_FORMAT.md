@@ -8,6 +8,12 @@ The owner ruled on this document on 2026-11-02. D-1, D-2, D-4 and D-5 are
 approved with conditions, and D-7 is amended: the numeric rule must exist
 before implementation. See `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md`.
 
+**Review round 1 found three blocking defects in this document.** The format as
+specified here is **not** one to one, and two admitted fields are not bound.
+`07_REVIEW_ROUND_1_FINDINGS.md` holds the findings, each reproduced by
+execution. The defects are marked in place below. Do not implement this
+document until the owner rules on the candidate fixes.
+
 ## Format name and version tag
 
 The format name is `forgesentinel.event_auth.v1`.
@@ -64,7 +70,7 @@ The tags are:
 |---|---|---|
 | `s` | A present string | The string in UTF-8 |
 | `b` | A present boolean | The text `true` or `false` |
-| `c` | A present count | The count as decimal ASCII digits |
+| `c` | A present count | The count as decimal ASCII digits, with no sign and no leading zero, exactly as `<length>` is written. A zero count is the single digit `0`. (Pinned by review finding F6; the earlier text left the form open to a second-language implementer.) |
 | `-` | An absent field | None. The length is `0`. |
 
 ## How an absent optional field is represented
@@ -75,6 +81,21 @@ The record is still present. The field order never changes.
 A field is absent when the event omits it, or when its parent object is absent.
 Example: an event with no `tenant` gives `-` for `tenant.tenant_id` and `-` for
 `tenant.account_id`.
+
+**BLOCKING DEFECT, review finding F2.** This rule makes an absent parent object
+and a present empty parent object encode identically. Verified by execution:
+an event with no `resource` and the same event with `resource: {}` both pass
+`validateEventEnvelope`, both are accepted by the gateway, and both give the
+same authenticated bytes. The same holds for `tenant` on a system-scoped
+family. Two different supported events therefore share one signature, which is
+what gate 2 forbids.
+
+Candidate fix, **not ruled**: add one presence record for each optional parent
+object — `tenant`, `resource` and `control_lineage` — with tag `b` and the
+value `true` or `false`. The parent's presence then changes the bytes. The
+alternative, refusing a present empty parent in the validator, is weaker: it
+leaves the format relying on the validator for injectivity rather than on the
+encoding.
 
 A present empty string uses the tag `s` with the length `0`. An absent field and
 a present empty string therefore have different bytes. This difference matters:
@@ -93,7 +114,13 @@ the event with the reason code `envelope_not_encodable`:
   surrogate with `U+FFFD` during UTF-8 conversion. Two different strings would
   then give the same bytes, so the encoding would stop being one to one;
 - a bound object field that is present but is not an object;
-- a `sentinel_finding_ids` array with an element that is not a string.
+- a `sentinel_finding_ids` that is not an array, or an array with an element
+  that is not a string. **This rule is new, from review finding F1.** The
+  earlier text refused only a bad element, so a value that merely behaves like
+  an array passed. A string and an array-like object both have `length` and
+  index access, so `["a","b"]`, `"ab"` and `{0:"a",1:"b",length:2}` all encoded
+  identically, and `validateEventEnvelope` admits all three. `Array.isArray`
+  is the check.
 
 ## The field list and the order
 
@@ -152,6 +179,24 @@ follows.
 
 `integrity.signature` and `credential.token` are the outputs of the format.
 The format does not bind them.
+
+**BLOCKING DEFECT, review finding F3.** `integrity.signature_key_id` is also
+unbound in the `credential` context: record 3 carries it only when the context
+is `signature`. Both fields are admitted by `validateEventEnvelope`, which
+never reads them, and the gateway evaluates them only when a signature is
+required. Verified by execution: an added `integrity.signature` of 64 `a`
+characters with `signature_key_id: "key_attacker"` was accepted on a
+`usage.tokens.recorded` event and stored inside the accepted record, and so
+was a non-hex signature with a numeric key id. A corrected gateway built from
+this document would still accept both, because nothing binds or refuses them.
+`KI-SENTINEL-20261102-014` records the current-code defect.
+
+Candidate fixes, **not ruled**: (a) refuse both fields on an event that
+requires no signature, and bind them in the `credential` context when a
+signature is required; or (b) bind both in every context, with the absent tag
+when they are not present. Option (a) keeps the bytes shorter and makes the
+refusal explicit. Either way the unknown-field refusal cannot help here,
+because both are known fields.
 
 ### A future authenticated field needs a versioned format change
 
@@ -241,17 +286,38 @@ alternative is recorded here for the record, and it is not the chosen path.
 ## Numeric canonicalization
 
 The owner amended D-7: the numeric rule must exist before implementation. This
-section is that rule. It aligns with the `forge.rfc8785-jcs-*` signing profile
-in `forge_contract_core` (`forge_contract_core/model_certification.py`), which
-`forge_contract_core/CLAUDE.md` names as the ecosystem canonical digest.
+section is that rule. It aligns with the integer-only JCS signing profile that
+`forge_contract_core` implements in
+`forge_contract_core/model_certification.py` (the profile constants there are
+`forge.rfc8785-jcs-ed25519.v1` and `.v2`; the digest name
+`forge.rfc8785-jcs-sha256.v1` that this plan quotes comes from that
+repository's `CLAUDE.md` and RFCs, not from that module — review finding F15).
+
+**One rule here is deliberately stricter than the ecosystem profile, and it is
+a divergence, not an alignment.** Review finding F12 verified by execution that
+`forge_contract_core` **accepts** the JSON token `-0` and normalizes it: it
+parses to `0` and encodes as `0`, because Python routes `-0` through the
+integer parser. Only the float form `-0.0` is refused there. JavaScript's
+`JSON.parse` yields `-0`, which `Object.is` distinguishes. So the same bytes
+are admitted by the ecosystem authority and refused here. Refusing is right
+under the owner's D-7 ruling, and it must be recorded as a stricter divergence,
+because ADR-025 makes cross-language parity a contract property.
 
 ### Where the rule applies
 
-**No bound envelope field carries a number from the event.** The 41 fixed
-records are strings, booleans and one count, each finding-id record is a
-string, and the encoder produces the count from the array length. So the
-envelope encoder admits no event-supplied number at all, and it needs no
-numeric rule of its own.
+**No bound field is typed as a number.** The 41 fixed records are strings,
+booleans and one count, each finding-id record is a string, and the encoder
+produces the count from the array length.
+
+That is a statement about the format, not about what the envelope admits.
+Review finding F14 corrected an earlier, stronger sentence here. Verified by
+execution: `validateEventEnvelope` admits a number in a bound string field —
+`tenant.account_id = 12345` validates and the gateway accepts it — so the
+encoder does receive event-supplied numbers. The encoder refuses them by its
+wrong-type rule, which is the safe outcome, but the format does not get to
+claim it never sees one. The validator must refuse a wrong-typed bound field
+as well, so a non-conforming event never reaches the encoder and never gets
+signed (review finding F5).
 
 The rule therefore applies in two other places:
 
@@ -261,7 +327,18 @@ The rule therefore applies in two other places:
    correction, and this plan depends on it (D-1).
 2. **The contract validator.** `validateEventEnvelope` must refuse a payload
    number that the rule forbids, so a non-conforming event never reaches the
-   encoder and never gets signed.
+   encoder and never gets signed. It must refuse a wrong-typed bound envelope
+   field for the same reason (review finding F5), and it must refuse a
+   `sentinel_finding_ids` that is not an array of strings (review finding F1).
+
+**The duplicate-key rule cannot be enforced at the validator.** Review finding
+F13 verified that `JSON.parse('{"x":1,"x":2}')` gives `{"x":2}` with one key:
+the duplicate is gone before any validator runs, and `parseReplayJsonl`
+(`src/spine/replay.ts:24`) is a plain `JSON.parse`. Python gets this property
+free through `object_pairs_hook`; TypeScript does not. Enforcing it needs a
+raw-text scan or a custom parser **at the intake boundary**, before parsing.
+This is an open design item, and the slice that owns it must say which
+boundary does the work.
 
 ### The rule
 
@@ -376,7 +453,11 @@ Three properties give the guarantee:
 3. The field list is closed, and the tag distinguishes an absent field from a
    present empty string.
 
-Two different bound envelopes therefore give two different byte strings.
+Two different bound envelopes therefore give two different byte strings **once
+findings F1, F2 and F3 are corrected**. As this document stands, that claim is
+false: review round 1 produced distinct, validator-admitted, gateway-accepted
+envelope pairs that encode identically. The property is the intent and the
+subject of gate 2. It is not yet established.
 
 The closed field list has one condition: the envelope must carry no field
 outside the list. `validateEventEnvelope` does not refuse an unknown field
@@ -385,13 +466,27 @@ stores it. The implementation must therefore refuse an unknown field in an
 event envelope, or an unbound field stays malleable.
 
 The owner approved D-5 with a condition: **define the permitted extension
-points, if any, in a future version.** This version has none. Every field is
-bound, and an unknown field is refused with `unknown_envelope_field`. A later
+points, if any, in a future version.** This version has none. An unknown field
+is refused with `unknown_envelope_field`.
+
+The refusal must cover **the top level and every bound object**, which is the
+wording in `03_COMPATIBILITY_AND_CALLER_IMPACT.md`. Review finding F4 noted
+that this document, `06` and ADR-027 said only "an unknown envelope field": on
+the narrow reading, `producer.extra`, `data_policy.extra`, `integrity.extra`,
+`tenant.extra` and `control_lineage.extra` all stay unbound and malleable, and
+the verified-behaviour table tested only an unknown **top-level** field. The
+broad reading is the required one.
+
+An unknown-field refusal still cannot close the field list on its own: review
+finding F3 shows two **known** fields that are admitted and unbound. A later
 version that wants an extension point must do three things: name the point in
 the format, bind its content in the authenticated bytes, and state what a
 consumer may do with a field it does not recognize. An unauthenticated
 extension point is the defect this plan corrects, so it must never be added as
 a convenience.
+
+Two known fields are unbound today, which is review finding F3. Until that is
+corrected, this document must not claim that every field is bound.
 
 ## Related finding
 

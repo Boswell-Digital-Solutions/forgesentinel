@@ -4,7 +4,7 @@ Owner requirement 4: independent negative tests must exist before any
 production enforcement.
 
 The owner added five implementation gates on 2026-11-02
-(`06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md`). Four of them are proved here:
+(`06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md`). All five are proved here:
 
 | Gate | Group |
 |---|---|
@@ -42,6 +42,13 @@ The owner added five implementation gates on 2026-11-02
 
 `Today` is the verified behaviour at `432337c`. `Required` is the behaviour the
 correction must produce.
+
+**A case whose `Today` already reads `rejected` is a control, not gate
+coverage.** Review finding F18 reproduced all of them — NEG-A03, A27, B04,
+B05, B06, D02, D03, E05, E06 and SUB-I08 — and noted that several admit an
+alternative reason code, so they pass even if authentication is absent
+entirely. They belong in the suite, because a correction must not break them.
+They must not be counted toward a gate. The coverage index below marks them.
 
 ## Group A: the bound envelope fields
 
@@ -177,20 +184,39 @@ The repository has no property-testing dependency, and it stays
 dependency-free. The generator is therefore a small function in the test file,
 driven by a fixed recorded seed, so a failure reproduces exactly.
 
+**Review finding F17 replaced the original PROP-H02.** It asserted that equal
+bytes imply equal projections, which is the contrapositive of PROP-H01 and so
+asserts nothing new, at the cost of about 50 million pair comparisons. The
+reviewer also showed that PROP-H01 alone is weak proof: a generator over
+well-typed random values would pass against an implementation that **omitted
+the length prefix entirely**, because distinct random values still give
+distinct bytes. A decoder is the sound proof. An encoding that is provably
+decodable under a fixed schedule is injective by construction, and the fixed
+adversarial cases carry the rest.
+
 | Case | Construction | Required |
 |---|---|---|
 | PROP-H01 | Generate 10,000 envelopes from the seed. Vary each bound field: present, absent, empty, a separator byte, a multi-byte character, a long value, and a lineage array of 0 to 3 ids. | No two distinct envelopes give the same bytes. The test compares a map of bytes to envelope. |
-| PROP-H02 | For each generated pair, assert the reverse: equal bytes imply equal bound projections. | Holds for every pair. |
+| PROP-H02 | **A decoder.** Recover the bound projection from the authenticated bytes under the fixed field schedule, and assert a round trip for every generated envelope and every fixture. | The decode of an encode returns the original bound projection, field for field, including every absent-versus-empty distinction. |
 | ADV-H03 | Move a separator between two adjacent fields: put the next field's name and value inside the previous field's value. | The two byte strings differ. |
 | ADV-H04 | A value that contains `0x1F`, a value that contains `0x1E`, and a value that contains both. | The bytes stay unambiguous, and the length prefix states the true count. |
 | ADV-H05 | A value that is the complete text of a later record. | The two byte strings differ. |
 | ADV-H06 | An absent field against a present empty string, for each optional field. | The bytes differ for every field. |
 | ADV-H07 | A lineage array of 2 ids against one of 3 where the third is empty. | The count record differs, so the bytes differ. |
-| ADV-H08 | Two envelopes that differ only in a field the format does not bind. | The bytes are equal. This is correct, and it documents the bound set. The strict validator refuses such an event, so the pair cannot both reach the gateway. |
+| ADV-H08 | Two envelopes that differ only in `integrity.signature` or `integrity.signature_key_id`, on an event that needs no signature. | **The bytes must differ once finding F3 is corrected.** Until then both envelopes are accepted by a real gateway, so this is a live collision and not correct behaviour. |
+| ADV-H10 | An absent optional parent object against a present empty one, for `tenant`, `resource` and `control_lineage`. | The bytes must differ (finding F2). |
+| ADV-H11 | `sentinel_finding_ids` as `["a","b"]`, as `"ab"`, and as `{0:"a",1:"b",length:2}`. | The encoder refuses the second and the third. The bytes for the first differ from any refusal (finding F1). |
 | ADV-H09 | A string with an unpaired surrogate. | The encoder refuses it. It never produces bytes. |
 
-ADV-H08 is the one case that must produce equal bytes. A test that asserted
-otherwise would be wrong, and the comment must say why.
+**ADV-H08 was wrong in review round 1, and it is corrected here.** It
+previously asserted that equal bytes were correct for a field the format does
+not bind, and justified that with a premise the reviewer falsified: the strict
+validator does **not** refuse those two envelopes, because
+`integrity.signature` and `integrity.signature_key_id` are **known** fields
+that `validateEventEnvelope` never reads. Both members of the pair were
+ingested into a real gateway and both were accepted. A case that documents a
+live collision as an invariant is worse than no case, so this one now asserts
+the corrected behaviour.
 
 ## Group I: substitution (gate 4)
 
@@ -224,7 +250,7 @@ write of an accepted event, routing and downstream publication.
 |---|---|---|
 | ORD-J01 | Ingest an event whose authentication fails. | No dedupe entry exists for its key. A later genuine event with that key is accepted, not reported as a duplicate. |
 | ORD-J02 | Ingest an event whose authentication fails. | The ledger holds one rejection record and no accepted record for that event. |
-| ORD-J03 | Ingest an event whose authentication fails, through `SentinelRuntime`. | No detector, no Sentinel Prime input and no policy decision sees the event. |
+| ORD-J03 | Ingest an event whose authentication fails, through `SentinelRuntime`. | No detector, no Sentinel Prime input and no policy decision sees the event. **This case is a control, not gate-3 proof** (review finding F19): `EvidenceLedger.events()` filters to `kind === "event" && validation === "accepted"` (`src/spine/ledger.ts:108`), so a rejection is structurally invisible to the detectors whether or not authentication works. It passes today and would pass against a broken implementation. |
 | ORD-J04 | Ingest a replay file whose second line fails authentication. | The remaining lines still process, and the summary counts one rejection. |
 | ORD-J05 | Read the order of checks in `ingest`. | Contract validation, then the payload-hash check, then authentication, then the signature check, then de-duplication, then the append. A test asserts the reason code of an event that would fail two checks, so the order is observable. |
 
@@ -239,10 +265,13 @@ and must not expose a credential or a sensitive payload.
 
 | Case | Construction | Required |
 |---|---|---|
-| EVD-K01 | Ingest an event whose authentication fails. Serialize the rejection record. | The text contains no part of the presented token, no expected bytes, no expected digest and no derived key. |
+| EVD-K01 | Ingest an event whose authentication fails. Serialize the rejection record. | The text contains neither the full presented token nor any contiguous run of 16 or more of its characters, and no expected bytes, expected digest or derived key. Review finding F21: "no part of" is untestable, because any two hex characters occur by chance in long hex text. |
+| EVD-K09 | The same, with a `credential.service` and a `credential.key_id` of 200 attacker-chosen characters including a NUL byte. | Neither value reaches the record, and neither reaches the caller's message. Verified to fail today: both reach both (`KI-SENTINEL-20261102-013`). |
+| EVD-K10 | Ingest a `restricted`, `content_included: true`, `cloud_allowed: false` event that fails any check. Call `cloudProjection` on the rejection record. | It returns no payload content and no `data_policy` from the rejected envelope. Verified to fail today: the projection returns the whole body, with no data-policy check at all (`KI-SENTINEL-20261102-011`). |
+| EVD-K11 | Ingest a failing event naming another tenant. Call `queryByTenant` for that tenant. | The forged record is not in that tenant's view. Verified to fail today (`KI-SENTINEL-20261102-012`). |
 | EVD-K02 | The same, with a `restricted` payload and `content_included: true`. | The record holds the shape the slice chose under gate 5, and the slice states that shape. The recommended shape is the permitted non-payload envelope metadata, plus a payload digest, plus the generic external code, plus the restricted internal category. |
 | EVD-K06 | Read the record's payload digest field. | It is labelled an observed, untrusted value. A reader cannot mistake it for proof that the producer sent the event. |
-| EVD-K07 | Ingest a failing event whose `data_policy` claims `sensitivity: public` and `cloud_allowed: true`, and one that claims `restricted`. | Neither classification changes what is stored, who may read the record, or how long it is kept. The rejected envelope's `data_policy` never decides storage access. |
+| EVD-K07 | Ingest a failing event whose `data_policy` claims `sensitivity: public` and `cloud_allowed: true`, and one that claims `restricted`. | **Absolute predicate, not a comparison:** the record and its cloud projection carry no payload content and no `data_policy` field from the rejected envelope, whatever it claimed. Review finding F32: the original comparative wording passes against today's broken code, which treats both classifications identically by publishing both. |
 | EVD-K08 | Ingest a failing event with a forged `tenant.tenant_id` naming another tenant. | The record does not become readable to that tenant on the strength of the forged value. |
 | EVD-K03 | The same. Read the `IngestResult` the caller receives. | One issue, code `producer_auth_failed`, with no field name, no value and no internal category. |
 | EVD-K04 | The same. Read the rejection record. | It carries one internal category from the closed set in `02_SIGNATURE_BINDING.md`. |
@@ -256,6 +285,29 @@ EVD-K06 to EVD-K08 come from recommendation 1 in `06`. They exist because every
 value on a failing event is attacker-chosen: the digest is observed and not
 proof, and the `data_policy` and the tenant on a rejected envelope must not
 reach any decision about storage, access or retention.
+
+## Group L: attacks review round 1 found missing
+
+| Case | Construction | Today | Required | Reason code |
+|---|---|---|---|---|
+| NEG-L01 | Change the payload **and** recompute `integrity.payload_hash` to match, then ingest with the original credential. | accepted | rejected | `producer_auth_failed` |
+| NEG-L02 | Add `integrity.signature` and `signature_key_id` to an event that needs no signature. | accepted and stored | rejected | `signature_invalid` or `unknown_envelope_field`, per the F3 ruling |
+| NEG-L03 | `sentinel_finding_ids` as a string, and as an array-like object. | accepted | rejected | `envelope_not_encodable` |
+| NEG-L04 | A present empty `tenant`, `resource` or `control_lineage` against the absent parent. | accepted | rejected | `producer_auth_failed` |
+| NEG-L05 | A raw replay line with a duplicate JSON key. | the later value wins silently | refused at intake | a new intake code |
+| NEG-L06 | A `key_id` containing the HKDF `info` separator, registered for two producers. | registration accepted | the registry refuses the second registration | `ProducerRegistrationError` |
+| NEG-L07 | Ingest a signed event, then ingest it verbatim through a fresh gateway over the same ledger. | accepted | duplicate, or a stated non-goal | — |
+| NEG-L08 | Submit many failing events with large credentials, and measure the ledger growth. | unbounded | a stated bound | — |
+
+NEG-L01 is the attack the matrix most obviously lacked: an attacker who holds a
+signed event and wants a different payload simply recomputes the hash the
+gateway recomputes. Today it succeeds. The format binds record 34, so the
+correction refuses it — which makes this the single best positive proof that
+the envelope binding works.
+
+NEG-L07 and NEG-L08 are outside owner requirement 3, and they belong to
+`KI-SENTINEL-20261102-015` and `KI-SENTINEL-20261102-013`. They are listed so
+the plan does not leave a reader assuming replay and resource use are handled.
 
 ## Group G: positive controls
 
@@ -289,7 +341,7 @@ Sentinel Prime and the policy decisions must give the same output as before.
 | `event_type` | NEG-D01 to NEG-D04 |
 | `occurred_at` | NEG-A10 |
 | payload digest | NEG-A27, NEG-F06, NEG-F07, POS-09 |
-| cross-tenant replay | NEG-B01, NEG-B02, NEG-B03 |
+| cross-tenant replay | NEG-B01, NEG-B02, NEG-B03 (B04, B05 and B06 are controls, not coverage) |
 | `event_id` replay | NEG-C01, NEG-C02, NEG-C04 |
 | positive control | POS-01 to POS-09 |
 
@@ -299,6 +351,6 @@ Sentinel Prime and the policy decisions must give the same output as before.
 | 2 Injective canonical encoding | PROP-H01, PROP-H02, ADV-H03 to ADV-H09 |
 | 3 Verify before side effects | ORD-J01 to ORD-J05 |
 | 4 Explicit tenant isolation | NEG-B01 to NEG-B06, SUB-I01 to SUB-I10 |
-| 5 Protected operational evidence | EVD-K01 to EVD-K05 |
+| 5 Protected operational evidence | EVD-K01 to EVD-K11 |
 | D-6 independent keys | NEG-E08, NEG-E09, NEG-E10 |
 | D-7 numeric canonicalization | NEG-F06, NEG-F07, and the payload-number cases that slice S0 owns |

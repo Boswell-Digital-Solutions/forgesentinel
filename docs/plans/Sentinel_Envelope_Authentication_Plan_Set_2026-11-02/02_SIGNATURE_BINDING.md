@@ -30,9 +30,9 @@ K_signature  = HKDF-SHA256(ikm = producer.secret, salt = SALT,
 |---|---|---|
 | Function | HKDF-SHA256, `node:crypto.hkdfSync("sha256", ikm, salt, info, 32)` | It is in the Node standard library, so the repository stays dependency-free. |
 | `ikm` | The producer secret from the registration, as UTF-8 bytes | The root secret never becomes an HMAC key itself. |
-| `salt` | The constant format name, in ASCII | The salt is not secret. HKDF admits a constant salt when the input keying material already has high entropy, which the production secret rules enforce (`src/spine/producer_secrets.ts`). |
-| `info` | The usage, then one vertical-bar character, then the key id | The usage separates the two keys. The key id stops one producer's derived key from matching another's, even if two secrets ever matched. |
-| `L` | 32 bytes | It matches the SHA-256 block security level. |
+| `salt` | The constant format name, in ASCII | The salt is a non-secret domain label. HKDF-Extract stays a secure pseudo-random function with a constant salt for the secrets the protected-environment rules admit. Those rules check length and character variety, not entropy, and `src/spine/producer_secrets.ts:68` skips them entirely outside `production` and `staging`, so a development or test secret is not strength-checked at all (review finding F9). |
+| `info` | The usage, then one vertical-bar character, then **the registration's** `key_id` | The usage separates the two keys. The key id stops one producer's derived key from matching another's, even if two secrets ever matched. The key id comes from the registration, never from the event or the credential, so attacker-controlled input never selects derivation material (review finding F11). The two usage labels differ at byte 0, so no key id, not even one containing a vertical bar, produces a cross-context collision. |
+| `L` | 32 bytes | It matches the SHA-256 output length, so HKDF-Expand needs one block. SHA-256's block is 64 bytes, and its security levels are 128-bit collision and 256-bit preimage (review finding F10 corrected an earlier, wrong reason). |
 
 Both derived keys are 32 bytes. A derived key never appears in a log, an error,
 a receipt or a rejection record.
@@ -90,8 +90,11 @@ producer used.
 
 | Function | File | Change |
 |---|---|---|
-| `ProducerRegistry.authenticate` | `src/spine/producers.ts:136` | Takes the validated event instead of the payload hash. Derives `K_credential`. Builds `AUTH("credential", credential.key_id, event)`. Keeps `timingSafeEqual`. |
-| `EventGateway.ingest` | `src/spine/gateway.ts:180` | Derives `K_signature`. Builds `AUTH("signature", event.integrity.signature_key_id, event)` for a signature-required producer or family. Keeps `timingSafeEqual` and the `signature_key_id` comparison. |
+| `ProducerRegistry.authenticate` | `src/spine/producers.ts:136` | Takes the validated event instead of the payload hash. Derives `K_credential` from the registration. Builds `AUTH("credential", credential.key_id, event)`. Keeps `timingSafeEqual`. |
+| `EventGateway.ingest` | `src/spine/gateway.ts:180` | Derives `K_signature` from the registration. Builds `AUTH("signature", event.integrity.signature_key_id, event)` for a signature-required producer or family. Keeps `timingSafeEqual`. **Compares `signature_key_id` with the registration before it verifies anything**, not inside the same condition as the comparison, so attacker-controlled input never reaches verification (review finding F11). |
+
+Implementation note: `crypto.hkdfSync` returns an `ArrayBuffer`, not a
+`Buffer`. Wrap it before use as an HMAC key.
 
 `buildEvent` (`src/spine/build.ts:25`) produces both values. It must use the
 same encoder and the same derivation. A separate copy of the field list or of
@@ -178,8 +181,20 @@ separate, authorized slice, and the safeguards below are part of it.
 
 The gateway chooses the primitive from the registration, not from the event. A
 producer cannot ask for a weaker primitive, because nothing in the event names
-one. One key id belongs to exactly one producer and one algorithm, and the
-registry already refuses a key id that two producers share.
+one. One key id should belong to exactly one producer and one algorithm.
+
+**Correction, review finding F8.** An earlier version of this document stated
+that the registry already refuses a key id that two producers share. It does
+not. `ProducerRegistry.register` keys its map on `service:key_id`
+(`src/spine/producers.ts:124`) and refuses only an exact duplicate of that
+pair. Key-id uniqueness is enforced in `loadProducerRegistrations`
+(`src/spine/producer_secrets.ts:196-200`), which is the secrets-file loader,
+over the standard profiles only. Verified by execution: registering a second
+producer with the same `key_id` directly on a `ProducerRegistry` succeeds.
+
+So the property the key-substitution argument needs does not exist yet, and
+D-9 safeguard 1 below must create it rather than assume it. The registry must
+refuse a `key_id` that another registered producer already uses.
 
 Record 3 binds the key id into the authenticated bytes. A signature made for
 one key id therefore does not verify for another.

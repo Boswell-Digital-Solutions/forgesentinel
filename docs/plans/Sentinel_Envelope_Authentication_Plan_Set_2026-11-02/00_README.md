@@ -5,7 +5,7 @@
 - **Date:** 2026-11-02
 - **Owner and decision authority:** Charlie Boswell
 - **Priority:** P0 security, by owner ruling of 2026-11-02
-- **Status:** Design approved conditionally. Merge not authorized.
+- **Status:** Design approved conditionally by the owner; **independent review round 1 returned blocking defects.** Merge not authorized. Implementation not authorized.
 
 This plan set is a design document. It is not an authorization to change code.
 Each implementation slice needs its own explicit authorization from the owner.
@@ -19,9 +19,14 @@ four further **recommendations**, which are explicitly not approvals.
 and it wins over any earlier text in this plan set.** It separates the rulings
 from the recommendations.
 
-**Independent design review is requested and not complete.** No pull-request
-review is submitted. A green documentation check is not a substitute for that
-review, and no part of this plan set may be read as a completed review.
+**Independent design review round 1 is complete and its verdict is "not safe
+to proceed to implementation authorization as written".** It found three
+blocking defects in the format itself: the encoding is not one to one, and two
+admitted envelope fields are not bound. `07_REVIEW_ROUND_1_FINDINGS.md` holds
+the findings. A second round is needed after the owner rules on the candidate
+fixes. No pull-request review is submitted on GitHub, so the review of record
+is that document. A green documentation check is not a substitute for any of
+this.
 
 The owner rules the correction a **P0 security priority**. The verified
 cross-tenant event re-targeting is a security-significant authentication
@@ -136,6 +141,7 @@ Not in scope for this plan set, and not changed by it:
 | `04_NEGATIVE_TEST_MATRIX.md` | The negative tests and the positive controls |
 | `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | Gates, the ruled decisions, risks, proposed slices, the plan registry request |
 | `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | **Authoritative.** The ten rulings, the two amendments, the five implementation gates, the four recommendations pending ruling, the findings disposition, the authorization boundaries |
+| `07_REVIEW_ROUND_1_FINDINGS.md` | Independent review round 1: the verdict, the blocking defects, what was re-verified, and the open design decisions |
 | `MANIFEST.md` | File sizes and SHA-256 digests |
 
 ## Sources read for this plan
@@ -165,7 +171,7 @@ The track is complete only when all of these hold:
 
 1. A producer authenticates the security-relevant envelope, not only the payload hash.
 2. The authentication format carries a version tag inside the authenticated bytes.
-3. The format is deterministic and one to one. Two different envelopes never give the same bytes.
+3. The format is deterministic and one to one. Two different envelopes never give the same bytes. **Not met today:** review round 1 produced distinct, validator-admitted, gateway-accepted envelope pairs with identical bytes.
 4. The gateway refuses an altered event and a cross-tenant event.
 5. The negative tests in `04_NEGATIVE_TEST_MATRIX.md` pass, and an independent reviewer wrote or reviewed them.
 6. An independent review of the implementation found no blocking defect.

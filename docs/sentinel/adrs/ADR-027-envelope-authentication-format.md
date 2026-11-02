@@ -1,7 +1,7 @@
 # ADR-027: Authenticate the Security-Relevant Event Envelope, Not Only the Payload Hash
 
-**Status:** Accepted for design (2026-11-02). Implementation is not authorized.
-**Corrects:** `KI-SENTINEL-20261102-008`
+**Status:** Accepted for design (2026-11-02). Implementation is not authorized. Independent review round 1 returned blocking defects in the format; a second round is required.
+**Addresses:** `KI-SENTINEL-20261102-008`
 **Depends on:** `KI-SENTINEL-20261102-006` (corrected and verified), ADR-026
 **Plan set:** `docs/plans/Sentinel_Envelope_Authentication_Plan_Set_2026-11-02/` (`BDS-SNT-ENVELOPE-AUTH-001`)
 
@@ -28,15 +28,19 @@ exploitation is claimed, and none is observed.
 ## Decision
 
 Producer authentication binds the security-relevant envelope through one
-versioned, deterministic, one-to-one byte format,
-`forgesentinel.event_auth.v1`.
+versioned, deterministic byte format, `forgesentinel.event_auth.v1`, which is
+**intended** to be one to one. That property is the subject of gate 2 and is
+not yet proved: review round 1 found three defects that break it (see
+`07_REVIEW_ROUND_1_FINDINGS.md`, findings F1 to F3).
 
 1. **The format.** The authenticated bytes are a fixed, ordered list of 41
    records, plus one record for each `control_lineage.sentinel_finding_ids`
    element. One record is `name 0x1F tag 0x1F byte-length 0x1F value 0x1E`. The
    name is a constant from the specification. The length is the exact UTF-8
-   byte count, so no value can create, hide or move a separator. A tag
-   separates an absent field from a present empty string.
+   byte count, so no value can create, hide or move a separator — the reviewer
+   confirmed this core property by implementing the spec and testing it. A tag
+   separates an absent field from a present empty string, but **not** an absent
+   parent object from a present empty one, which finding F2 must correct.
 2. **The version tag is inside the authenticated bytes.** Record 1 holds the
    format name, so it cannot be stripped or downgraded. The gateway holds the
    accepted name as a constant, and it reads no version from the event.
@@ -56,9 +60,12 @@ versioned, deterministic, one-to-one byte format,
    ±9007199254740991, which aligns with the `forge.rfc8785-jcs-*` profile in
    `forge_contract_core`. A floating-point payload number is refused; a
    fraction travels as a scaled integer or a decimal string.
-7. **A closed field list.** `validateEventEnvelope` refuses an unknown envelope
-   field, so no field escapes the binding. This version defines no extension
-   point.
+7. **A closed field list.** `validateEventEnvelope` refuses an unknown field,
+   at the top level and in every bound object, so no unknown field escapes the
+   binding. This version defines no extension point. Two **known** fields,
+   `integrity.signature` and `integrity.signature_key_id`, are admitted and
+   unbound today; finding F3 must correct that, and an unknown-field refusal
+   cannot.
 8. **One external reason code.** Every authentication failure returns
    `producer_auth_failed` to the caller, with no field name. A closed set of
    internal categories stays in the operator evidence record.
