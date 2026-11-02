@@ -2,7 +2,8 @@
 
 - **Date of ruling:** 2026-11-02
 - **Ruling authority:** Charlie Boswell, owner
-- **Disposition:** Design approved conditionally. Merge not authorized.
+- **Disposition at the ruling:** Design approved conditionally. Merge not authorized.
+- **Since:** The owner instructed the merge on 2026-11-02. PR #32 merged as `79698ac`. Implementation stays unauthorized, and the review-round-1 findings stay open.
 
 This document is the authoritative record of the owner's rulings on
 `BDS-SNT-ENVELOPE-AUTH-001`. Where a ruling and an earlier document in this
@@ -274,7 +275,11 @@ in this plan set may be read as an approved design.
 Three boundaries, in order. Each needs its own explicit authorization.
 
 1. **Design review.** This plan set, revised with these rulings, goes to
-   independent review. PR #32 stays in draft.
+   independent review. PR #32 was kept in draft for that, then merged on the
+   owner's instruction as `79698ac`. Round 1 is complete and its verdict is
+   "not safe to proceed to implementation authorization as written", so this
+   boundary is **not** cleared: a second round follows the owner's rulings on
+   the candidate fixes. Merging the documentation did not clear it.
 2. **Implementation authorization.** Each slice in `05` needs the owner's
    explicit authorization. Design approval is not implementation authorization.
 3. **Production deployment authorization.** Separate again. The gateway stays
