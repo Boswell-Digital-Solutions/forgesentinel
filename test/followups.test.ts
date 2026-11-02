@@ -126,3 +126,15 @@ test("a malformed replay line is rejected and the replay continues", () => {
   assert.equal(summary.results[3]!.status, "accepted");
   assert.ok(summary.results[2]!.reasons.some((reason) => reason.code === "producer_credential_malformed"));
 });
+
+test("rejections of malformed replay lines stay verifiable by the ledger integrity check", () => {
+  const { runtime, producers } = setup();
+  const genuine = usage(producers["usage-metering"]!);
+  const lines = [genuine, null, 5, "line", [], { credential: genuine.credential }, { event: 5, credential: genuine.credential }] as unknown as ReplayLine[];
+  const summary = replayInto(runtime.gateway, lines);
+  assert.equal(summary.accepted, 1);
+  assert.equal(summary.rejected, lines.length - 1);
+  const checks = runtime.ledger.integrityCheck();
+  assert.equal(checks.length, lines.length, "every line has a ledger record, with no gap");
+  assert.ok(checks.every((check) => check.ok), JSON.stringify(checks.filter((check) => !check.ok)));
+});

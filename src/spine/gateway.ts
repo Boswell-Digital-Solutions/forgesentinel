@@ -154,9 +154,11 @@ export class EventGateway {
       rejection_reasons: reasons,
       transformation_version: "ingest.1.0.0",
       ...(tenantId !== undefined ? { tenant_id: tenantId } : {}),
-      // A missing event is recorded as null: JSON has no undefined, and the
-      // ledger hashes the body (KI-SENTINEL-20261030-006 item 2).
-      body: rawEvent === undefined ? null : rawEvent,
+      // The ledger hashes the body, and its integrity check verifies only an
+      // object or array body. A missing, null or primitive input is therefore
+      // wrapped, so the rejection stays verifiable (KI-SENTINEL-20261030-006
+      // item 2). JSON has no undefined, so a missing input is recorded as null.
+      body: typeof rawEvent === "object" && rawEvent !== null ? rawEvent : { malformed_input: rawEvent === undefined ? null : rawEvent },
     });
     const eventId =
       typeof rawEvent === "object" && rawEvent !== null && typeof (rawEvent as Record<string, unknown>)["event_id"] === "string"

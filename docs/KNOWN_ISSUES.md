@@ -131,7 +131,7 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Evidence**: `tools/gen-fixtures.ts:18` sets `const ROOT = new URL("../..", import.meta.url).pathname;`. On Windows, `pathname` is `/C:/Forge/...`, and `join` then makes `C:\C:\Forge\...`.
 - **Observed behavior**: `npm run fixtures` fails before it writes a file, with `ENOENT: no such file or directory, mkdir 'C:\C:\Forge\...\fixtures\replay'`. On Linux, `pathname` is a valid path, and the generator works.
 - **Proposed correction**: Use `fileURLToPath(new URL("../..", import.meta.url))` from `node:url`. Then confirm that `npm run fixtures` on Windows and on Linux makes no change under `fixtures/`.
-- **Correction implemented (2026-11-02, unverified)**: Branch `fix/sentinel-followups`, operator-authorized as one isolated PR with KI-SENTINEL-20261030-003, -006 and KI-SENTINEL-20261102-001, -002. `tools/gen-fixtures.ts` uses `fileURLToPath`. On Windows, `npm run fixtures` now completes, and all 12 regenerated fixture files match the committed content after line endings are normalized. The Linux run is not yet confirmed.
+- **Correction implemented (2026-11-02, unverified)**: Branch `fix/sentinel-followups`, operator-authorized as one isolated PR with KI-SENTINEL-20261030-003, -006 and KI-SENTINEL-20261102-001, -002. `tools/gen-fixtures.ts` uses `fileURLToPath`. On Windows, `npm run fixtures` now completes, and all 12 regenerated fixture files match the committed content after line endings are normalized. The independent review of PR #27 ran it on Linux (WSL Ubuntu, Node 20), and all fixture files were byte-identical there too.
 - **Status**: Open — recorded, unresolved until the correction is verified.
 
 ## KI-SENTINEL-20261030-001: doc/system does not describe the Event Gateway or the ingress surface — OPEN 2026-10-30
@@ -247,9 +247,8 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Related**: the fixture generator's Windows path bug is tracked separately as KI-SENTINEL-20261030-003.
 - **Correction implemented (2026-11-02, unverified)**: Branch `fix/sentinel-followups`, operator-authorized as one isolated PR with KI-SENTINEL-20261030-003, -006 and KI-SENTINEL-20261102-001, -002.
   1. Item 1: a token or a signature is accepted only as 64 lowercase hex characters (`HMAC_HEX_PATTERN`). An upper-case token is rejected with `producer_auth_failed`, and an upper-case signature with `signature_invalid`.
-  2. Item 2: the gateway rejects a missing or malformed credential with `producer_credential_malformed`, instead of throwing. `replayInto` turns a malformed line (for example `null`) into a rejection and continues. A rejection with no event is recorded with a `null` body.
+  2. Item 2: the gateway rejects a missing or malformed credential with `producer_credential_malformed`, instead of throwing. `replayInto` turns a line that parses but is malformed (for example `null`) into a rejection and continues. A rejection stores a non-object input as `{ "malformed_input": ... }`, so the ledger integrity check verifies it. A line that is not valid JSON still stops the replay before anything is ingested, which fails closed. Hostile in-process inputs (throwing getters, Proxies, cyclic objects) can still throw; JSON-parsed lines cannot produce them.
   3. Item 3: `doc/system/03-runtime-boundary.md` states the trust assumption: the directory path to the secrets file must be trusted.
-- **No change made**: This record changes no code.
 - **Status**: Open — recorded, unresolved until each item is corrected or explicitly accepted.
 
 ## KI-SENTINEL-20261102-001: A huge sparse prefix list is copied in full before it is checked — OPEN 2026-11-02 — resource exhaustion — follow-up
@@ -262,7 +261,6 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Reachability**: Only a library caller that builds a registration in code. The secrets file always uses the fixed standard profiles.
 - **Proposed correction**: Refuse a prefix list longer than a small bound (for example 64) before the copy, or check each element as it is copied. Add a negative test.
 - **Correction implemented (2026-11-02, unverified)**: Branch `fix/sentinel-followups`, operator-authorized as one isolated PR with KI-SENTINEL-20261030-003, -006 and KI-SENTINEL-20261102-001, -002. `register()` reads the prefix-list length once and refuses a count that is not an integer from 0 to `MAX_EVENT_PREFIXES` (64), before it reads any element. A test shows that lengths of 65, 5,000,000 and 2^32-1 are refused quickly, and that a Proxy reporting a huge length has no element read.
-- **No change made**: This record changes no code.
 - **Status**: Open — deferred to follow-up work; unresolved until the correction is verified.
 
 ## KI-SENTINEL-20261102-002: The Symbol.species half of a registry test does not show the old bypass — OPEN 2026-11-02 — test quality — follow-up
@@ -274,7 +272,6 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Observed behavior**: Against `6bcc336`, before the fix, the species half fails with `TypeError: copy.allowed_event_prefixes is not iterable`. It does not fail by storing a list that differs from the checked list. Its assertions are valid at the merged head. The `Array`-subclass half of the same test does fail for the intended reason.
 - **Proposed correction**: Give the species object an iterator that yields `"usage."` and a `some` that returns true. Then confirm that, against `6bcc336`, the test fails because `allowsEventType(..., "billing.subscription.changed")` returns true.
 - **Correction implemented (2026-11-02, unverified)**: Branch `fix/sentinel-followups`, operator-authorized as one isolated PR with KI-SENTINEL-20261030-003, -006 and KI-SENTINEL-20261102-001, -002. The species object now has an iterator that yields `"usage."` and a `some` that returns true, and the billing check comes first. Against `6bcc336`, with only the species half kept, the test fails because `allowsEventType(..., "billing.subscription.changed")` returns true. That is the intended reason.
-- **No change made**: This record changes no code.
 - **Status**: Open — deferred to a separate PR; unresolved until the correction is verified.
 
 ## KI-SENTINEL-20261102-003: The public allowsEventType trusts the registration it is given — ACCEPTED 2026-11-02

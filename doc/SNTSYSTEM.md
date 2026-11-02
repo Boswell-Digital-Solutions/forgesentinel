@@ -75,7 +75,7 @@ Nodes hold no authority credentials. The pipeline terminates at policy decisions
 
 ## Producer Authentication
 
-The Event Gateway (`src/spine/gateway.ts`) is an in-process class. It has no network ingress. Events reach it through `sentinel replay <file>` or through a library caller. The gateway authenticates each producer with HMAC-SHA256 over the payload hash. A signature-required producer or event family also needs a signature made with the same producer secret. A token or a signature is accepted only as 64 lowercase hex characters, so one HMAC has one accepted text form. A missing or malformed credential (not an object with string `service`, `key_id` and `token`) is rejected with `producer_credential_malformed`. A malformed replay line becomes a rejection of that line, and the replay continues.
+The Event Gateway (`src/spine/gateway.ts`) is an in-process class. It has no network ingress. Events reach it through `sentinel replay <file>` or through a library caller. The gateway authenticates each producer with HMAC-SHA256 over the payload hash. A signature-required producer or event family also needs a signature made with the same producer secret. A token or a signature is accepted only as 64 lowercase hex characters, so one HMAC has one accepted text form. A missing or malformed credential (not an object with string `service`, `key_id` and `token`) is rejected with `producer_credential_malformed`. A replay line that parses as JSON but is malformed (for example `null`, a number, or a line without a credential) becomes a rejection of that line, and the replay continues. The rejection stores a non-object input as `{ "malformed_input": ... }`, so the ledger integrity check can verify it. A line that is not valid JSON stops the replay before anything is ingested.
 
 Producer secrets come from protected configuration (KI-SENTINEL-20261030-002). The source holds only the non-secret producer profiles (`STANDARD_PRODUCER_PROFILES` in `src/spine/producer_secrets.ts`).
 
@@ -92,9 +92,9 @@ Producer secrets come from protected configuration (KI-SENTINEL-20261030-002). T
   - a missing variable;
   - a path that is not a regular file, or a file that cannot be read;
   - on POSIX, a symlink, a file that group or others can read or write, or a file owned by another user (Windows follows symlinks and has no permission or owner check);
-  - Trust assumption: the symlink check covers only the last path component. On POSIX, a parent directory in the path can still be a symlink, and is followed. The type, mode and owner checks apply to the file itself. The directory path to the secrets file must therefore be trusted: it must not be writable by another user.
   - a file for another environment, or an unknown field at the top level or in a producer entry;
   - a missing producer, an unknown producer, or one `key_id` used by two producers.
+- Trust assumption, not a refusal: the symlink check covers only the last path component. On POSIX, a parent directory in the path can still be a symlink, and is followed. The type, mode and owner checks apply to the file itself. The directory path to the secrets file must therefore be trusted: it must not be writable by another user.
 - Every environment refuses a secret that contains a control character. HMAC pads a short key with NUL bytes, so a secret of NUL bytes is the empty key.
 - In `production` and `staging`, the runtime, the registry and the loader also refuse:
   - a secret with the published `test-secret-` prefix;

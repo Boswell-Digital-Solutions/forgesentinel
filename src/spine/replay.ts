@@ -30,8 +30,9 @@ export function loadReplayFile(path: string): ReplayLine[] {
 
 /**
  * Deterministic replay: identical input fixtures produce identical ledgers.
- * A malformed line (for example `null`, or one with no credential) becomes
- * a rejection of that line; it does not stop the replay
+ * A line that parses but is malformed (for example `null`, or one with no
+ * credential) becomes a rejection of that line; it does not stop the replay.
+ * A line that is not valid JSON fails earlier, in parseReplayJsonl
  * (KI-SENTINEL-20261030-006 item 2).
  */
 export function replayInto(gateway: EventGateway, lines: ReplayLine[]): ReplaySummary {
