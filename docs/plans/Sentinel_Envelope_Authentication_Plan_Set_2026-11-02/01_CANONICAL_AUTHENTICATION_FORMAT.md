@@ -4,6 +4,10 @@ This document specifies the exact bytes a producer authenticates. It answers
 owner requirements 1 and 2: bind the security-relevant envelope, and use a
 versioned, deterministic format.
 
+The owner ruled on this document on 2026-11-02. D-1, D-2, D-4 and D-5 are
+approved with conditions, and D-7 is amended: the numeric rule must exist
+before implementation. See `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md`.
+
 ## Format name and version tag
 
 The format name is `forgesentinel.event_auth.v1`.
@@ -15,6 +19,11 @@ strippable and not downgradable.
 The gateway holds the accepted name as a constant. It does not read a format
 name from the event or from the credential. A producer cannot ask the gateway
 for an older format.
+
+This satisfies D-4 as ruled: the gateway controls the version and the
+algorithm, it refuses an unsupported version, and it never negotiates an
+algorithm from event input. `02_SIGNATURE_BINDING.md` states what a refusal of
+an unsupported version means in practice.
 
 ## Why the format is not canonical JSON
 
@@ -144,6 +153,19 @@ follows.
 `integrity.signature` and `credential.token` are the outputs of the format.
 The format does not bind them.
 
+### A future authenticated field needs a versioned format change
+
+D-2 is approved with this condition. The field list is part of the format, not
+a configuration value. Adding a field, removing one, changing a tag or changing
+the order changes the authenticated bytes for every event, so it is a new
+format version with a new name, for example
+`forgesentinel.event_auth.v2`. A version is never added in place, and the
+gateway accepts one version at a time unless the owner authorizes an allowlist.
+
+The same rule governs a new envelope field in the contract. The field list and
+`validateEventEnvelope` must change together. Risk R-5 in `05` names the drift
+test that holds the two sets equal.
+
 ### Why each group is bound
 
 - Records 8 to 14, 16 and 20 are the owner's requirement-1 minimum: the event
@@ -182,8 +204,16 @@ change.
 
 **This plan therefore declares a hard dependency: the correction of
 `KI-SENTINEL-20261102-006` must land before enforcement of this format.**
-Without it, the envelope is authenticated and the payload is not. The owner
-decides the order (decision D-1 in `05`).
+Without it, the envelope is authenticated and the payload is not.
+
+The owner approved D-1 with a condition: **the corrected payload digest must be
+verified before envelope authentication relies on it.** Landing the correction
+is not enough, and a passing suite is not enough. Slice S0 in `05` is complete
+only when the corrected digest semantics and the negative tests for them are
+independently verified. Cases NEG-F06 and NEG-F07 in `04` hold this track open
+until that verification exists. The owner's disposition of
+`KI-SENTINEL-20261102-006` says the same: it must not be closed on passing
+tests alone.
 
 `KI-SENTINEL-20261102-006` already proposes the correction: build a canonical
 object with a null prototype or with `Object.defineProperty`, so every own key
@@ -204,9 +234,77 @@ can confuse.
 
 The ecosystem already has a canonical digest convention,
 `forge.rfc8785-jcs-sha256.v1`, owned by `forge_contract_core`. A second digest
-in this repository must not contradict it. The recommendation is therefore
-option A: depend on the `KI-SENTINEL-20261102-006` correction, and keep one
-payload digest.
+in this repository must not contradict it. **The owner ruled option A:** depend
+on the `KI-SENTINEL-20261102-006` correction, and keep one payload digest. The
+alternative is recorded here for the record, and it is not the chosen path.
+
+## Numeric canonicalization
+
+The owner amended D-7: the numeric rule must exist before implementation. This
+section is that rule. It aligns with the `forge.rfc8785-jcs-*` signing profile
+in `forge_contract_core` (`forge_contract_core/model_certification.py`), which
+`forge_contract_core/CLAUDE.md` names as the ecosystem canonical digest.
+
+### Where the rule applies
+
+**No bound envelope field carries a number from the event.** The 41 records are
+strings, booleans and one count, and the encoder produces the count from the
+array length. So the envelope encoder admits no event-supplied number at all,
+and it needs no numeric rule of its own.
+
+The rule therefore applies in two other places:
+
+1. **The payload digest.** Record 34 binds `integrity.payload_hash`, which the
+   corrected canonical form computes over the payload. Payload numbers are
+   event input, so the rule belongs to the `KI-SENTINEL-20261102-006`
+   correction, and this plan depends on it (D-1).
+2. **The contract validator.** `validateEventEnvelope` must refuse a payload
+   number that the rule forbids, so a non-conforming event never reaches the
+   encoder and never gets signed.
+
+### The rule
+
+| Case | Treatment |
+|---|---|
+| `NaN` | Refused. |
+| `+Infinity`, `-Infinity` | Refused. |
+| Negative zero (`-0`) | Refused. `Object.is(value, -0)` identifies it; `value === 0` does not. |
+| A floating-point number | Refused, as signing profile v1 refuses it. |
+| An integer from −9007199254740991 to 9007199254740991 | Admitted. The bound is `MAX_JCS_SAFE_INTEGER` in `forge_contract_core` and `Number.MAX_SAFE_INTEGER` in JavaScript. Both are 2^53 − 1. |
+| An integer outside that range | Refused. A double cannot hold it exactly, so two systems can disagree about its value. |
+| A duplicate object key | Refused. Two keys that collide make the canonical text ambiguous. |
+| A lone UTF-16 surrogate, in a key or a string | Refused. `forge_contract_core` refuses it, and the encoder in this document refuses it. |
+
+An admitted integer is written as decimal ASCII digits, with a leading `-` for
+a negative value, with no leading zero, no `+`, no exponent and no fraction.
+That is `str(value)` in `forge_contract_core` and `String(value)` in
+JavaScript for every admitted value.
+
+Key order is unchanged. `forge_contract_core` sorts object keys by UTF-16 code
+unit, and JavaScript's default `Array.prototype.sort` on strings does the same,
+so the current canonical form already agrees on ordering.
+
+### What a producer does with a fraction
+
+A quantity that needs a fraction must not be a JSON float. Two forms are
+admitted:
+
+- a scaled integer, as `forge_contract_core` uses for `confidence_percent`;
+- a decimal string, which the encoder treats as a string.
+
+The producer chooses, and the event family documents the choice.
+
+### Effect on the committed fixtures
+
+No event payload in the committed fixtures holds a non-integer number. The
+non-integer values in `fixtures/golden/` are risk dimensions inside a finding
+and an incident (`likelihood`, `impact`, `confidence`, `evidence_quality`,
+`contribution`). A producer does not sign those artifacts, so the rule does not
+reach them. The rule therefore breaks no committed fixture today.
+
+It does constrain a future producer. A cost or rate payload must use a scaled
+integer or a decimal string. `doc/system/03-runtime-boundary.md` must state
+this when the slice lands.
 
 ## Worked example
 
@@ -281,8 +379,16 @@ The closed field list has one condition: the envelope must carry no field
 outside the list. `validateEventEnvelope` does not refuse an unknown field
 today, and the check confirmed that the gateway accepts one and the ledger
 stores it. The implementation must therefore refuse an unknown field in an
-event envelope, or an unbound field stays malleable. Decision D-5 in `05`
-records this choice.
+event envelope, or an unbound field stays malleable.
+
+The owner approved D-5 with a condition: **define the permitted extension
+points, if any, in a future version.** This version has none. Every field is
+bound, and an unknown field is refused with `unknown_envelope_field`. A later
+version that wants an extension point must do three things: name the point in
+the format, bind its content in the authenticated bytes, and state what a
+consumer may do with a field it does not recognize. An unauthenticated
+extension point is the defect this plan corrects, so it must never be added as
+a convenience.
 
 ## Related finding
 
@@ -291,4 +397,8 @@ records this choice.
 `|` and `:`, with no length prefix and no escape. Two different events can give
 one dedupe key, and the gateway then reports the second as a duplicate and
 never records it. The encoder in this plan is the correct basis for that key.
-Decision D-8 in `05` records whether the same track corrects it.
+
+The owner ruled D-8: that finding is a separate security-relevant integrity
+defect, it stays separately tracked, and it follows immediately after this
+correction, reusing this encoder where that is safe. Slice S7 in `05` carries
+it.

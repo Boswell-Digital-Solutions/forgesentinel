@@ -14,6 +14,7 @@ Every implementation slice must pass these gates. Run them in this order.
 | G6 Documentation | `bash doc/system/BUILD.sh && git diff --exit-code -- doc` | `doc/SNTSYSTEM.md` matches its parts. This is the documentation CI. |
 | G7 Golden vector | a test that re-encodes `fixtures/golden/event_auth.v1.vector.json` | The implementation reproduces the committed bytes, digest and HMAC. |
 | G8 Independent review | a review round by a reviewer who did not write the change | No blocking defect. PR #21 needed three rounds; one round is not a rule. |
+| G9 No legacy credential path | a source check over `src/` | No module computes an HMAC over `payload_hash` alone, and the old `producerToken(secret, payloadHash)` signature no longer exists. This proves owner gate 1 at the source, and NEG-E07 proves it at the gateway. |
 
 ### Gates that are not available today
 
@@ -46,27 +47,88 @@ Owner requirement 6 governs this section.
 - Only the negative tests in `04` show that an altered event is refused, and
   only when they fail against the base commit first.
 
-## Decisions the owner must make
+## Decisions, as the owner ruled them
 
-| ID | Decision | Options | Recommendation |
+The owner ruled all ten decisions on 2026-11-02. Eight are approved, D-6 is
+approved with an amendment, and D-7 is amended.
+`06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` holds the authoritative record
+with every condition. The summary:
+
+| ID | Decision | Ruling | The condition that binds the implementation |
 |---|---|---|---|
-| D-1 | How the payload is bound | A: bind `integrity.payload_hash` and depend on the `KI-SENTINEL-20261102-006` correction. B: define a recursive encoder in this track and bind a second digest. | A. One payload digest. The dependency is explicit, and `KI-SENTINEL-20261102-006` already has a proposed correction. |
-| D-2 | The bound field set | The requirement-1 minimum (8 fields). The full set in `01` (41 records and the lineage array). | The full set. The check confirmed that every added field is alterable today, and `data_policy` and `control_lineage` carry privacy and ADR-022 meaning. |
-| D-3 | The rejection reason code | One code, `producer_auth_failed`, for every authentication failure. A distinct code for each cause. | One code. A code that names the differing field is an oracle. |
-| D-4 | Version and algorithm handling | The gateway holds one format name as a constant. The credential declares a version and the gateway holds an allowlist. Add an explicit `alg` record. | One constant, and no `alg` record. The key id already binds the algorithm, and the gateway chooses the primitive from the registration. |
-| D-5 | Unknown envelope fields | Refuse an unknown field in an event envelope. Leave the validator as it is. | Refuse. Without it the field list is not closed, and an unbound field stays malleable. |
-| D-6 | The high-value signature | Keep the producer key with domain separation. Move to a separate signing key. Wait for Ed25519. | Keep the producer key with domain separation now. A separate key is a key-management change, and it belongs with ADR-026. |
-| D-7 | Payload number discipline | Refuse `-0`, `NaN` and a non-finite number. Also refuse a non-integer number, which matches `forge.rfc8785-jcs-sha256.v1` in `forge_contract_core`. | Refuse the first set now. No event payload in the committed fixtures holds a non-integer number; the non-integer values are in findings and incidents, which a producer does not sign. The stricter rule needs a separate ruling, because a future cost payload may need a decimal. |
-| D-8 | `KI-SENTINEL-20261102-009`, the dedupe key | Correct it in this track, with the same encoder. Correct it in its own track. Accept it. | Its own track, immediately after this one. It is the same defect class, but it changes de-duplication behaviour, and that needs its own tests. |
-| D-9 | The Ed25519 order (ADR-026) | Ed25519 after this format change. Ed25519 first. Both in one change. | After. The format change is the correction for the finding, and the primitive that exists today can verify it. Ed25519 also changes the producer-secrets file schema, which touches `KI-SENTINEL-20261030-002`. |
-| D-10 | The records | Write a new ADR for the format. Record the format in `doc/system/` only. Add a plan id to the organization plan registry. | Write a short ADR, because the format is a trust root and ADR-026 names the signing decisions. The registry today holds one entry for this repository, `BDS-FS-ROADMAP-001`, with `plan_path: docs/plans`. A separate plan id is a change in the `forge` repository, and this pull request does not make it. |
+| D-1 | How the payload is bound | Approved | Depend on `KI-SENTINEL-20261102-006`. The corrected digest must be **verified** before envelope authentication relies on it. |
+| D-2 | The bound field set | Approved | Bind all 41 records. A future authenticated field needs a versioned format change. |
+| D-3 | The rejection reason code | Approved | `producer_auth_failed` externally. Keep internal diagnostic categories, and do not leak them. |
+| D-4 | Version and algorithm handling | Approved | The gateway controls both. Refuse an unsupported version. Never negotiate an algorithm from event input. |
+| D-5 | Unknown envelope fields | Approved | Refuse them. Define permitted extension points, if any, in a future version. |
+| D-6 | The high-value signature | **Approved with amendment** | Domain separation **and** independent derived keys for the credential and the signature. |
+| D-7 | Numeric discipline | **Amended** | Define deterministic numeric canonicalization before implementation. Refuse non-finite values and negative zero. Align integers with `forge_contract_core`. |
+| D-8 | `KI-SENTINEL-20261102-009` | Approved | Separately tracked, immediately after this correction. |
+| D-9 | The Ed25519 order | Approved | After the format correction, with explicit algorithm-transition safeguards. |
+| D-10 | The records | Approved | A short ADR, and a plan registry entry requested through the authorized `forge` change process. |
+
+No decision in this plan set is open. The next boundary is independent design
+review, then implementation authorization for each slice.
+
+## The owner's implementation gates
+
+Five gates bind the implementation. `06` states each one in full. The proof for
+each lives in `04_NEGATIVE_TEST_MATRIX.md`:
+
+| Gate | Proof |
+|---|---|
+| 1 No unauthenticated compatibility fallback | NEG-E07, and gate G9 below |
+| 2 The canonical encoding must be injective | Group H: a seeded property suite and seven adversarial cases |
+| 3 Verify before side effects | Group J |
+| 4 Test tenant isolation explicitly | Group B and group I |
+| 5 Preserve operational evidence | Group K |
+
+## The plan registry request (D-10)
+
+D-10 is approved: request the registry entry through the authorized `forge`
+change process. **This pull request does not change the `forge` repository.**
+The organization registry
+(`forge/docs/canonical/plan_registry_v1.json`) holds one entry for this
+repository today, `BDS-FS-ROADMAP-001`, with `plan_path: docs/plans`.
+
+The requested row, for whoever makes that change:
+
+```json
+{
+  "plan_id": "BDS-SNT-ENVELOPE-AUTH-001",
+  "title": "Sentinel Envelope Authentication Correction",
+  "version": "v1",
+  "owner_repository": "Boswell-Digital-Solutions/forgesentinel",
+  "scope": "repository",
+  "lifecycle_status": "approved",
+  "plan_path": "docs/plans/Sentinel_Envelope_Authentication_Plan_Set_2026-11-02",
+  "tracking_issue": null,
+  "implementation": {
+    "completed_slices": 0,
+    "total_slices": 8,
+    "evidence_status": "missing_closeout"
+  },
+  "next_action": "Independent design review of the revised plan, then slice S0 (the KI-SENTINEL-20261102-006 correction, verified).",
+  "blocker": "KI-SENTINEL-20261102-006 must be corrected and verified before envelope authentication relies on the payload digest.",
+  "doc_system_paths": ["doc/system/03-runtime-boundary.md"],
+  "last_verified": null,
+  "archive": null,
+  "superseded_by": null,
+  "closeout_reason": null
+}
+```
+
+`lifecycle_status` is `approved` under the protocol in
+`forge/docs/canonical/plan_registry_protocol_v1.md`: the design is accepted and
+no implementation slice is underway. It becomes `in_progress` when the owner
+authorizes the first slice.
 
 ## Risks
 
 | ID | Risk | Mitigation |
 |---|---|---|
 | R-1 | The encoder becomes the trust root. A defect in it is a defect in authentication. | One module, one field list, a committed golden vector, an independent review, and the negative tests written first. |
-| R-2 | Enforcement before the `KI-SENTINEL-20261102-006` correction authenticates the envelope and leaves the payload malleable. | D-1. Cases NEG-F06 and NEG-F07 hold the track open until the correction lands. |
+| R-2 | Enforcement before the `KI-SENTINEL-20261102-006` correction authenticates the envelope and leaves the payload malleable. | D-1, as ruled: the corrected digest must be **verified**, not only landed. Cases NEG-F06 and NEG-F07 hold the track open. The owner's disposition forbids closing `KI-SENTINEL-20261102-006` on passing tests alone. |
 | R-3 | A test helper that both signs and verifies hides a defect, and every test still passes. | Rule 2 in `04`: a case builds its own input and does not call `resign` or `buildEvent` for the value under test. |
 | R-4 | A producer that corrects `observed_at`, a data-policy field or a trace id after signing breaks its own authentication. | This is a producer-implementation cost, not a migration cost. No producer exists yet. State the rule in `doc/system/03-runtime-boundary.md`: sign last. |
 | R-5 | A new envelope field is added later, and nobody adds it to the field list. It is then unbound and malleable. | Add a drift test: the bound field list must cover every field that `validateEventEnvelope` admits. The test fails when the two sets differ. |
@@ -74,6 +136,9 @@ Owner requirement 6 governs this section.
 | R-7 | 103 fixture lines change at once, and a reviewer cannot read 103 token changes. | G5: a scripted check that only `credential.token` and `integrity.signature` changed. |
 | R-8 | A real producer is built in another repository and implements the old token. | The golden vector is the cross-repository agreement. No repository implements the token today, so nothing is stranded now. |
 | R-9 | The plan binds 41 records, so the authenticated bytes grow from 71 bytes to about 1.5 kB for each event. | HMAC-SHA256 over 1.5 kB is not a measurable cost at this volume. Record a measurement in the slice if the owner wants one. |
+| R-10 | Key derivation is a new step, so a defect in the `info` strings or the salt gives two producers one key, or gives one value both keys. | The `info` string holds the usage and the key id, and one module owns both strings. Cases NEG-E08 to NEG-E10 prove that a wrong key fails. A test asserts that two producers with the same secret still get different derived keys. |
+| R-11 | The numeric rule refuses a floating-point payload number, so a future producer that sends a decimal cost breaks. | The rule is stated before implementation (D-7), and `01` names the two admitted forms: a scaled integer and a decimal string. No committed event payload holds a non-integer number, so nothing breaks today. `doc/system/03-runtime-boundary.md` must state the rule for producer authors. |
+| R-12 | Gate 5 changes what a rejection record holds, so an operator loses the rejected payload that the ledger keeps today. | The slice states the chosen shape and records the trade. The recommendation keeps the payload digest, so an operator can still match a rejected event to a known payload without storing unauthenticated content. |
 
 ## Proposed slices
 
@@ -82,14 +147,17 @@ stays shadow-only throughout (owner requirement 5).
 
 | Slice | Content | Gates | Authorization |
 |---|---|---|---|
-| S0 | The `KI-SENTINEL-20261102-006` correction: make the canonical form one to one. | G1, G2, G4, G6 | Separate. It is its own finding. |
-| S1 | `src/spine/event_auth.ts`, the field list, the encoder, its unit tests, and the golden vector. Nothing calls it from the gateway. | G1, G2, G4, G6, G7 | This track. |
+| S0 | The `KI-SENTINEL-20261102-006` correction: make the canonical form one to one, and add the D-7 numeric rule to the payload path and to `validateEventEnvelope`. **The corrected digest semantics and their negative tests must be independently verified**, per the D-1 condition. | G1, G2, G4, G6, G8 | Separate. It is its own finding, and its own authorization. |
+| S1 | `src/spine/event_auth.ts`: the field list, the encoder, the HKDF derivation, the unit tests, the group H property and adversarial suite, and the golden vector. Nothing calls it from the gateway. | G1, G2, G4, G6, G7 | This track. |
 | S2 | The unknown-field refusal in `validateEventEnvelope`, with tests, and the drift test from R-5. | G1, G2, G4, G6 | This track. |
-| S3 | The negative tests from `04`. | G1, G3 | This track. See the note below. |
-| S4 | `buildEvent`, `producerToken`, `ProducerRegistry.authenticate` and the gateway signature check use the format. Fixtures regenerated. Test support updated. | G1 to G7 | This track. |
-| S5 | `doc/system/` updates, the rebuilt `doc/SNTSYSTEM.md`, the ADR under D-10, and the `KI-SENTINEL-20261102-008` record. | G6, G8 | This track. |
-| S6 | Ed25519 under ADR-026, with the producer-secrets file schema change. | G1 to G8 | Separate. ADR-026 and `KI-SENTINEL-20261030-002`. |
-| S7 | `dedupeKey` adopts the encoder (`KI-SENTINEL-20261102-009`). | G1 to G6 | Separate, under D-8. |
+| S3 | The negative tests from `04`: groups A to K. | G1, G3 | This track. See the note below. |
+| S4 | `buildEvent`, `producerToken`, `ProducerRegistry.authenticate` and the gateway signature check use the format and the derived keys. The old payload-hash-only call signature is **removed**, not kept beside the new one (gate 1). The gate-5 rejection-record shape is chosen and recorded. Fixtures regenerated. Test support updated. | G1 to G9 | This track. |
+| S5 | `doc/system/` updates, the rebuilt `doc/SNTSYSTEM.md`, and the `KI-SENTINEL-20261102-008` record. ADR-027 already exists from the design phase; S5 updates its status if the implementation changes a decision. | G6, G8 | This track. |
+| S6 | Ed25519 under ADR-026, with the producer-secrets file schema change and the seven algorithm-transition safeguards in `02`. | G1 to G9 | Separate. ADR-026 and `KI-SENTINEL-20261030-002`. |
+| S7 | `dedupeKey` adopts the encoder (`KI-SENTINEL-20261102-009`). The owner rules this a security-relevant integrity defect, so it follows immediately and reuses the encoder where that is safe. | G1 to G6 | Separate, under D-8. |
+
+S0 is a prerequisite, not a part of this track. The owner's D-1 condition makes
+its verification, not its merge, the thing that unblocks enforcement.
 
 ### The order of S3 and S4
 
@@ -119,3 +187,8 @@ commit, and what the result was.
 - No change to the shadow-mode boundary (ADR-011).
 - No claim that authentication is secure until the negative tests pass and an
   independent reviewer confirms them.
+
+The owner set three authorization boundaries, in order: **design review first,
+implementation authorization second, production deployment authorization
+separately.** Design approval is not implementation authorization, and a merged
+implementation is not deployment authorization.

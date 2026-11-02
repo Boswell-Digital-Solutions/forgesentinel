@@ -4,10 +4,50 @@ This document states how the producer credential and the high-value signature
 cover the format in `01_CANONICAL_AUTHENTICATION_FORMAT.md`. It covers
 HMAC-SHA256 now, and Ed25519 under ADR-026 later.
 
+The owner amended D-6 on 2026-11-02: the credential and the high-value
+signature must use **independent keys**, not one key with two contexts. This
+document states the amended design. `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md`
+records the ruling.
+
 `AUTH(context, key_id, event)` means the authenticated bytes from `01`, built
 with that context and that key id.
 
-## The credential, with HMAC-SHA256
+## Key derivation (the D-6 amendment)
+
+One producer secret derives two keys. Nothing uses the producer secret directly
+as an HMAC key.
+
+```text
+SALT = "forgesentinel.event_auth.v1"                       (ASCII, not secret)
+
+K_credential = HKDF-SHA256(ikm = producer.secret, salt = SALT,
+                           info = "credential|" + key_id, L = 32)
+K_signature  = HKDF-SHA256(ikm = producer.secret, salt = SALT,
+                           info = "signature|"  + key_id, L = 32)
+```
+
+| Parameter | Value | Reason |
+|---|---|---|
+| Function | HKDF-SHA256, `node:crypto.hkdfSync("sha256", ikm, salt, info, 32)` | It is in the Node standard library, so the repository stays dependency-free. |
+| `ikm` | The producer secret from the registration, as UTF-8 bytes | The root secret never becomes an HMAC key itself. |
+| `salt` | The constant format name, in ASCII | The salt is not secret. HKDF admits a constant salt when the input keying material already has high entropy, which the production secret rules enforce (`src/spine/producer_secrets.ts`). |
+| `info` | The usage, then one vertical-bar character, then the key id | The usage separates the two keys. The key id stops one producer's derived key from matching another's, even if two secrets ever matched. |
+| `L` | 32 bytes | It matches the SHA-256 block security level. |
+
+Both derived keys are 32 bytes. A derived key never appears in a log, an error,
+a receipt or a rejection record.
+
+**The limit, stated plainly.** HMAC is symmetric, so the gateway holds the
+producer secret and can derive both keys. Derivation gives usage separation and
+bounds the damage of one leaked subkey. It does not make the verifier incapable
+of signing. Only an asymmetric primitive gives that, and D-9 sequences it:
+Ed25519 follows this format correction. A second option, two independent root
+keys in the producer-secrets file, is stronger than derivation, but it changes
+the `forgesentinel.producer_secrets.v1` schema that
+`KI-SENTINEL-20261030-002` owns. The Ed25519 slice changes that schema anyway,
+so the two changes belong together, and `05` slice S6 records that.
+
+## The credential
 
 Today:
 
@@ -18,15 +58,15 @@ token = hex( HMAC-SHA256( producer.secret, payload_hash ) )
 Under this plan:
 
 ```text
-token = hex( HMAC-SHA256( producer.secret, AUTH("credential", credential.key_id, event) ) )
+token = hex( HMAC-SHA256( K_credential, AUTH("credential", credential.key_id, event) ) )
 ```
 
-The key, the primitive and the text form do not change. Only the message
-changes. The text form stays 64 lowercase hex characters, so
-`HMAC_HEX_PATTERN` (`src/spine/producers.ts:62`) stays as it is. One HMAC keeps
-one accepted text form.
+The primitive and the text form do not change. The key and the message change.
+The text form stays 64 lowercase hex characters, so `HMAC_HEX_PATTERN`
+(`src/spine/producers.ts:62`) stays as it is. One HMAC keeps one accepted text
+form.
 
-## The high-value signature, with HMAC-SHA256
+## The high-value signature
 
 Today the signature is byte-identical to the token. This plan verified that:
 both are `HMAC-SHA256(producer.secret, payload_hash)`. A second value over the
@@ -35,17 +75,13 @@ same bytes with the same key adds no evidence.
 Under this plan:
 
 ```text
-signature = hex( HMAC-SHA256( producer.secret, AUTH("signature", integrity.signature_key_id, event) ) )
+signature = hex( HMAC-SHA256( K_signature, AUTH("signature", integrity.signature_key_id, event) ) )
 ```
 
-The `context` record differs, so the signature and the token are different
-bytes. A person cannot copy a token into `integrity.signature`, and cannot copy
-a signature into a credential. This is domain separation.
-
-Domain separation alone does not make the signature independent evidence. The
-signature still uses the producer key, so it proves the same key. Decision D-6
-in `05` asks whether the high-value signature moves to a separate key, or waits
-for Ed25519.
+Two things now differ: the key and the `context` record. A person cannot copy a
+token into `integrity.signature`, and cannot copy a signature into a
+credential. Separation holds at the key and at the message, so a defect in one
+layer does not remove the other.
 
 ## Verification points
 
@@ -54,13 +90,19 @@ producer used.
 
 | Function | File | Change |
 |---|---|---|
-| `ProducerRegistry.authenticate` | `src/spine/producers.ts:136` | Takes the validated event instead of the payload hash. Builds `AUTH("credential", credential.key_id, event)`. Keeps `timingSafeEqual`. |
-| `EventGateway.ingest` | `src/spine/gateway.ts:180` | Builds `AUTH("signature", event.integrity.signature_key_id, event)` for a signature-required producer or family. Keeps `timingSafeEqual` and the `signature_key_id` comparison. |
+| `ProducerRegistry.authenticate` | `src/spine/producers.ts:136` | Takes the validated event instead of the payload hash. Derives `K_credential`. Builds `AUTH("credential", credential.key_id, event)`. Keeps `timingSafeEqual`. |
+| `EventGateway.ingest` | `src/spine/gateway.ts:180` | Derives `K_signature`. Builds `AUTH("signature", event.integrity.signature_key_id, event)` for a signature-required producer or family. Keeps `timingSafeEqual` and the `signature_key_id` comparison. |
 
 `buildEvent` (`src/spine/build.ts:25`) produces both values. It must use the
-same encoder. A separate copy of the field list in the builder would drift, so
-the encoder must live in one module that the builder, the registry and the
-gateway all import.
+same encoder and the same derivation. A separate copy of the field list or of
+the `info` strings would drift, so one module holds the field list, the
+derivation and the encoder, and the builder, the registry and the gateway all
+import it.
+
+Derivation runs once for each registration, not once for each event. The
+registry may cache the two derived keys beside the registration, which is
+frozen. A cache must never widen who can read a key: the derived keys stay in
+the private field that holds the registration.
 
 ## Check order in the gateway
 
@@ -86,8 +128,22 @@ failures, including a field change.
 
 A code that named the field that differed would be an oracle. A person could
 then find the bound field set, and could test one field at a time. The
-rejection record must also not store the expected bytes or the expected digest.
-Decision D-3 in `05` records this choice.
+rejection record must also not store the presented token, the expected bytes,
+the expected digest or a derived key.
+
+The owner approved D-3 with one condition: keep useful internal diagnostic
+categories, and do not leak them to a caller. The implementation therefore
+separates the two surfaces:
+
+| Surface | Content |
+|---|---|
+| The `IngestResult` that a caller receives | One `ValidationIssue` with the code `producer_auth_failed` and a message that names no field and no value. |
+| The rejection record in the evidence ledger, which an operator reads | The same code, plus one internal category from a closed set: `unknown_producer`, `unknown_key_id`, `malformed_token`, `envelope_mismatch`, `signature_mismatch`, `signature_key_mismatch`. |
+
+The closed set is a vocabulary, not a field name. `envelope_mismatch` says that
+the authenticated bytes did not match. It does not say which record differed,
+so an operator gains a triage category and a person gains no oracle. Gate 5 in
+`06` governs what else that record may hold.
 
 ## Ed25519 under ADR-026
 
@@ -113,10 +169,10 @@ The Ed25519 move changes more than the primitive:
 | `HMAC_HEX_PATTERN` | An Ed25519 signature is 64 bytes, so the text form is 128 lowercase hex characters. The pattern needs a second constant, or one constant for each algorithm. |
 | `KI-SENTINEL-20261030-002` | Its loader and its negative tests cover the secret file. The Ed25519 change touches both. The two tracks must not land at the same time without a plan for the file schema. |
 
-Decision D-9 in `05` asks whether Ed25519 comes before or after this format
-change. The recommendation is after: the format change is the correction for
-the finding, and it is verifiable with the primitive that exists today. ADR-026
-stays a separate, authorized slice.
+The owner ruled D-9: **Ed25519 follows this format correction**, with explicit
+algorithm-transition safeguards. The format change is the correction for the
+finding, and the primitive that exists today can verify it. ADR-026 stays a
+separate, authorized slice, and the safeguards below are part of it.
 
 ## Why the format carries no algorithm record
 
@@ -128,5 +184,44 @@ registry already refuses a key id that two producers share.
 Record 3 binds the key id into the authenticated bytes. A signature made for
 one key id therefore does not verify for another.
 
-An explicit `alg` record is still an option if the owner prefers that the bytes
-state the primitive. It is listed under decision D-4.
+The owner ruled D-4 as approved: the gateway controls the algorithm and the
+version, it refuses an unsupported version, and it never negotiates an
+algorithm from event input. So the gateway holds one format name and one
+algorithm for each registration, and no `alg` record is needed. An explicit
+`alg` record stays available for a future version if the owner wants the bytes
+to state the primitive.
+
+"Refuse an unsupported version" has one consequence worth stating. Nothing in
+an event or a credential declares a version, so an unsupported version cannot
+arrive as a declaration. It arrives as bytes that do not verify, and the
+gateway refuses them with `producer_auth_failed`. If a later version does add a
+declared version field, the gateway must hold an allowlist, must refuse any
+value outside it before it verifies anything, and the declared value must also
+sit inside the authenticated bytes, so the two cannot disagree.
+
+## Algorithm-transition safeguards (D-9)
+
+The owner approved D-9 with a condition: the Ed25519 migration needs explicit
+algorithm-transition safeguards. These are the safeguards the Ed25519 slice
+must implement and prove.
+
+1. **One algorithm for one key id.** A registration declares its algorithm. A
+   key id never carries two algorithms, and the registry refuses a second
+   registration for a key id that exists.
+2. **The gateway chooses, never the event.** The verifier takes the algorithm
+   from the registration. No event field and no credential field selects it.
+3. **No mixed-algorithm acceptance for one producer.** A producer is HMAC or
+   Ed25519, not both. A transition replaces the registration, and the gateway
+   refuses the old value from that moment.
+4. **No downgrade.** Once a producer is registered for Ed25519, an HMAC token
+   for that producer must fail. A test must show that.
+5. **Distinct text forms.** An HMAC token is 64 lowercase hex characters. An
+   Ed25519 signature is 128. The pattern for each algorithm is separate, so a
+   value of the wrong length fails before any verification.
+6. **The derivation does not carry over.** HKDF derivation exists because HMAC
+   is symmetric. An Ed25519 key is not derived from a shared secret, so the
+   `info` strings are retired for that producer, and the `context` record then
+   carries the domain separation alone.
+7. **A key rotation is a registration change, with its own receipt.** The
+   secrets-file schema change that ADR-026 needs must record which algorithm
+   each key id uses, and the loader must refuse a file that omits it.

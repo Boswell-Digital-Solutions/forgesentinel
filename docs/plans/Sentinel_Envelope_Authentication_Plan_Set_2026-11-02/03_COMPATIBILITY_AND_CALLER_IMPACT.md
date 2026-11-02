@@ -32,6 +32,18 @@ So the gateway must accept exactly one format. It must not accept a credential
 over the payload hash alone after this change lands. A dual-accept path would
 leave the defect reachable, and nothing needs it.
 
+This is now owner gate 1: **no unauthenticated compatibility fallback. A legacy
+credential must not silently retain the ability to authenticate a mutable
+envelope.** Three consequences bind the implementation:
+
+1. There is no dual-accept path, no feature flag and no environment variable
+   that restores the old behaviour.
+2. The old call signature is removed, not kept beside the new one. A function
+   that still computes an HMAC over the payload hash alone is a latent fallback,
+   even when nothing calls it. Gate G9 in `05` is a source check for that.
+3. Case NEG-E07 in `04` proves the refusal at the gateway: a correct HMAC over
+   the payload hash alone is rejected with `producer_auth_failed`.
+
 The one compatibility rule that does apply: when a real producer is built in
 another repository, that repository and this one must agree at the moment the
 second change merges. The golden vector in this plan exists for that purpose.
@@ -44,7 +56,7 @@ second change merges. The golden vector in this plan exists for that purpose.
 | `src/spine/producers.ts` | `producerToken` takes the authenticated bytes, not the payload hash. `ProducerRegistry.authenticate` takes the validated event. `HMAC_HEX_PATTERN` is unchanged. |
 | `src/spine/gateway.ts` | `ingest` passes the event to `authenticate`. The signature check builds the `signature` context bytes. A new reason code, `envelope_not_encodable`, covers an envelope the encoder refuses. |
 | `src/spine/build.ts` | `buildEvent` builds the token and the signature from the encoder. The envelope is assembled first, then signed, because the signature covers the whole envelope. |
-| `src/contracts/envelope.ts` | `validateEventEnvelope` refuses an unknown field, at the top level and in each bound object (decision D-5). Without this, an unbound field stays malleable. |
+| `src/contracts/envelope.ts` | `validateEventEnvelope` refuses an unknown field, at the top level and in each bound object (ruling D-5). Without this, an unbound field stays malleable. |
 | `src/index.ts` | Exports the new module. |
 
 `src/spine/replay.ts` needs no change. The `ReplayLine` shape, `{ event,
@@ -110,5 +122,7 @@ The implementation slice must update these in the same change:
   authentication state.
 
 ADR-026 needs no amendment. The format is primitive-independent, and ADR-026
-still requires Ed25519 before any non-shadow deployment. A new ADR for the
-format is an option under decision D-10.
+still requires Ed25519 before any non-shadow deployment. The owner ruled D-10,
+so the format has its own short decision record:
+`docs/sentinel/adrs/ADR-027-envelope-authentication-format.md`. It is written,
+and it states that it authorizes no implementation.

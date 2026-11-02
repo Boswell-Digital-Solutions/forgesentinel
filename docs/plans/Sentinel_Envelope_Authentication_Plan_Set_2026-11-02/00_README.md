@@ -4,12 +4,24 @@
 - **Finding:** `KI-SENTINEL-20261102-008`
 - **Date:** 2026-11-02
 - **Owner and decision authority:** Charlie Boswell
-- **Status:** Plan only.
+- **Priority:** P0 security, by owner ruling of 2026-11-02
+- **Status:** Design approved conditionally. Merge not authorized.
 
 This plan set is a design document. It is not an authorization to change code.
 Each implementation slice needs its own explicit authorization from the owner.
 The gateway stays in shadow mode, with no network ingress, until the correction
 is implemented and independently verified (owner requirement 5).
+
+The owner ruled all ten decisions on 2026-11-02, amended two of them, and added
+five implementation gates.
+**`06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` is the authoritative record,
+and it wins over any earlier text in this plan set.**
+
+The owner rules the correction a **P0 security priority**. The verified
+cross-tenant event re-targeting is a security-significant authentication
+failure. **No exploitation is claimed, and none is observed:** the gateway has
+no network ingress, the pipeline is shadow-only, and every demonstration here
+ran in a local test process.
 
 ## The defect
 
@@ -116,7 +128,8 @@ Not in scope for this plan set, and not changed by it:
 | `02_SIGNATURE_BINDING.md` | HMAC now, Ed25519 later, domain separation, verification points |
 | `03_COMPATIBILITY_AND_CALLER_IMPACT.md` | No installed base, no shim; fixtures, `buildEvent`, test support |
 | `04_NEGATIVE_TEST_MATRIX.md` | The negative tests and the positive controls |
-| `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | Gates, owner decisions, risks, proposed slices |
+| `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | Gates, the ruled decisions, risks, proposed slices, the plan registry request |
+| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | **Authoritative.** The ten rulings, the two amendments, the five implementation gates, the findings disposition, the authorization boundaries |
 | `MANIFEST.md` | File sizes and SHA-256 digests |
 
 ## Sources read for this plan
@@ -131,6 +144,8 @@ Findings and decisions:
 
 - `docs/KNOWN_ISSUES.md`: `KI-SENTINEL-20261102-008` (this finding), `KI-SENTINEL-20261102-006` (the canonical form is not one to one), `KI-SENTINEL-20261030-002` (producer secrets from protected configuration), `KI-SENTINEL-20261030-001` (no ingress surface), `KI-SENTINEL-20261102-007` (the ledger can persist a body it did not hash), `KI-SENTINEL-20261102-009` (the dedupe key joins strings without length prefixes).
 - `docs/sentinel/adrs/ADR-026-hmac-signing-for-mvp.md` — Ed25519 replaces HMAC before any non-shadow deployment.
+- `docs/sentinel/adrs/ADR-027-envelope-authentication-format.md` — the decision record for this format, written under ruling D-10.
+- `forge_contract_core/model_certification.py` — the `forge.rfc8785-jcs-*` signing profile, which the D-7 numeric rule aligns with.
 - `docs/sentinel/adrs/ADR-025-typescript-reference-and-golden-fixtures.md` — the golden fixtures carry cross-language contract evidence.
 - `docs/plans/Forge_Sentinel_Integrated_Plan_Set_2026-06-11/04_EVENT_EVIDENCE_AND_INCIDENT_CONTRACTS.md` — the canonical event contract.
 
@@ -150,4 +165,6 @@ The track is complete only when all of these hold:
 6. An independent review of the implementation found no blocking defect.
 7. `doc/system/03-runtime-boundary.md` describes the implemented format, and `doc/SNTSYSTEM.md` is rebuilt.
 8. `KI-SENTINEL-20261102-008` records the correction, the verification and the residual items.
-9. The owner authorizes each step. Merging is not deployment authorization.
+9. The five implementation gates in `06` each have a named, passing proof.
+10. The owner authorizes each step. Design approval is not implementation
+    authorization, and merging is not deployment authorization.
