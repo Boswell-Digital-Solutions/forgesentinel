@@ -350,7 +350,7 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 
 - **Classification**: Security, payload integrity. Priority review requested. This predates PR #29; its independent review found it, and the author confirmed it end to end. It is recorded here and is not corrected by PR #29.
 - **Discovery source**: independent review of forgesentinel PR #29 (finding F1).
-- **Verified at**: `1d3d8859371206f65648c783d5cafc2501b2692a` (`origin/master`; the canonical form is unchanged at `3b17efe`), by execution.
+- **Verified at**: `3b17efe` (the `origin/master` base when PR #29's review ran), by execution. The canonical form is the same at `1d3d8859`, its parent: only `docs/KNOWN_ISSUES.md` differs between the two.
 - **Evidence**: `canonicalJson` (`src/contracts/common.ts:140-154`) rebuilds each object with `sorted[key] = ...`. For the key `__proto__`, that assignment sets the prototype of the new object instead of creating a key, so the key is dropped from the canonical text. `JSON.stringify` also writes `-0` as `0` and a non-finite number as `null`. The payload hash (`hashPayload`, `:160-162`), the producer token and the producer signature are all computed over this canonical text.
 - **Observed behavior**:
   1. `JSON.parse('{"total_tokens":1,"route_class":"general_cloud","__proto__":{"injected":true}}')` has `__proto__` as a real own key, but its payload hash equals the hash of the same object without that key.
