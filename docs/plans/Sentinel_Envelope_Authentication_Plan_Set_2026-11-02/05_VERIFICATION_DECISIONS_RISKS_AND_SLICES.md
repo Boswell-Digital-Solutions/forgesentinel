@@ -150,10 +150,11 @@ stays shadow-only throughout (owner requirement 5).
 | Slice | Content | Gates | Authorization |
 |---|---|---|---|
 | S0 | The `KI-SENTINEL-20261102-006` correction: make the canonical form one to one, and add the D-7 numeric rule to the payload path and to `validateEventEnvelope`. **The corrected digest semantics and their adversarial tests must be independently verified**, per the D-1 condition. **Merging S0 alone is insufficient**: the verification, not the merge, is what unblocks enforcement. | G1, G2, G4, G6, G8 | Separate. It is its own finding, and its own authorization. |
+| SL | `src/spine/ledger.ts`: the R1-E omission rule for a record of unauthenticated provenance; a data-policy gate for every record kind (`KI-SENTINEL-20261102-011`); the denial record's `kind`, `validation` and tenant labelling, with body validation in `events()` so no mislabelled record enters the accepted-event stream (`KI-SENTINEL-20261102-016`); and the rejection tenant id (`KI-SENTINEL-20261102-012`). | G5 | Separate, under R1-D. **Sequenced before S4.** |
 | S1 | `src/spine/event_auth.ts`: the field list, the encoder, the HKDF derivation, the unit tests, the group H property and adversarial suite, and the golden vector. Nothing calls it from the gateway. | G1, G2, G4, G6, G7 | This track. |
 | S2 | The unknown-field refusal in `validateEventEnvelope`, with tests, and the drift test from R-5. | G1, G2, G4, G6 | This track. |
 | S3 | The negative tests from `04`: groups A to K. | G1, G3 | This track. See the note below. |
-| S4 | `buildEvent`, `producerToken`, `ProducerRegistry.authenticate` and the gateway signature check use the format and the derived keys. The old payload-hash-only call signature is **removed**, not kept beside the new one (gate 1). The gate-5 rejection-record shape is chosen and recorded. Fixtures regenerated. Test support updated. | G1 to G9 | This track. |
+| S4 | `buildEvent`, `producerToken`, `ProducerRegistry.authenticate` and the gateway signature check use the format and the derived keys. The old payload-hash-only call signature is **removed**, not kept beside the new one (gate 1). The gate-5 rejection-record shape is recorded, with its `tenant_id` rule fixed by R1-E and implemented by SL. Fixtures regenerated. Test support updated. | G1 to G9 | This track. |
 | S5 | `doc/system/` updates, the rebuilt `doc/SNTSYSTEM.md`, and the `KI-SENTINEL-20261102-008` record. ADR-027 already exists from the design phase; S5 updates its status if the implementation changes a decision. | G6, G8 | This track. |
 | S6 | Ed25519 under ADR-026, with the producer-secrets file schema change and the seven algorithm-transition safeguards in `02`. | G1 to G9 | Separate. ADR-026 and `KI-SENTINEL-20261030-002`. |
 | S7 | `dedupeKey` adopts the encoder (`KI-SENTINEL-20261102-009`). The owner rules this a security-relevant integrity defect, so it follows immediately and reuses the encoder where that is safe. | G1 to G6 | Separate, under D-8. |
@@ -162,6 +163,18 @@ S0 is a prerequisite, not a part of this track. The owner's D-1 condition makes
 its verification, not its merge, the thing that unblocks enforcement, and
 recommendation 4 in `06` restates it: merging S0 alone is insufficient, and the
 adversarial tests for the corrected digest must be independently verified.
+
+SL is a prerequisite too, by ruling R1-D. It is not a part of this track, and it
+comes before S4, because gate 5 must have an implementable foundation when S4
+records the rejection-record shape. Three of its four defects — `-011`, `-016`
+and F34 — are not authentication defects, so they do not wait on the six open
+format decisions. The separation also keeps recommendation 2's reproduce-first
+evidence stage free of ledger failures, because a reviewer reproducing the
+negative-test failures against the pinned vulnerable base must not have to sort
+an authentication failure from a ledger failure.
+
+SL needs its own authorization. R1-D rules where the work goes, not that it may
+start.
 
 ### The order of S3 and S4
 

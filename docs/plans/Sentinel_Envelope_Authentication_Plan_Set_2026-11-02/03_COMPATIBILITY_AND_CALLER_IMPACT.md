@@ -58,13 +58,28 @@ second change merges. The golden vector in this plan exists for that purpose.
 | `src/spine/build.ts` | `buildEvent` builds the token and the signature from the encoder. The envelope is assembled first, then signed, because the signature covers the whole envelope. |
 | `src/contracts/envelope.ts` | `validateEventEnvelope` refuses an unknown field, at the top level and in each bound object (ruling D-5). Without this, an unbound field stays malleable. |
 | `src/index.ts` | Exports the new module. |
-| `src/spine/ledger.ts` | **Added to scope by review finding F33.** Gate 5 and the owner's recommendation 1 cannot be implemented without it. `cloudProjection` skips every data-policy check for a record whose kind is not `event` (`KI-SENTINEL-20261102-011`), `queryByTenant` filters on a `tenant_id` that a rejection took from an unauthenticated envelope (`KI-SENTINEL-20261102-012`), and `LedgerRecord` has no field in which a value can be marked observed and untrusted (review finding F34). The owner must rule on whether this track carries those changes or a separate one does. |
+
+`src/spine/ledger.ts` is **not** in this track, by ruling R1-D (2026-11-02).
+Review finding F33 added it to scope, because gate 5 and the owner's
+recommendation 1 cannot be implemented without it. The owner then ruled that a
+separate authorized change carries it, sequenced before S4. Four defects go with
+it: `cloudProjection` skips every data-policy check for a record whose kind is
+not `event` (`KI-SENTINEL-20261102-011`); `queryByTenant` filters on a
+`tenant_id` that a rejection took from an unauthenticated envelope
+(`KI-SENTINEL-20261102-012`); `LedgerRecord` has no field in which a value can
+be marked observed and untrusted (review finding F34); and the ledger writes its
+own cross-tenant denial record as an accepted event under the requested tenant
+(`KI-SENTINEL-20261102-016`). Slice SL in `05` holds them, and R1-E fixes the
+`tenant_id` rule. See "Owner rulings on review round 1" in `06`.
 
 `src/spine/replay.ts` needs no change. The `ReplayLine` shape, `{ event,
 credential }`, stays as it is.
 
 `src/runtime.ts` needs no change. It wires the registry, the gateway and the
-ledger, and it signs nothing.
+ledger, and it signs nothing. `KI-SENTINEL-20261102-016` does surface at
+`src/runtime.ts:255`, where `Date.parse` of an absent `occurred_at` stops
+`runShadow`. The correction belongs in the ledger, which writes the mislabelled
+record, so slice SL carries it and this statement holds.
 
 `src/spine/gateway.ts` carries one further change that review finding F30
 requires: the authentication-failure message must stop interpolating

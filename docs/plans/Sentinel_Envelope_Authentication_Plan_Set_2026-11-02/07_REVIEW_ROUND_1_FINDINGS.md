@@ -102,13 +102,18 @@ commit, named in this document before the review starts.**
 
 Round 1 does not propose rulings. These are the decisions it surfaced.
 
+**Two are ruled (2026-11-02): R1-D and R1-E.** `06` holds both rulings, and an
+amendment to R1-E's wording, which did not reach the denial record in
+`KI-SENTINEL-20261102-016`. Six stay open: R1-A, R1-B, R1-C, R1-F, R1-G and
+R1-H. Round 1's findings and its verdict are unchanged by those two rulings.
+
 | ID | Decision |
 |---|---|
 | R1-A | F3: refuse `integrity.signature` and `signature_key_id` on an event that needs no signature, or bind both in every context. |
 | R1-B | F2: add a presence record for each optional parent object, or refuse a present empty parent in the validator. The first keeps injectivity in the encoding. |
 | R1-C | F1 and F5: how far the validator's type rules go, and whether the drift test compares types as well as names. |
-| R1-D | F33, F31, F34: whether this track carries the `src/spine/ledger.ts` changes, or a separate authorized change does. Gate 5 cannot be met without them. |
-| R1-E | F34: a new `LedgerRecord` provenance field, or a rule that a rejection record carries no `tenant_id`. |
+| R1-D | **RULED, see `06`.** F33, F31, F34: whether this track carries the `src/spine/ledger.ts` changes, or a separate authorized change does. Gate 5 cannot be met without them. Ruled: a separate change, as slice SL, sequenced before S4. |
+| R1-E | **RULED, see `06`.** F34: a new `LedgerRecord` provenance field, or a rule that a rejection record carries no `tenant_id`. Ruled: the omission rule, bound on unauthenticated provenance rather than on the `rejection` kind, with the claimed tenant held in metadata. |
 | R1-F | F12: confirm that refusing `-0` is a deliberate divergence from `forge_contract_core`, and accept the ADR-025 cross-language consequence. |
 | R1-G | F13: which boundary enforces the duplicate-key rule, given that `JSON.parse` discards duplicates. |
 | R1-H | Whether this document satisfies the owner's recommendation 3, or a submitted GitHub review is required as well. |
@@ -117,5 +122,7 @@ Round 1 does not propose rulings. These are the decisions it surfaced.
 
 1. The candidate fixes for F1, F2 and F3, re-attacked.
 2. The decoder round trip that replaces PROP-H02.
-3. The gate-5 record shape, once chosen, against `src/spine/ledger.ts`.
+3. The gate-5 record shape, once chosen, against `src/spine/ledger.ts`. R1-D
+   moves that file to slice SL, before S4, so round 2 assesses the shape against
+   SL and not against this track.
 4. A frozen commit, named before the review starts.
