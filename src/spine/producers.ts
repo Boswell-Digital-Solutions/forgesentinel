@@ -29,6 +29,17 @@ export function producerToken(secret: string, payloadHash: string): string {
   return createHmac("sha256", secret).update(payloadHash, "utf8").digest("hex");
 }
 
+/** A registration that the registry refuses for a reason other than its secret. */
+export class ProducerRegistrationError extends Error {
+  override readonly name = "ProducerRegistrationError";
+}
+
+/**
+ * An event prefix is one or more lowercase dotted segments and ends in ".".
+ * An empty prefix would match every event type (KI-SENTINEL-20261030-005).
+ */
+const EVENT_PREFIX_PATTERN = /^[a-z0-9_]+(\.[a-z0-9_]+)*\.$/;
+
 export class ProducerRegistry {
   readonly #producers = new Map<string, Readonly<ProducerRegistration>>();
 
@@ -37,11 +48,25 @@ export class ProducerRegistry {
    * only at construction (KI-SENTINEL-20261030-002). A registry is bound to
    * one environment. A key that is already registered cannot be replaced.
    * The registry checks and keeps a frozen copy, so a caller cannot change a
-   * registration after the check.
+   * registration after the check. The instance is frozen, so a caller cannot
+   * shadow a method with an own property (KI-SENTINEL-20261030-004). These
+   * guard against accidental change in the same process. They are not a
+   * boundary against hostile code that runs in the same process.
    */
-  constructor(readonly environment: Environment) {}
+  constructor(readonly environment: Environment) {
+    Object.freeze(this);
+  }
 
   register(registration: ProducerRegistration): void {
+    const prefixes: unknown = registration.allowed_event_prefixes;
+    if (!Array.isArray(prefixes) || prefixes.length === 0) {
+      throw new ProducerRegistrationError(`producer "${registration.service}" has no allowed event prefixes`);
+    }
+    for (const prefix of prefixes) {
+      if (typeof prefix !== "string" || !EVENT_PREFIX_PATTERN.test(prefix)) {
+        throw new ProducerRegistrationError(`producer "${registration.service}" has a malformed event prefix ${JSON.stringify(prefix)}; a prefix is lowercase dotted segments that end in "."`);
+      }
+    }
     const copy: Readonly<ProducerRegistration> = Object.freeze({
       service: registration.service,
       environment: registration.environment,

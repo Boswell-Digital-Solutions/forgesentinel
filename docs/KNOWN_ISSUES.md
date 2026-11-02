@@ -207,7 +207,11 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Observed behavior**: Code in the same process sets `runtime.gateway["registry"]` to another object. That object can be another `ProducerRegistry`, or any object with `authenticate` and `allowsEventType` methods. A production runtime then accepts a forged event signed with the published fixture secret.
 - **Reachability**: Not reachable through `sentinel replay`, `sentinel watch-cssa`, or any external event path. The gateway has no network ingress (KI-SENTINEL-20261030-001). An attacker must already run code inside the Sentinel process.
 - **Proposed correction**: Hold the registry in a true private field (`#registry`). Refuse a registry that is not a `ProducerRegistry` instance. Add a negative test for both cases.
-- **No change made**: This record changes no code.
+- **Correction implemented (2026-11-01, unverified)**: The operator authorized an isolated correction for this entry and KI-SENTINEL-20261030-005 (branch `fix/registry-integrity-and-prefixes`).
+  1. `EventGateway` holds its registry in `#registry`. It refuses any object whose prototype is not exactly `ProducerRegistry.prototype`, so a look-alike object or a subclass that overrides `authenticate` is refused.
+  2. `ProducerRegistry` freezes its instance, so `authenticate` or `allowsEventType` cannot be shadowed by an own property.
+  3. `test/registry_integrity.test.ts` checks through the gateway that a forged event stays rejected after each attempt, with a genuine event as a positive control. On unpatched `origin/master`, the tests for this entry fail.
+  The operator ruled that this guards against accidental change in the same process, and is not a security boundary against hostile code in the same process. Such code can still change `ProducerRegistry.prototype`.
 - **Status**: Open — recorded, unresolved until the correction is verified.
 
 ## KI-SENTINEL-20261030-005: A producer registration with an empty event prefix allows every event type — OPEN 2026-10-30 — security — high-priority follow-up
@@ -219,7 +223,7 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Observed behavior**: A library caller registers a usage producer with `allowed_event_prefixes: [""]`. That producer can then emit `billing.subscription.changed`, and the gateway accepts it.
 - **Reachability**: Not reachable through the secrets file. `loadProducerRegistrations` always uses the fixed `STANDARD_PRODUCER_PROFILES` prefixes. A caller that builds registrations in code can reach it.
 - **Proposed correction**: In `register()`, refuse an empty prefix list, an empty prefix, and a prefix that does not end in `.`. Add a negative test.
-- **No change made**: This record changes no code.
+- **Correction implemented (2026-11-01, unverified)**: Same branch as KI-SENTINEL-20261030-004. `ProducerRegistry.register` refuses, with `ProducerRegistrationError`, a missing or empty prefix list and any prefix that is not lowercase dotted segments ending in `.`. `test/registry_integrity.test.ts` checks the refusals, and checks through the gateway that a producer cannot emit an event outside its prefixes (`event_type_not_allowed`). The tests for the refusals fail on unpatched `origin/master`.
 - **Status**: Open — recorded, unresolved until the correction is verified.
 
 ## KI-SENTINEL-20261030-006: Low-priority residual items from the PR #21 review — OPEN 2026-10-30

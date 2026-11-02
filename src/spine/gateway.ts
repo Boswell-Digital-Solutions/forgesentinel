@@ -47,11 +47,24 @@ export function dedupeKey(event: EventEnvelope): string {
  */
 export class EventGateway {
   private readonly seen = new Map<string, number>();
+  readonly #registry: ProducerRegistry;
 
+  /**
+   * The registry is held in a true private field, and only a ProducerRegistry
+   * itself is accepted: not a subclass, not a look-alike object
+   * (KI-SENTINEL-20261030-004). This guards against accidental replacement in
+   * the same process. It is not a boundary against hostile code that runs in
+   * the same process.
+   */
   constructor(
-    private readonly registry: ProducerRegistry,
+    registry: ProducerRegistry,
     private readonly ledger: EvidenceLedger,
-  ) {}
+  ) {
+    if (registry === null || typeof registry !== "object" || Object.getPrototypeOf(registry) !== ProducerRegistry.prototype) {
+      throw new TypeError("EventGateway needs a ProducerRegistry instance");
+    }
+    this.#registry = registry;
+  }
 
   ingest(rawEvent: unknown, credential: ProducerCredential): IngestResult {
     const reasons: ValidationIssue[] = [];
@@ -68,7 +81,7 @@ export class EventGateway {
       return this.reject(event, reasons, event.tenant?.tenant_id);
     }
 
-    const producer = this.registry.authenticate(credential, event.integrity.payload_hash);
+    const producer = this.#registry.authenticate(credential, event.integrity.payload_hash);
     if (!producer) {
       reasons.push({ path: "producer", code: "producer_auth_failed", message: `producer "${credential.service}" failed authentication for key "${credential.key_id}"` });
       return this.reject(event, reasons, event.tenant?.tenant_id);
@@ -81,7 +94,7 @@ export class EventGateway {
       reasons.push({ path: "producer.environment", code: "environment_boundary", message: `producer is registered for "${producer.environment}" but emitted a "${event.producer.environment}" event` });
       return this.reject(event, reasons, event.tenant?.tenant_id);
     }
-    if (!this.registry.allowsEventType(producer, event.event_type)) {
+    if (!this.#registry.allowsEventType(producer, event.event_type)) {
       reasons.push({ path: "event_type", code: "event_type_not_allowed", message: `producer "${producer.service}" is not registered to emit "${event.event_type}"` });
       return this.reject(event, reasons, event.tenant?.tenant_id);
     }
