@@ -57,25 +57,38 @@ export class ProducerRegistry {
     Object.freeze(this);
   }
 
+  /**
+   * True only for an object made by this class's constructor. A private-field
+   * check is false for an Object.create look-alike, a Proxy, and an object
+   * from another realm, even when its prototype is ProducerRegistry.prototype.
+   */
+  static isRegistry(value: unknown): value is ProducerRegistry {
+    return typeof value === "object" && value !== null && #producers in value;
+  }
+
   register(registration: ProducerRegistration): void {
-    const prefixes: unknown = registration.allowed_event_prefixes;
-    if (!Array.isArray(prefixes) || prefixes.length === 0) {
-      throw new ProducerRegistrationError(`producer "${registration.service}" has no allowed event prefixes`);
-    }
-    for (const prefix of prefixes) {
-      if (typeof prefix !== "string" || !EVENT_PREFIX_PATTERN.test(prefix)) {
-        throw new ProducerRegistrationError(`producer "${registration.service}" has a malformed event prefix ${JSON.stringify(prefix)}; a prefix is lowercase dotted segments that end in "."`);
-      }
-    }
+    // Read each field once into a copy, then check and freeze that copy, so a
+    // getter or iterator cannot return one value to the check and another to
+    // the store.
+    const rawPrefixes: unknown = registration.allowed_event_prefixes;
+    const prefixes: unknown[] = Array.isArray(rawPrefixes) ? Array.prototype.slice.call(rawPrefixes) : [];
     const copy: Readonly<ProducerRegistration> = Object.freeze({
       service: registration.service,
       environment: registration.environment,
       key_id: registration.key_id,
       secret: registration.secret,
       signature_required: registration.signature_required,
-      allowed_event_prefixes: Object.freeze([...registration.allowed_event_prefixes]) as string[],
+      allowed_event_prefixes: Object.freeze(prefixes) as string[],
       tenant_scope: registration.tenant_scope,
     });
+    if (copy.allowed_event_prefixes.length === 0) {
+      throw new ProducerRegistrationError(`producer "${copy.service}" has no allowed event prefixes`);
+    }
+    for (const prefix of copy.allowed_event_prefixes as readonly unknown[]) {
+      if (typeof prefix !== "string" || !EVENT_PREFIX_PATTERN.test(prefix)) {
+        throw new ProducerRegistrationError(`producer "${copy.service}" has a malformed event prefix ${JSON.stringify(prefix)}; a prefix is lowercase dotted segments that end in "."`);
+      }
+    }
     const key = `${copy.service}:${copy.key_id}`;
     if (this.#producers.has(key)) {
       throw new ProducerSecretsError(`producer "${copy.service}" key "${copy.key_id}" is already registered`);

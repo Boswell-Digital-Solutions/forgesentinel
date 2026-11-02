@@ -234,6 +234,10 @@ export class SentinelRuntime {
     this.policy.register(ACCOUNT_COMPROMISE_POLICY);
     this.policy.register(AGENT_DRIFT_POLICY);
     this.policy.register(DATA_EXFILTRATION_POLICY);
+    // Freeze the runtime's own fields, so `registry`, `gateway` and `ledger`
+    // cannot be replaced after construction (KI-SENTINEL-20261030-004). The
+    // objects they hold keep their own rules.
+    Object.freeze(this);
   }
 
   /**

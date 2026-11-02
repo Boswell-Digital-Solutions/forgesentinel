@@ -46,24 +46,26 @@ export function dedupeKey(event: EventEnvelope): string {
  * does not compute risk.
  */
 export class EventGateway {
-  private readonly seen = new Map<string, number>();
+  readonly #seen = new Map<string, number>();
   readonly #registry: ProducerRegistry;
+  readonly #ledger: EvidenceLedger;
 
   /**
-   * The registry is held in a true private field, and only a ProducerRegistry
-   * itself is accepted: not a subclass, not a look-alike object
-   * (KI-SENTINEL-20261030-004). This guards against accidental replacement in
-   * the same process. It is not a boundary against hostile code that runs in
-   * the same process.
+   * The registry, the ledger and the dedupe map are held in true private
+   * fields, and the instance is frozen. Only an object that the
+   * ProducerRegistry constructor made, and not a subclass, is accepted as the
+   * registry: an Object.create look-alike, a Proxy, an object from another
+   * realm and a subclass instance are refused (KI-SENTINEL-20261030-004). This
+   * guards against accidental replacement in the same process. It is not a
+   * boundary against hostile code that runs in the same process.
    */
-  constructor(
-    registry: ProducerRegistry,
-    private readonly ledger: EvidenceLedger,
-  ) {
-    if (registry === null || typeof registry !== "object" || Object.getPrototypeOf(registry) !== ProducerRegistry.prototype) {
+  constructor(registry: ProducerRegistry, ledger: EvidenceLedger) {
+    if (!ProducerRegistry.isRegistry(registry) || Object.getPrototypeOf(registry) !== ProducerRegistry.prototype) {
       throw new TypeError("EventGateway needs a ProducerRegistry instance");
     }
     this.#registry = registry;
+    this.#ledger = ledger;
+    Object.freeze(this);
   }
 
   ingest(rawEvent: unknown, credential: ProducerCredential): IngestResult {
@@ -120,12 +122,12 @@ export class EventGateway {
     }
 
     const key = dedupeKey(event);
-    const existingSeq = this.seen.get(key);
+    const existingSeq = this.#seen.get(key);
     if (existingSeq !== undefined) {
-      return { status: "duplicate", event_id: event.event_id, dedupe_key: key, reasons: [], record: this.ledger.bySeq(existingSeq) as LedgerRecord };
+      return { status: "duplicate", event_id: event.event_id, dedupe_key: key, reasons: [], record: this.#ledger.bySeq(existingSeq) as LedgerRecord };
     }
 
-    const record = this.ledger.append({
+    const record = this.#ledger.append({
       kind: "event",
       gateway_version: GATEWAY_VERSION,
       validation: "accepted",
@@ -133,12 +135,12 @@ export class EventGateway {
       ...(event.tenant?.tenant_id !== undefined ? { tenant_id: event.tenant.tenant_id } : {}),
       body: event,
     });
-    this.seen.set(key, record.ledger_seq);
+    this.#seen.set(key, record.ledger_seq);
     return { status: "accepted", event_id: event.event_id, dedupe_key: key, reasons: [], record };
   }
 
   private reject(rawEvent: unknown, reasons: ValidationIssue[], tenantId: string | undefined): IngestResult {
-    const record = this.ledger.append({
+    const record = this.#ledger.append({
       kind: "rejection",
       gateway_version: GATEWAY_VERSION,
       validation: "rejected",

@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { runInNewContext } from "node:vm";
 import {
   EventGateway,
   EvidenceLedger,
@@ -75,14 +76,18 @@ test("replacing the gateway's registry from outside has no effect", () => {
   const { runtime, producers, published } = setup();
   const gateway = runtime.gateway as unknown as Record<string, unknown>;
   assert.equal(gateway["registry"], undefined, "the registry is not a reachable property");
-  gateway["registry"] = lookalike();
+  assert.throws(() => {
+    gateway["registry"] = lookalike();
+  }, TypeError, "the gateway is frozen");
   assert.equal(status(runtime.gateway, usage(published["usage-metering"]!, "evt_swap_forged")), "rejected");
   assert.equal(status(runtime.gateway, usage(producers["usage-metering"]!, "evt_swap_genuine")), "accepted", "positive control");
 });
 
 test("replacing the runtime's registry does not change the gateway's registry", () => {
   const { runtime, producers, published } = setup();
-  (runtime as unknown as Record<string, unknown>)["registry"] = new ProducerRegistry("production");
+  assert.throws(() => {
+    (runtime as unknown as Record<string, unknown>)["registry"] = new ProducerRegistry("production");
+  }, TypeError, "the runtime is frozen");
   assert.equal(status(runtime.gateway, usage(published["usage-metering"]!, "evt_runtime_swap_forged")), "rejected");
   assert.equal(status(runtime.gateway, usage(producers["usage-metering"]!, "evt_runtime_swap_genuine")), "accepted", "the gateway keeps its own registry");
 });
@@ -145,4 +150,82 @@ test("a producer cannot emit an event outside its assigned prefixes", () => {
 test("the standard producer profiles pass the prefix rule", () => {
   const registry = new ProducerRegistry("production");
   for (const producer of testProducers("production")) assert.doesNotThrow(() => registry.register(producer));
+});
+
+// Independent review of PR #24 (round 1) -------------------------------------
+
+test("the gateway refuses objects that only borrow ProducerRegistry.prototype", () => {
+  const ledger = new EvidenceLedger();
+  const permissive = { authenticate: { value: () => byService(fixtureProducers("production"))["usage-metering"] }, allowsEventType: { value: () => true } };
+  const created = Object.create(ProducerRegistry.prototype, permissive);
+  class Fake {}
+  const constructed = Reflect.construct(Fake, [], ProducerRegistry);
+  const proxied = new Proxy(new ProducerRegistry("production"), {});
+  const trapped = new Proxy({}, { getPrototypeOf: () => ProducerRegistry.prototype });
+  const foreign = runInNewContext("Object.create(proto)", { proto: ProducerRegistry.prototype });
+  for (const [name, candidate] of Object.entries({ created, constructed, proxied, trapped, foreign })) {
+    assert.equal(Object.getPrototypeOf(candidate), ProducerRegistry.prototype, `${name} borrows the prototype`);
+    assert.throws(() => new EventGateway(candidate as ProducerRegistry, ledger), TypeError, name);
+  }
+});
+
+test("a runtime's gateway, registry and ledger cannot be replaced", () => {
+  const { runtime, producers, published } = setup();
+  assert.ok(Object.isFrozen(runtime));
+  const fields = runtime as unknown as Record<string, unknown>;
+  assert.throws(() => {
+    fields["gateway"] = Object.create(EventGateway.prototype);
+  }, TypeError);
+  assert.throws(() => {
+    fields["registry"] = new ProducerRegistry("production");
+  }, TypeError);
+  assert.throws(() => {
+    fields["ledger"] = new EvidenceLedger();
+  }, TypeError);
+  assert.equal(status(runtime.gateway, usage(published["usage-metering"]!, "evt_frozen_runtime_forged")), "rejected");
+  assert.equal(status(runtime.gateway, usage(producers["usage-metering"]!, "evt_frozen_runtime_genuine")), "accepted", "positive control");
+});
+
+test("the gateway's dedupe map and ledger are not reachable", () => {
+  const { runtime, producers } = setup();
+  const gateway = runtime.gateway as unknown as Record<string, unknown>;
+  assert.ok(Object.isFrozen(runtime.gateway));
+  assert.equal(gateway["seen"], undefined);
+  assert.equal(gateway["ledger"], undefined);
+  const first = usage(producers["usage-metering"]!, "evt_dedupe_once");
+  assert.equal(status(runtime.gateway, first), "accepted");
+  assert.throws(() => {
+    gateway["seen"] = new Map();
+  }, TypeError);
+  assert.equal(status(runtime.gateway, first), "duplicate", "de-duplication still holds");
+});
+
+test("a producer registered after construction with an empty prefix is refused, and the gateway still enforces scope", () => {
+  const { runtime, producers } = setup();
+  const rogue = { ...testProducers("production")[1]!, key_id: "key_usage_rogue", allowed_event_prefixes: [""] };
+  assert.throws(() => runtime.registry.register(rogue), ProducerRegistrationError);
+  const billing = line({ ...rogue, allowed_event_prefixes: ["usage."] }, "evt_rogue_billing", "billing.subscription.changed", { plan: "pro" });
+  assert.ok(codes(runtime.gateway, billing).includes("producer_auth_failed"), "the refused key was never registered");
+  const inScope = line(producers["usage-metering"]!, "evt_usage_billing_after_refusal", "billing.subscription.changed", { plan: "pro" });
+  assert.ok(codes(runtime.gateway, inScope).includes("event_type_not_allowed"));
+});
+
+test("a prefix list is read once: a getter or iterator cannot change it after the check", () => {
+  const registry = new ProducerRegistry("production");
+  const base = testProducers("production")[1]!;
+  let reads = 0;
+  const viaGetter = { ...base, key_id: "key_usage_getter" } as ProducerRegistration;
+  Object.defineProperty(viaGetter, "allowed_event_prefixes", { get: () => (reads++ === 0 ? ["usage."] : [""]), enumerable: true });
+  registry.register(viaGetter);
+  assert.deepEqual(registry.get(base.service, "key_usage_getter")!.allowed_event_prefixes, ["usage."]);
+  assert.equal(reads, 1);
+
+  const tricky = ["usage."];
+  (tricky as unknown as { [Symbol.iterator]: () => Iterator<string> })[Symbol.iterator] = function* () {
+    yield "";
+  };
+  registry.register({ ...testProducers("production")[1]!, key_id: "key_usage_iterator", allowed_event_prefixes: tricky });
+  const stored = registry.get(base.service, "key_usage_iterator")!;
+  assert.deepEqual([...stored.allowed_event_prefixes], ["usage."]);
+  assert.equal(registry.allowsEventType(stored, "billing.subscription.changed"), false);
 });
