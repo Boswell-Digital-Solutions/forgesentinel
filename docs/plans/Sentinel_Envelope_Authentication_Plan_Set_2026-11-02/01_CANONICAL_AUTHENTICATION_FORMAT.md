@@ -21,9 +21,11 @@ R1-C for F1 and F5. Each marking below now states the ruled fix.
 stays unauthorized.** Three consequences are outstanding, and slice S1 must
 produce them:
 
-1. The bound record count moves from 41 to **43**, because R1-B adds a presence
-   record for `tenant` and one for `resource`. Ruling D-2 fixed the count at 41,
-   so D-2 is amended by R1-B. Amendment 3 in `06` records that.
+1. The bound record count of 41 is **superseded, and no replacement count is
+   stated**. R1-B adds a presence record for each of the three optional parents,
+   and R1-A's binding adds an unsettled number more, so the total is not yet
+   derivable. Amendment 3 in `06` records that, and slice S1 derives and
+   publishes the count. **The field table below still has 41 rows and is stale.**
 2. The worked example below — 41 records and 1479 bytes — is **superseded**. It
    must be regenerated, and the round-1 reviewer reproduced the old value byte
    for byte, so the new value needs the same independent reproduction.
@@ -107,30 +109,32 @@ same authenticated bytes. The same holds for `tenant` on a system-scoped
 family. Two different supported events therefore share one signature, which is
 what gate 2 forbids.
 
-**RULED, R1-B (2026-11-02).** Add a presence record for the affected optional
-parent objects, with tag `b` and the value `true` or `false`, **and** tighten
-the validator under R1-C. Both, not one: gate 2 requires the *encoding* to be
-injective, so that property must not depend on the validator behaving.
+**RULED, R1-B (2026-11-02).** Add a presence record for **each** optional parent
+object — `tenant`, `resource` and `control_lineage` — with tag `b` and the value
+`true` or `false`, **and** tighten the validator under R1-C. Both, not one: gate
+2 requires the *encoding* to be injective, so that property must not depend on
+the validator behaving.
 
-**Two parents are affected, not three.** The earlier candidate fix named
-`tenant`, `resource` and `control_lineage`. Verified by execution at `4225489`:
+Three parents, so three records. The present-empty form is admitted for two of
+the three today. Verified by execution at `4225489`:
 
-| Parent | Absent | Present `{}` | Presence record |
-|---|---|---|---|
-| `resource` | admitted | **admitted** | **Required** |
-| `tenant`, system-scoped family | admitted | **admitted** | **Required** |
-| `control_lineage` | admitted | refused | Not required |
+| Parent | Absent | Present `{}` |
+|---|---|---|
+| `resource` | admitted | **admitted** |
+| `tenant`, system-scoped family | admitted | **admitted** |
+| `control_lineage` | admitted | refused |
 
-`control_lineage` needs none. `validateEventEnvelope` already requires
-`control_origin` and `policy_generated_effect` when `control_lineage` is
-present, so a present empty one cannot pass, and an absent parent already
-differs from a present valid one in the `control_origin` record. A presence
-record there would distinguish nothing.
+**An earlier draft exempted `control_lineage` on the strength of that third row,
+and the owner rejected the exemption.** The exemption contradicted the ruling's
+own reason: it rested on `validateEventEnvelope` requiring `control_origin` and
+`policy_generated_effect`, which is the dependency the ruling forbids. The same
+reasoning also cuts the other way, because R1-C makes the validator refuse a
+present empty `resource` too, and an exemption rule would then remove `resource`
+from the list as well. All three parents get a record, so a later change to the
+validator cannot reopen F2.
 
-So the count rises by two, from 41 to 43, which amends D-2.
-
-The alternative, refusing a present empty parent in the validator alone, is
-refused as insufficient. For `resource` it **cannot** work on its own:
+The alternative, refusing a present empty parent in the validator alone, was
+rejected as insufficient. For `resource` it **cannot** work on its own:
 `validateEventEnvelope` never reads `resource` at any depth today, so that
 option silently depends on the R1-C type rules anyway.
 
@@ -157,22 +161,42 @@ the event with the reason code `envelope_not_encodable`:
   value that merely behaves like an array passed. A string and an array-like
   object both have `length` and index access, so `["a","b"]`, `"ab"` and
   `{0:"a",1:"b",length:2}` all encoded identically, and `validateEventEnvelope`
-  admits all three. `Array.isArray` is the check, because it is the only one of
-  those properties that separates the three. Verified at `4225489`: all three
-  give `length=2`, `[0]="a"` and `[1]="b"`, and only `Array.isArray` differs.
+  admits all three. `Array.isArray` is the check. Verified at `4225489`: all
+  three give `length=2`, `[0]="a"` and `[1]="b"`, so no length or index test can
+  tell them apart. `Array.isArray` does **not** separate the three from each
+  other — it is `false` for both `"ab"` and `{0:"a",1:"b",length:2}` — and it
+  does not need to. The rule refuses everything that is not an array, so one
+  array test is enough, and the two non-arrays need no distinction.
 
 **RULED, R1-C (2026-11-02).** The encoder rule above is necessary and not
 sufficient. `validateEventEnvelope` must type-validate **every declared field**,
 and the R-5 drift test must compare **types as well as names**.
 
-Measured at `4225489`: a wrong-typed value is admitted in **18 of 18** declared
-optional fields. The cause is structural rather than a single missing check.
+**The measurement, stated precisely.** At `4225489`, **18 probes** against
+declared fields were all admitted. Counted by distinct declared **optional
+field**, the result is **15 of 17 admitted**, and that is the figure to cite. An
+earlier draft of this section said "18 of 18 declared optional fields", which
+conflated the probe count with the field count and was wrong. The two figures
+differ for three reasons:
+
+- Three probes targeted `control_lineage.sentinel_finding_ids`, and two each
+  targeted `integrity.signature` and `integrity.signature_key_id`, so 18 probes
+  cover 13 distinct paths.
+- Two probes targeted `resource.resource_type` and `resource.resource_id`, which
+  `EventResource` declares as **required**, not optional.
+- The `tenant` and `control_lineage` parents are **refused** when wrongly typed,
+  verified at `4225489` — `tenant: 123` and `control_lineage: "x"` both fail.
+  They are the 2 of 17 that hold.
+
+The cause is structural rather than a single missing check.
 `validateEventEnvelope` never reads `resource` at any depth, never reads
 `integrity.signature` or `integrity.signature_key_id`, never reads
 `control_lineage.sentinel_finding_ids`, and never reads `tenant.account_id`,
 `actor.session_id`, `actor.api_key_fingerprint`, `correlation.run_id`,
-`correlation.parent_event_id`, `location.region` or `location.country`. So
-`resource: "not-an-object"`, `location.country: 44` and
+`correlation.parent_event_id`, `location.region` or `location.country`. It reads
+`control_lineage.control_id`, `sentinel_incident_id` and `policy_decision_id`
+only when `control_origin` is `sentinel_policy`, so those three are untyped on
+the other two origins. So `resource: "not-an-object"`, `location.country: 44` and
 `resource.classification: "banana"` are all admitted today.
 
 Two reasons the ruling goes this far. First, the encoder must refuse an
@@ -187,6 +211,14 @@ type and reopen F1 without failing CI.
 
 The order below is part of the format. The encoder uses this order. It never
 sorts at run time, because a sort depends on a collation that can change.
+
+**STALE. This table is 41 rows and does not carry the ruled corrections.** R1-B
+adds a presence record for each of `tenant`, `resource` and `control_lineage`,
+and R1-A binds `integrity.signature` and `integrity.signature_key_id` where they
+may appear. Both change the rows and the numbering. Every record **index** cited
+in this document and in `02`, `04`, `05` and ADR-027 shifts when a record is
+inserted, so those citations are stale too. Slice S1 regenerates this table, the
+indices and the derived count together. Amendment 3 in `06` records the scope.
 
 | # | Field name | Tag | Source |
 |---:|---|---|---|
@@ -380,8 +412,9 @@ because ADR-025 makes cross-language parity a contract property.
 
 **No bound field is typed as a number.** The fixed records are strings,
 booleans and one count, each finding-id record is a string, and the encoder
-produces the count from the array length. R1-B raises the fixed count from 41 to
-43 and both new records are booleans, so this statement still holds.
+produces the count from the array length. R1-B adds three parent presence
+records, and all three are booleans, so this statement still holds whatever the
+final count is.
 
 That is a statement about the format, not about what the envelope admits.
 Review finding F14 corrected an earlier, stronger sentence here. Verified by
@@ -509,11 +542,13 @@ control_lineage.control_id\x1f-\x1f0\x1f\x1e
 control_lineage.sentinel_finding_ids.count\x1f-\x1f0\x1f\x1e
 ```
 
-**SUPERSEDED by ruling R1-B (2026-11-02). Do not use these numbers.** The
-example above has 41 records and 1479 bytes. R1-B adds a presence record for
-`tenant` and one for `resource`, so a corrected example has **43** fixed records
-and a different byte count. The example is not regenerated here, because that is
-encoder work and slice S1 owns it.
+**SUPERSEDED by rulings R1-A and R1-B (2026-11-02). Do not use these numbers.**
+The example above has 41 records and 1479 bytes. R1-B adds three parent presence
+records and R1-A binds the two signature fields, so a corrected example has more
+records and a different byte count. **This document states no corrected count**,
+because R1-A's binding contexts are not settled, so the total is not derivable
+yet. Amendment 3 in `06` records that. The example is not regenerated here,
+because that is encoder work and slice S1 owns it, together with the count.
 
 The round-1 reviewer reproduced the 1479-byte value byte for byte before making
 any claim, which is why the stale value is called out rather than quietly left.
