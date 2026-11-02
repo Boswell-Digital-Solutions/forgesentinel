@@ -46,9 +46,8 @@ test("a wrapped input and the literal wrapper object give different bodies and h
 
 test("distinct malformed inputs give distinct rejection hashes", () => {
   const rt = runtime();
-  const inputs: unknown[] = [undefined, null, 0, 5, "5", true, false, NaN, Infinity, -Infinity, 10n, Symbol("s"), () => 1, [], {}, { [MALFORMED_INPUT_KEY]: 5 }];
+  const inputs: unknown[] = [undefined, null, 0, -0, 5, "5", true, false, NaN, Infinity, -Infinity, 10n, Symbol("s"), () => 1, [], {}, { [MALFORMED_INPUT_KEY]: 5 }];
   const hashes = inputs.map((input) => rejectionOf(rt, input).source_hash);
-  // A function and a Symbol with no description cannot keep their value; every other pair must differ.
   assert.equal(new Set(hashes).size, inputs.length, "every input above has its own hash");
 });
 

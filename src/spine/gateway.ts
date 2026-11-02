@@ -48,15 +48,21 @@ export const MALFORMED_INPUT_KEY = "malformed_input";
  * - An object or array that JSON can serialize, and that has no own
  *   `malformed_input` key, is stored as it is.
  * - Every other input is wrapped as `{ malformed_input, input_type }`. This
- *   includes an object that itself has the reserved key, so a stored body
- *   with that key is always a wrapper, and two different inputs never give
- *   the same body (KI-SENTINEL-20261102-004).
+ *   includes an object that itself has the reserved key, so an input with
+ *   that key can no longer collide with a wrapped primitive
+ *   (KI-SENTINEL-20261102-004).
  * - `malformed_input` holds a JSON-safe form of the input: the value for a
- *   string, number or boolean; a decimal string for a BigInt; the description
- *   for a Symbol; the object for a serializable object with the reserved key;
- *   otherwise null. `input_type` records what the input was, so a function,
- *   a Symbol or an unserializable object is not lost as `{}`
- *   (KI-SENTINEL-20261102-005).
+ *   string, boolean or finite number; the text for -0, NaN and Infinity; a
+ *   decimal string for a BigInt; the description for a Symbol; the object for
+ *   a serializable object with the reserved key; otherwise null. `input_type`
+ *   records what the input was, so a function, a Symbol or an unserializable
+ *   object is not lost as `{}` (KI-SENTINEL-20261102-005).
+ *
+ * This is not a one-to-one encoding of every input. Inputs that canonical
+ * JSON writes alike still give the same body: for example a nested -0 and 0,
+ * a nested out-of-range number and null, a `__proto__` key that the canonical
+ * form drops, or (from a library caller) a Date, Map, Set and `{}`, two
+ * functions, or two unserializable objects. See KI-SENTINEL-20261102-006.
  *
  * The ledger hashes the body, and its integrity check verifies only an object
  * or array body, so every rejection stays verifiable.
@@ -83,7 +89,8 @@ export function rejectionBody(rawEvent: unknown): unknown {
     case "boolean":
       return { [MALFORMED_INPUT_KEY]: rawEvent, input_type: typeof rawEvent };
     case "number":
-      // JSON writes NaN and Infinity as null; record the text so they stay distinct.
+      // JSON writes NaN and Infinity as null and -0 as 0; record the text so they stay distinct.
+      if (Object.is(rawEvent, -0)) return { [MALFORMED_INPUT_KEY]: "-0", input_type: "number" };
       return { [MALFORMED_INPUT_KEY]: Number.isFinite(rawEvent) ? rawEvent : String(rawEvent), input_type: "number" };
     case "bigint":
       return { [MALFORMED_INPUT_KEY]: rawEvent.toString(), input_type: "bigint" };
