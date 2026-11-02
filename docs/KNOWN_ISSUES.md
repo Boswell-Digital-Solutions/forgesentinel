@@ -299,8 +299,8 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 ## KI-SENTINEL-20261102-005: Function, Symbol and BigInt inputs from a library caller are not recorded faithfully — OPEN 2026-11-02 — library-only input handling — non-blocking
 
 - **Classification**: Non-blocking. A JSON replay file cannot produce these inputs; only a library caller in the same process can. This is inside the accepted in-process boundary.
-- **Discovery source**: independent review of forgesentinel PR #27, round 2. Confirmed for BigInt by the post-merge verification at `1d3d8859`.
-- **Verified at**: `1d3d8859371206f65648c783d5cafc2501b2692a` (`origin/master`). BigInt by execution; function and Symbol by the review's execution and by code reading.
+- **Discovery source**: independent review of forgesentinel PR #27, round 2. Confirmed for all three inputs at `1d3d8859`.
+- **Verified at**: `1d3d8859371206f65648c783d5cafc2501b2692a` (`origin/master`), by execution. A function and a Symbol input each gave a rejection whose `source_hash` equals `hashPayload({})`. A BigInt input threw `TypeError`, and the next record took `ledger_seq` 4 after 2, so 3 was skipped.
 - **Evidence**: `src/spine/gateway.ts:161` wraps a non-object input. `canonicalJson` (`src/contracts/common.ts:140-154`) uses `JSON.stringify`. `EvidenceLedger.append` increments the sequence number (`src/spine/ledger.ts:72`) before it computes `source_hash` (`:74`).
 - **Observed behavior**:
   1. A function or Symbol input is rejected, but `JSON.stringify` drops it, so the record hashes as `{}`. The value is lost.
