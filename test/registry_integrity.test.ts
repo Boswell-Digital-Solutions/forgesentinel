@@ -240,13 +240,28 @@ test("a prefix list cannot be swapped through an Array subclass or Symbol.specie
   const subclassed = Evil.from([""]) as unknown as string[];
   assert.throws(() => registry.register({ ...testProducers("production")[1]!, key_id: "key_usage_subclass", allowed_event_prefixes: subclassed }), ProducerRegistrationError);
 
+  // A species result that passes an iterating check ("usage.") but whose
+  // some() allows every event type. Code that copies through slice() or the
+  // species constructor stores this object, and the billing check below then
+  // fails (KI-SENTINEL-20261102-002).
   const species = ["usage."] as string[] & { constructor: unknown };
-  species.constructor = { [Symbol.species]: function () { return { some: () => true, length: 1, 0: "usage." }; } };
+  species.constructor = {
+    [Symbol.species]: function () {
+      return {
+        length: 1,
+        0: "usage.",
+        some: () => true,
+        *[Symbol.iterator]() {
+          yield "usage.";
+        },
+      };
+    },
+  };
   registry.register({ ...testProducers("production")[1]!, key_id: "key_usage_species", allowed_event_prefixes: species });
   const stored = registry.get("usage-metering", "key_usage_species")!;
+  assert.equal(registry.allowsEventType(stored, "billing.subscription.changed"), false, "the species result was not stored");
   assert.ok(Array.isArray(stored.allowed_event_prefixes));
   assert.equal(Object.getPrototypeOf(stored.allowed_event_prefixes), Array.prototype);
   assert.ok(Object.isFrozen(stored.allowed_event_prefixes));
-  assert.equal(registry.allowsEventType(stored, "billing.subscription.changed"), false);
   assert.equal(registry.allowsEventType(stored, "usage.tokens.recorded"), true);
 });

@@ -25,6 +25,13 @@ export interface ProducerCredential {
   token: string;
 }
 
+/** True when `value` has the shape of a ProducerCredential: three strings. */
+export function isWellFormedCredential(value: unknown): value is ProducerCredential {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate["service"] === "string" && typeof candidate["key_id"] === "string" && typeof candidate["token"] === "string";
+}
+
 export function producerToken(secret: string, payloadHash: string): string {
   return createHmac("sha256", secret).update(payloadHash, "utf8").digest("hex");
 }
@@ -39,6 +46,20 @@ export class ProducerRegistrationError extends Error {
  * An empty prefix would match every event type (KI-SENTINEL-20261030-005).
  */
 const EVENT_PREFIX_PATTERN = /^[a-z0-9_]+(\.[a-z0-9_]+)*\.$/;
+
+/**
+ * Most prefixes one registration may list. The bound is checked before the
+ * list is copied, so a huge or sparse list cannot make registration copy
+ * billions of elements (KI-SENTINEL-20261102-001).
+ */
+export const MAX_EVENT_PREFIXES = 64;
+
+/**
+ * A producer token or signature is HMAC-SHA256 as 64 lowercase hex
+ * characters. Any other form is refused, so one HMAC has one accepted text
+ * form (KI-SENTINEL-20261030-006 item 1).
+ */
+export const HMAC_HEX_PATTERN = /^[0-9a-f]{64}$/;
 
 export class ProducerRegistry {
   readonly #producers = new Map<string, Readonly<ProducerRegistration>>();
@@ -76,7 +97,10 @@ export class ProducerRegistry {
     const rawPrefixes: unknown = registration.allowed_event_prefixes;
     const prefixes: unknown[] = [];
     if (Array.isArray(rawPrefixes)) {
-      const length = rawPrefixes.length;
+      const length: unknown = rawPrefixes.length;
+      if (typeof length !== "number" || !Number.isInteger(length) || length < 0 || length > MAX_EVENT_PREFIXES) {
+        throw new ProducerRegistrationError(`producer "${String(registration.service)}" lists more than ${MAX_EVENT_PREFIXES} event prefixes, or an invalid count`);
+      }
       for (let index = 0; index < length; index++) prefixes.push(rawPrefixes[index]);
     }
     const copy: Readonly<ProducerRegistration> = Object.freeze({
@@ -110,12 +134,12 @@ export class ProducerRegistry {
   }
 
   authenticate(credential: ProducerCredential, payloadHash: string): ProducerRegistration | undefined {
+    if (!isWellFormedCredential(credential) || !HMAC_HEX_PATTERN.test(credential.token)) return undefined;
     const registration = this.get(credential.service, credential.key_id);
     if (!registration) return undefined;
-    const expected = producerToken(registration.secret, payloadHash);
-    const a = Buffer.from(expected, "hex");
-    const b = Buffer.from(credential.token.length === expected.length ? credential.token : "0".repeat(expected.length), "hex");
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return undefined;
+    const expected = Buffer.from(producerToken(registration.secret, payloadHash), "hex");
+    const presented = Buffer.from(credential.token, "hex");
+    if (expected.length !== presented.length || !timingSafeEqual(expected, presented)) return undefined;
     return registration;
   }
 
