@@ -13,9 +13,15 @@ The gateway stays in shadow mode, with no network ingress, until the correction
 is implemented and independently verified (owner requirement 5).
 
 The owner ruled all ten decisions on 2026-11-02, amended two of them, and added
-five implementation gates.
+five implementation gates. The owner then checked the pull request and recorded
+four further **recommendations**, which are explicitly not approvals.
 **`06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` is the authoritative record,
-and it wins over any earlier text in this plan set.**
+and it wins over any earlier text in this plan set.** It separates the rulings
+from the recommendations.
+
+**Independent design review is requested and not complete.** No pull-request
+review is submitted. A green documentation check is not a substitute for that
+review, and no part of this plan set may be read as a completed review.
 
 The owner rules the correction a **P0 security priority**. The verified
 cross-tenant event re-targeting is a security-significant authentication
@@ -129,7 +135,7 @@ Not in scope for this plan set, and not changed by it:
 | `03_COMPATIBILITY_AND_CALLER_IMPACT.md` | No installed base, no shim; fixtures, `buildEvent`, test support |
 | `04_NEGATIVE_TEST_MATRIX.md` | The negative tests and the positive controls |
 | `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | Gates, the ruled decisions, risks, proposed slices, the plan registry request |
-| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | **Authoritative.** The ten rulings, the two amendments, the five implementation gates, the findings disposition, the authorization boundaries |
+| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | **Authoritative.** The ten rulings, the two amendments, the five implementation gates, the four recommendations pending ruling, the findings disposition, the authorization boundaries |
 | `MANIFEST.md` | File sizes and SHA-256 digests |
 
 ## Sources read for this plan

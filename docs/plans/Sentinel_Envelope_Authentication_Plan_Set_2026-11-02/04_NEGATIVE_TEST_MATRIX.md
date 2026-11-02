@@ -25,7 +25,10 @@ The owner added five implementation gates on 2026-11-02
    call `resign` or `buildEvent` to produce the value under test. A defect in
    the encoder would otherwise make both sides agree, and every test would pass.
 3. **An independent reviewer writes or reviews the tests.** The author of the
-   implementation must not be the only author of its negative tests.
+   implementation must not be the only author of its negative tests. Under
+   recommendation 2 in `06`, that reviewer also reproduces the failures against
+   the pinned vulnerable base **before** reading the corrected implementation,
+   and records the exact commit, command, cases and results.
 4. **Each case asserts three things:** the status is `rejected`; the reason code
    is exactly the code in the table; the ledger holds no accepted record for
    that event.
@@ -34,6 +37,8 @@ The owner added five implementation gates on 2026-11-02
    would lock in an oracle.
 6. The new file is `test/event_auth.test.ts`. The existing `test/gateway.test.ts`
    keeps the contract and boundary cases.
+7. **No skipped security test.** A skipped case proves nothing. A case that
+   cannot run is a blocker, not a note.
 
 `Today` is the verified behaviour at `432337c`. `Required` is the behaviour the
 correction must produce.
@@ -235,7 +240,10 @@ and must not expose a credential or a sensitive payload.
 | Case | Construction | Required |
 |---|---|---|
 | EVD-K01 | Ingest an event whose authentication fails. Serialize the rejection record. | The text contains no part of the presented token, no expected bytes, no expected digest and no derived key. |
-| EVD-K02 | The same, with a `restricted` payload and `content_included: true`. | The record holds the shape the slice chose under gate 5, and the slice states that shape. The recommendation is the envelope without the payload, plus the payload digest. |
+| EVD-K02 | The same, with a `restricted` payload and `content_included: true`. | The record holds the shape the slice chose under gate 5, and the slice states that shape. The recommended shape is the permitted non-payload envelope metadata, plus a payload digest, plus the generic external code, plus the restricted internal category. |
+| EVD-K06 | Read the record's payload digest field. | It is labelled an observed, untrusted value. A reader cannot mistake it for proof that the producer sent the event. |
+| EVD-K07 | Ingest a failing event whose `data_policy` claims `sensitivity: public` and `cloud_allowed: true`, and one that claims `restricted`. | Neither classification changes what is stored, who may read the record, or how long it is kept. The rejected envelope's `data_policy` never decides storage access. |
+| EVD-K08 | Ingest a failing event with a forged `tenant.tenant_id` naming another tenant. | The record does not become readable to that tenant on the strength of the forged value. |
 | EVD-K03 | The same. Read the `IngestResult` the caller receives. | One issue, code `producer_auth_failed`, with no field name, no value and no internal category. |
 | EVD-K04 | The same. Read the rejection record. | It carries one internal category from the closed set in `02_SIGNATURE_BINDING.md`. |
 | EVD-K05 | Ingest an event whose authentication fails. Read every log line and every thrown error. | No secret, no derived key and no token appears. |
@@ -243,6 +251,11 @@ and must not expose a credential or a sensitive payload.
 EVD-K02 depends on a design choice the slice must make and record. The test
 asserts the chosen shape. It must not be written to pass whatever the code
 happens to do.
+
+EVD-K06 to EVD-K08 come from recommendation 1 in `06`. They exist because every
+value on a failing event is attacker-chosen: the digest is observed and not
+proof, and the `data_policy` and the tenant on a rejected envelope must not
+reach any decision about storage, access or retention.
 
 ## Group G: positive controls
 

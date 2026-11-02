@@ -139,13 +139,13 @@ telemetry must not expose a credential or a sensitive payload.
 - **Verified today:** the rejection record stores the rejected envelope and not
   the credential. `EventGateway.reject` receives `rawEvent` only, so no token
   reaches `rejectionBody`.
-- **Open design item:** the rejection record stores the whole envelope,
-  including the payload. For an authentication failure the envelope is
-  unauthenticated, so its `data_policy` is unauthenticated too. A `restricted`
-  payload can therefore be stored under a forged `internal` label. The
-  recommendation is to store, for an authentication failure only, the envelope
-  without the payload, plus the payload digest. The slice must state the chosen
-  shape, and `doc/system/03-runtime-boundary.md` must describe it.
+- **Open design item, with a recommended shape:** the rejection record stores
+  the whole envelope, including the payload. For an authentication failure the
+  envelope is unauthenticated, so its `data_policy` is unauthenticated too. A
+  `restricted` payload can therefore be stored under a forged `internal` label.
+  Recommendation 1 below states the recommended record shape. It is a
+  recommendation, not a ruling, so the slice must still state the chosen shape,
+  and `doc/system/03-runtime-boundary.md` must describe it.
 - The record must never hold the presented token, the expected bytes, the
   expected digest or a derived key.
 - D-3 applies here. An internal diagnostic category may say which group failed,
@@ -153,6 +153,86 @@ telemetry must not expose a credential or a sensitive payload.
   `producer_auth_failed` and nothing more. The rejection record is operator
   evidence, so it may carry the internal category; the `IngestResult` returned
   to a caller must not.
+
+## Owner recommendations pending formal ruling (2026-11-02)
+
+The owner checked PR #32 on GitHub and recorded four recommended rulings.
+**These are recommendations, not approvals.** The owner stated so explicitly.
+They are not recorded here as owner rulings, they do not authorize
+implementation, and the ten rulings above are unaffected by them.
+
+The owner's observations from that check: the pull request is a draft, it is
+mergeable, it is unmerged, every changed file is documentation, and GitHub
+reports no submitted pull-request review.
+
+### Recommendation 1: approve the payload-excluding rejection record (gate 5)
+
+For an authentication failure, the record retains only:
+
+- the permitted non-payload envelope metadata;
+- a payload digest;
+- a generic external failure code;
+- a restricted internal diagnostic category.
+
+Three constraints come with it:
+
+1. **Do not trust the rejected envelope's `data_policy` classification to
+   determine storage access.** The classification is attacker-chosen on an
+   unauthenticated event, so it must not decide what is stored, who may read
+   it, or how long it is kept.
+2. **The digest is an observed, untrusted value.** The record must identify it
+   that way. It is not proof of authenticity, and a reader must not treat a
+   matching digest as evidence that the producer sent the event.
+3. **No secrets, tokens, authentication bytes or sensitive payload content**
+   belong in the record.
+
+This resolves the open design item under gate 5, subject to a formal ruling.
+Group K in `04` must assert the chosen shape, including that the digest is
+labelled untrusted.
+
+### Recommendation 2: one implementation pull request, with separate evidence stages (S3 and S4)
+
+The recommendation keeps slices S3 and S4 in one pull request, and adds an
+ordered evidence procedure:
+
+1. The independent reviewer **reproduces the negative-test failures against the
+   pinned vulnerable base**, before examining the corrected implementation.
+2. The record states the **exact commit, the exact command, the cases and the
+   results** of that reproduction.
+3. Only then does the reviewer read the corrected implementation.
+4. The combined pull request must pass the new negative tests **and** the
+   positive regression controls before it is merge-eligible.
+5. **No skipped security tests.** A skipped case is not evidence.
+
+`05` carries this procedure in "The order of S3 and S4".
+
+### Recommendation 3: independent design review is required before proceeding
+
+A green documentation check does not substitute for this review. The review
+must assess six axes:
+
+| Axis | Where the plan answers it |
+|---|---|
+| Canonical-encoding injectivity | `01`, "Why the format is one to one"; group H in `04` |
+| HKDF key separation | `02`, "Key derivation" |
+| Unknown-field refusal | `01`, the D-5 condition; `03`, the `envelope.ts` row |
+| Tenant isolation | Group B and group I in `04` |
+| Rejection-record confidentiality | Gate 5 above; recommendation 1; group K in `04` |
+| `KI-SENTINEL-20261102-006` dependency closure | `01`, "The payload digest"; slice S0 in `05` |
+
+### Recommendation 4: S0 remains a hard prerequisite
+
+The corrected payload digest **and its adversarial tests** must be
+independently verified before envelope authentication may rely on it.
+**Merging S0 alone is insufficient.** `05` states this in the S0 row and in the
+S0 note.
+
+### Review status, stated precisely
+
+Independent design review is **requested and not complete**. No
+pull-request review is submitted on GitHub. Nothing in this plan set may be
+read as a completed review, and the design direction being sound enough to
+proceed to review is not the same as a review having been done.
 
 ## Findings disposition
 

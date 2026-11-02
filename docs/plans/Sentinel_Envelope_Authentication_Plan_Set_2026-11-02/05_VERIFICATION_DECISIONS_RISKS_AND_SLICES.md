@@ -147,7 +147,7 @@ stays shadow-only throughout (owner requirement 5).
 
 | Slice | Content | Gates | Authorization |
 |---|---|---|---|
-| S0 | The `KI-SENTINEL-20261102-006` correction: make the canonical form one to one, and add the D-7 numeric rule to the payload path and to `validateEventEnvelope`. **The corrected digest semantics and their negative tests must be independently verified**, per the D-1 condition. | G1, G2, G4, G6, G8 | Separate. It is its own finding, and its own authorization. |
+| S0 | The `KI-SENTINEL-20261102-006` correction: make the canonical form one to one, and add the D-7 numeric rule to the payload path and to `validateEventEnvelope`. **The corrected digest semantics and their adversarial tests must be independently verified**, per the D-1 condition. **Merging S0 alone is insufficient**: the verification, not the merge, is what unblocks enforcement. | G1, G2, G4, G6, G8 | Separate. It is its own finding, and its own authorization. |
 | S1 | `src/spine/event_auth.ts`: the field list, the encoder, the HKDF derivation, the unit tests, the group H property and adversarial suite, and the golden vector. Nothing calls it from the gateway. | G1, G2, G4, G6, G7 | This track. |
 | S2 | The unknown-field refusal in `validateEventEnvelope`, with tests, and the drift test from R-5. | G1, G2, G4, G6 | This track. |
 | S3 | The negative tests from `04`: groups A to K. | G1, G3 | This track. See the note below. |
@@ -157,7 +157,9 @@ stays shadow-only throughout (owner requirement 5).
 | S7 | `dedupeKey` adopts the encoder (`KI-SENTINEL-20261102-009`). The owner rules this a security-relevant integrity defect, so it follows immediately and reuses the encoder where that is safe. | G1 to G6 | Separate, under D-8. |
 
 S0 is a prerequisite, not a part of this track. The owner's D-1 condition makes
-its verification, not its merge, the thing that unblocks enforcement.
+its verification, not its merge, the thing that unblocks enforcement, and
+recommendation 4 in `06` restates it: merging S0 alone is insufficient, and the
+adversarial tests for the corrected digest must be independently verified.
 
 ### The order of S3 and S4
 
@@ -179,6 +181,25 @@ Two honest options:
 Option 1 keeps the evidence and keeps `master` green. The record in
 `KI-SENTINEL-20261102-008` must state who ran the tests against the base
 commit, and what the result was.
+
+#### The recommended evidence procedure
+
+The owner recommends option 1 with an ordered evidence procedure (recommendation
+2 in `06`; a recommendation, not yet a ruling):
+
+1. The independent reviewer reproduces the negative-test failures **against the
+   pinned vulnerable base**, before reading the corrected implementation.
+2. The record states the exact commit, the exact command, the cases and the
+   results of that reproduction.
+3. Only then does the reviewer read the corrected implementation.
+4. The combined pull request must pass the new negative tests **and** the
+   positive regression controls in group G before it is merge-eligible.
+5. No skipped security tests. A skipped case is not evidence, so a case that
+   cannot run is a blocker and not a note.
+
+Step 1 is what makes the matrix evidence rather than decoration. A reviewer who
+reads the implementation first knows what the tests are shaped around, and can
+no longer judge whether they would have caught the defect.
 
 ## What this track does not authorize
 
