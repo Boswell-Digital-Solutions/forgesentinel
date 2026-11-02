@@ -26,7 +26,7 @@ incident happened.
 | Decision | Ruling | Condition | Where the plan now states it |
 |---|---|---|---|
 | D-1 Payload binding | **Approved** | Depend on `KI-SENTINEL-20261102-006`. The corrected payload digest must be verified before envelope authentication relies on it. | `01`, "The payload digest"; slice S0 in `05` |
-| D-2 Bound field set | **Approved** | Bind all 41 records. A future authenticated field needs a versioned format change. | `01`, the field table and "A future authenticated field" |
+| D-2 Bound field set | **Approved** | Bind all 41 records, which means the 41 fixed records plus one record for each control-lineage finding id. A future authenticated field needs a versioned format change. | `01`, the field table and "A future authenticated field" |
 | D-3 Rejection reason code | **Approved** | Use `producer_auth_failed` externally. Keep useful internal diagnostic categories, and do not leak them to a caller. | `02`, "One reason code"; gate 5 below |
 | D-4 Version and algorithm | **Approved** | The gateway controls the algorithm and the version. Refuse an unsupported version. Never negotiate an algorithm from event input. | `01`, "Format name and version tag"; `02`, "Why the format carries no algorithm record" |
 | D-5 Unknown fields | **Approved** | Refuse an unknown envelope field. Define the permitted extension points, if any, in a future version. | `01`, "Why the format is one to one"; `03`, the `envelope.ts` row |

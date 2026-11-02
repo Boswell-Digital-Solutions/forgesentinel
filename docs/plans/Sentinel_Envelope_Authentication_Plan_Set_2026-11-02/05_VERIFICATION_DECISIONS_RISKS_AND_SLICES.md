@@ -57,7 +57,7 @@ with every condition. The summary:
 | ID | Decision | Ruling | The condition that binds the implementation |
 |---|---|---|---|
 | D-1 | How the payload is bound | Approved | Depend on `KI-SENTINEL-20261102-006`. The corrected digest must be **verified** before envelope authentication relies on it. |
-| D-2 | The bound field set | Approved | Bind all 41 records. A future authenticated field needs a versioned format change. |
+| D-2 | The bound field set | Approved | Bind all 41 records, which means the 41 fixed records plus one record for each control-lineage finding id. A future authenticated field needs a versioned format change. |
 | D-3 | The rejection reason code | Approved | `producer_auth_failed` externally. Keep internal diagnostic categories, and do not leak them. |
 | D-4 | Version and algorithm handling | Approved | The gateway controls both. Refuse an unsupported version. Never negotiate an algorithm from event input. |
 | D-5 | Unknown envelope fields | Approved | Refuse them. Define permitted extension points, if any, in a future version. |
@@ -135,7 +135,7 @@ authorizes the first slice.
 | R-6 | The Ed25519 slice changes `ProducerRegistration`, the secrets-file schema and the strength rules, which `KI-SENTINEL-20261030-002` also owns. | D-9. Do not run the two tracks at the same time. |
 | R-7 | 103 fixture lines change at once, and a reviewer cannot read 103 token changes. | G5: a scripted check that only `credential.token` and `integrity.signature` changed. |
 | R-8 | A real producer is built in another repository and implements the old token. | The golden vector is the cross-repository agreement. No repository implements the token today, so nothing is stranded now. |
-| R-9 | The plan binds 41 records, so the authenticated bytes grow from 71 bytes to about 1.5 kB for each event. | HMAC-SHA256 over 1.5 kB is not a measurable cost at this volume. Record a measurement in the slice if the owner wants one. |
+| R-9 | The plan binds 41 fixed records, plus one for each finding id, so the authenticated bytes grow from 71 bytes to about 1.5 kB for an event with no lineage, and more with one. | HMAC-SHA256 over a few kilobytes is not a measurable cost at this volume. The 1479-byte figure is the worked example in `01`, which carries no lineage. Record a measurement in the slice if the owner wants one. |
 | R-10 | Key derivation is a new step, so a defect in the `info` strings or the salt gives two producers one key, or gives one value both keys. | The `info` string holds the usage and the key id, and one module owns both strings. Cases NEG-E08 to NEG-E10 prove that a wrong key fails. A test asserts that two producers with the same secret still get different derived keys. |
 | R-11 | The numeric rule refuses a floating-point payload number, so a future producer that sends a decimal cost breaks. | The rule is stated before implementation (D-7), and `01` names the two admitted forms: a scaled integer and a decimal string. No committed event payload holds a non-integer number, so nothing breaks today. `doc/system/03-runtime-boundary.md` must state the rule for producer authors. |
 | R-12 | Gate 5 changes what a rejection record holds, so an operator loses the rejected payload that the ledger keeps today. | The slice states the chosen shape and records the trade. The recommendation keeps the payload digest, so an operator can still match a rejected event to a known payload without storing unauthenticated content. |

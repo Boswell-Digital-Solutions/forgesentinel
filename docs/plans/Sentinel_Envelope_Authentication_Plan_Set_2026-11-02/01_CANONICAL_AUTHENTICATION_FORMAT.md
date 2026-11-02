@@ -247,10 +247,11 @@ in `forge_contract_core` (`forge_contract_core/model_certification.py`), which
 
 ### Where the rule applies
 
-**No bound envelope field carries a number from the event.** The 41 records are
-strings, booleans and one count, and the encoder produces the count from the
-array length. So the envelope encoder admits no event-supplied number at all,
-and it needs no numeric rule of its own.
+**No bound envelope field carries a number from the event.** The 41 fixed
+records are strings, booleans and one count, each finding-id record is a
+string, and the encoder produces the count from the array length. So the
+envelope encoder admits no event-supplied number at all, and it needs no
+numeric rule of its own.
 
 The rule therefore applies in two other places:
 
@@ -357,8 +358,10 @@ control_lineage.control_id\x1f-\x1f0\x1f\x1e
 control_lineage.sentinel_finding_ids.count\x1f-\x1f0\x1f\x1e
 ```
 
-This example has 41 records and 1479 bytes. A planning script produced it from
-the committed fixture. It is illustrative. The implementation slice commits the
+This example has 41 records and 1479 bytes. It has 41 because the golden event
+carries no control lineage: an event with a lineage array adds one record for
+each finding id, so 41 is the floor and not the count for every event. A
+planning script produced the example from the committed fixture. It is illustrative. The implementation slice commits the
 authoritative vector as a golden fixture, with the bytes, the digest and the
 HMAC over a published test key (see `03_COMPATIBILITY_AND_CALLER_IMPACT.md`).
 
