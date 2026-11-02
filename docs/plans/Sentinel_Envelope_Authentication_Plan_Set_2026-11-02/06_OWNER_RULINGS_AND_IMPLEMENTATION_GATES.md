@@ -363,11 +363,10 @@ by execution at `4225489`:
 that third row, and the owner rejected the exemption.** The exemption
 contradicted the ruling's own reason: it made injectivity rest on
 `validateEventEnvelope` requiring `control_origin` and `policy_generated_effect`,
-which is the dependency the ruling forbids. The same reasoning also cuts the
-other way, because R1-C makes the validator refuse a present empty `resource`
-too, and an exemption rule would then remove `resource` from the list as well.
-The ruling applies the encoder-only principle to all three parents, so a later
-change to the validator cannot reopen F2.
+which is the dependency the ruling forbids. An exemption rule of that shape is
+also unstable, because it changes whenever the validator changes, and R1-C
+changes the validator. The ruling applies the encoder-only principle to all three
+parents, so no later change to the validator can reopen F2.
 
 The validator-only alternative was rejected as insufficient. For `resource` it
 cannot work alone in any case, because `validateEventEnvelope` never reads
@@ -381,19 +380,19 @@ field**, and the R-5 drift test compares **types as well as names**.
 The rest of this section is the plan author's record of the supporting facts, and
 not part of the ruling.
 
-**The measurement, stated precisely.** At `4225489`, **18 probes** against
-declared fields were all admitted. Counted by distinct declared **optional
-field**, rather than by probe, the result is **15 of 17 admitted**. The two
-figures differ for three reasons, and the second figure is the one to cite:
+**The measurement, stated precisely.** `EventEnvelope` and its member interfaces
+declare **17** optional fields. At `4225489`, **15 of those 17 admit a
+wrong-typed value**.
 
-- Three probes targeted `control_lineage.sentinel_finding_ids` and two each
-  targeted `integrity.signature` and `integrity.signature_key_id`, so 18 probes
-  cover 13 distinct paths.
-- Two probes targeted `resource.resource_type` and `resource.resource_id`, which
-  `EventResource` declares as **required**, not optional.
-- The `tenant` and `control_lineage` parents are **refused** when wrongly typed,
-  verified at `4225489`: `tenant: 123` and `control_lineage: "x"` both fail
-  validation. They are the 2 of 17 that hold.
+The two that hold are the `tenant` and `control_lineage` **parents**, which the
+validator type-checks: `tenant: 123` and `control_lineage: "x"` both fail
+validation, verified at `4225489`.
+
+An earlier draft said "18 of 18 declared optional fields". That was wrong. It
+reported a count of ad-hoc probes as though it were a count of fields. Several
+probes targeted one field, two targeted fields that `EventResource` declares
+**required**, and the probe set did not cover all 17. A probe count measures
+nothing about field coverage, so it is not reported here.
 
 The validator never reads `resource` at any depth, never reads
 `integrity.signature` or `integrity.signature_key_id`, never reads
@@ -517,8 +516,10 @@ Three boundaries, in order. Each needs its own explicit authorization.
    independent review. PR #32 was kept in draft for that, then merged on the
    owner's instruction as `79698ac`. Round 1 is complete and its verdict is
    "not safe to proceed to implementation authorization as written", so this
-   boundary is **not** cleared: a second round follows the owner's rulings on
-   the candidate fixes. Merging the documentation did not clear it.
+   boundary is **not** cleared. The owner ruled on all three format fixes on
+   2026-11-02, so what remains is round 2 against the corrected `01`, with a
+   frozen commit named before it starts. Merging the documentation did not clear
+   it, and neither did the rulings.
 2. **Implementation authorization.** Each slice in `05` needs the owner's
    explicit authorization. Design approval is not implementation authorization.
 3. **Production deployment authorization.** Separate again. The gateway stays

@@ -28,7 +28,8 @@ blocking defects in the format itself: the encoding is not one to one, and two
 admitted envelope fields are not bound. `07_REVIEW_ROUND_1_FINDINGS.md` holds
 the findings. **The owner ruled all three fixes on 2026-11-02 — R1-A, R1-B and
 R1-C — and a ruling is not a correction**: the three defects are settled in
-design and open in fact, and gate 2 stays open until slice S1 applies them.
+design and open in fact. Gate 2 stays open until slice S1 applies them **and**
+review round 2 re-attacks them against a frozen commit.
 Round 2 reviews the corrected `01` and still needs a frozen commit named before
 it starts. No pull-request review is submitted on GitHub, so the review of record
 is that document. A green documentation check is not a substitute for any of

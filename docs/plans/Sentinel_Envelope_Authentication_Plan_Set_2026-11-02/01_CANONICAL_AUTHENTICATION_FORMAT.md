@@ -127,11 +127,10 @@ the three today. Verified by execution at `4225489`:
 **An earlier draft exempted `control_lineage` on the strength of that third row,
 and the owner rejected the exemption.** The exemption contradicted the ruling's
 own reason: it rested on `validateEventEnvelope` requiring `control_origin` and
-`policy_generated_effect`, which is the dependency the ruling forbids. The same
-reasoning also cuts the other way, because R1-C makes the validator refuse a
-present empty `resource` too, and an exemption rule would then remove `resource`
-from the list as well. All three parents get a record, so a later change to the
-validator cannot reopen F2.
+`policy_generated_effect`, which is the dependency the ruling forbids. An
+exemption rule of that shape is also unstable, because it changes whenever the
+validator changes, and R1-C changes the validator. All three parents get a
+record, so no later change to the validator can reopen F2.
 
 The alternative, refusing a present empty parent in the validator alone, was
 rejected as insufficient. For `resource` it **cannot** work on its own:
@@ -172,21 +171,20 @@ the event with the reason code `envelope_not_encodable`:
 sufficient. `validateEventEnvelope` must type-validate **every declared field**,
 and the R-5 drift test must compare **types as well as names**.
 
-**The measurement, stated precisely.** At `4225489`, **18 probes** against
-declared fields were all admitted. Counted by distinct declared **optional
-field**, the result is **15 of 17 admitted**, and that is the figure to cite. An
-earlier draft of this section said "18 of 18 declared optional fields", which
-conflated the probe count with the field count and was wrong. The two figures
-differ for three reasons:
+**The measurement, stated precisely.** `EventEnvelope` and its member interfaces
+declare **17** optional fields. At `4225489`, **15 of those 17 admit a
+wrong-typed value**. That is the figure to cite.
 
-- Three probes targeted `control_lineage.sentinel_finding_ids`, and two each
-  targeted `integrity.signature` and `integrity.signature_key_id`, so 18 probes
-  cover 13 distinct paths.
-- Two probes targeted `resource.resource_type` and `resource.resource_id`, which
-  `EventResource` declares as **required**, not optional.
-- The `tenant` and `control_lineage` parents are **refused** when wrongly typed,
-  verified at `4225489` — `tenant: 123` and `control_lineage: "x"` both fail.
-  They are the 2 of 17 that hold.
+The two that hold are the `tenant` and `control_lineage` **parents**, which the
+validator type-checks: `tenant: 123` and `control_lineage: "x"` both fail
+validation, verified at `4225489`.
+
+An earlier draft of this section said "18 of 18 declared optional fields". That
+was wrong. It reported a count of ad-hoc probes as though it were a count of
+fields, and the two are not the same: several probes targeted one field, two
+targeted fields that `EventResource` declares **required**, and the probe set did
+not cover all 17. The probe count is not a measurement of field coverage and is
+not reported here.
 
 The cause is structural rather than a single missing check.
 `validateEventEnvelope` never reads `resource` at any depth, never reads
@@ -272,6 +270,15 @@ follows.
 
 `integrity.signature` and `credential.token` are the outputs of the format.
 The format does not bind them.
+
+**PARTLY SUPERSEDED by ruling R1-A (2026-11-02).** R1-A binds
+`integrity.signature` and `integrity.signature_key_id` where they may
+legitimately appear, so the sentence above no longer holds for the whole format.
+It still holds in one direction that no ruling can change: a value cannot be
+bound into the bytes it signs, so `integrity.signature` cannot be an input to the
+`signature` context that produces it. Which contexts bind which field is **not
+settled by the ruling**. Slice S1 names them, and amendment 3 in `06` records
+that the bound record count cannot be derived until it does.
 
 **BLOCKING DEFECT, review finding F3.** `integrity.signature_key_id` is also
 unbound in the `credential` context: record 3 carries it only when the context
