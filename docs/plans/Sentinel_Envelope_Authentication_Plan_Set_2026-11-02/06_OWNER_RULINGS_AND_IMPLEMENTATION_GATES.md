@@ -27,7 +27,7 @@ incident happened.
 | Decision | Ruling | Condition | Where the plan now states it |
 |---|---|---|---|
 | D-1 Payload binding | **Approved** | Depend on `KI-SENTINEL-20261102-006`. The corrected payload digest must be verified before envelope authentication relies on it. | `01`, "The payload digest"; slice S0 in `05` |
-| D-2 Bound field set | **Approved** | Bind all 41 records, which means the 41 fixed records plus one record for each control-lineage finding id. A future authenticated field needs a versioned format change. | `01`, the field table and "A future authenticated field" |
+| D-2 Bound field set | **Approved; the count is superseded by R1-A and R1-B** | Bind all fixed records plus one record for each control-lineage finding id. **The count of 41 is superseded, and amendment 3 states no replacement**: R1-B adds three parent presence records, and R1-A's binding adds an unsettled number more, so the total is not yet derivable. Slice S1 derives and publishes it. A future authenticated field needs a versioned format change; this correction does not trigger that clause. | Amendment 3 below. The field table in `01` is stale and still shows 41 rows. |
 | D-3 Rejection reason code | **Approved** | Use `producer_auth_failed` externally. Keep useful internal diagnostic categories, and do not leak them to a caller. | `02`, "One reason code"; gate 5 below |
 | D-4 Version and algorithm | **Approved** | The gateway controls the algorithm and the version. Refuse an unsupported version. Never negotiate an algorithm from event input. | `01`, "Format name and version tag"; `02`, "Why the format carries no algorithm record" |
 | D-5 Unknown fields | **Approved** | Refuse an unknown envelope field. Define the permitted extension points, if any, in a future version. | `01`, "Why the format is one to one"; `03`, the `envelope.ts` row |
@@ -103,7 +103,10 @@ Two different supported events must never give the same authenticated bytes.
   separates an absent field from a present empty string. **Review round 1
   showed the property does not hold as specified** — findings F1, F2 and F3 —
   so this gate is open, and the length-prefix core is sound while the field set
-  and the type rules are not.
+  and the type rules are not. **The three corrections are ruled (R1-A, R1-B and
+  R1-C, 2026-11-02) and not yet applied.** The gate stays open until slice S1
+  implements them and review round 2 re-attacks them against a frozen commit. A
+  ruling is not a correction.
 - Proof: group H in `04`. It has a property test over a seeded generator and
   adversarial cases. The repository has no property-testing dependency, and it
   stays dependency-free, so the generator is a small seeded function in the
@@ -275,11 +278,138 @@ the rejection-record axis, and two false statements of present code behaviour.
 A second round is needed after the owner rules on the candidate fixes. Nothing
 in this plan set may be read as an approved design.
 
+**Status of that condition (2026-11-02):** the owner has ruled on the fixes for
+all three format defects — R1-A, R1-B and R1-C — and on R1-D and R1-E. Three
+decisions stay open: R1-F, R1-G and R1-H. The rulings are recorded below.
+
+Round 2 is still required, and the rulings do not reduce what it must do.
+
+**Round 2 reviews the corrected design, not an implementation.** An earlier draft
+of this paragraph said round 2 could not start until slices S1 and S2 existed.
+That created a circular gate: the authorization boundaries below put design
+review before implementation authorization, so a round 2 that needed S1 and S2
+could never start. Round 2 therefore reviews `01` once it carries the corrected
+format — the three parent presence records, the R1-A binding and refusal, the
+R1-C type rules, the regenerated field table, the worked example and the derived
+record count. Whether a later round also re-attacks the running implementation is
+a separate question, and the gate-2 proof in `04` covers that at S1.
+
+R1-H is one of the three open decisions, and it governs whether `07` satisfies
+recommendation 3 or a submitted GitHub review is also required. No GitHub review
+has ever been submitted on this track.
+
 ## Owner rulings on review round 1 (2026-11-02)
 
 Independent review round 1 surfaced eight open decisions, R1-A to R1-H, in
-`07_REVIEW_ROUND_1_FINDINGS.md`. The owner ruled two of them. Six stay open:
-R1-A, R1-B, R1-C, R1-F, R1-G and R1-H.
+`07_REVIEW_ROUND_1_FINDINGS.md`. The owner ruled five of them. Three stay open:
+R1-F, R1-G and R1-H.
+
+R1-D and R1-E were ruled first, and R1-A, R1-B and R1-C followed on the same
+day. A ruling settles what the correction is. It does not authorize the
+correction, and it does not make the correction exist.
+
+### R1-A: refuse the two signature fields, and bind them
+
+**The owner's ruling.** Both measures, not one.
+
+1. **Refuse** `integrity.signature` and `integrity.signature_key_id` on an event
+   whose family requires no signature.
+2. **Bind** both fields in every context where they may legitimately appear,
+   with the absent tag when they are not present.
+
+The rest of this section is the plan author's record of the supporting facts, and
+not part of the ruling.
+
+The two measures close different holes. Binding alone stops a third party adding
+or altering the fields. But on a no-signature family an unverified value is still
+stored as accepted evidence, so `KI-SENTINEL-20261102-014` would stay open.
+Refusal closes that, because the field cannot be present at all. Refusal alone
+would leave the signature-required case resting on the verification path rather
+than on the credential binding.
+
+`validateEventEnvelope` already resolves the family entry, so the condition in
+measure 1 needs no new lookup.
+
+**Two details are not settled by this ruling, and slice S1 or S2 must settle and
+record them.** The refusal needs a reason code, and `unknown_envelope_field` is
+the wrong one, because both fields are known — that is review finding F16's
+lesson. And `01` states that the format does not bind `integrity.signature`,
+because it is an output of the format, so measure 2 needs the contexts named
+before the bound record count can be derived. Amendment 3 covers the second
+point.
+
+### R1-B: a presence record for every optional parent, plus the validator
+
+**The owner's ruling.** Add a presence record for **each** optional parent
+object — `tenant`, `resource` and `control_lineage` — with tag `b`, **and** apply
+the R1-C validator rules.
+
+**The owner's stated reason.** Gate 2 requires the *encoding* to be injective, so
+that property must not depend on the validator behaving.
+
+The rest of this section is the plan author's record of the supporting facts, and
+not part of the ruling.
+
+The present-empty form is admitted for two of the three parents today. Verified
+by execution at `4225489`:
+
+| Parent | Absent | Present `{}` |
+|---|---|---|
+| `resource` | admitted | admitted |
+| `tenant`, system-scoped family | admitted | admitted |
+| `control_lineage` | admitted | refused |
+
+**An earlier draft of this section exempted `control_lineage` on the strength of
+that third row, and the owner rejected the exemption.** The exemption
+contradicted the ruling's own reason: it made injectivity rest on
+`validateEventEnvelope` requiring `control_origin` and `policy_generated_effect`,
+which is the dependency the ruling forbids. An exemption rule of that shape is
+also unstable, because it changes whenever the validator changes, and R1-C
+changes the validator. The ruling applies the encoder-only principle to all three
+parents, so no later change to the validator can reopen F2.
+
+The validator-only alternative was rejected as insufficient. For `resource` it
+cannot work alone in any case, because `validateEventEnvelope` never reads
+`resource` at any depth today.
+
+### R1-C: type-validate every declared field, and compare types in the drift test
+
+**The owner's ruling.** `validateEventEnvelope` type-validates **every declared
+field**, and the R-5 drift test compares **types as well as names**.
+
+The rest of this section is the plan author's record of the supporting facts, and
+not part of the ruling.
+
+**The measurement, stated precisely.** `EventEnvelope` and its member interfaces
+declare **17** optional fields. At `4225489`, **15 of those 17 admit a
+wrong-typed value**.
+
+The two that hold are the `tenant` and `control_lineage` **parents**, which the
+validator type-checks: `tenant: 123` and `control_lineage: "x"` both fail
+validation, verified at `4225489`.
+
+An earlier draft said "18 of 18 declared optional fields". That was wrong. It
+reported a count of ad-hoc probes as though it were a count of fields. Several
+probes targeted one field, two targeted fields that `EventResource` declares
+**required**, and the probe set did not cover all 17. A probe count measures
+nothing about field coverage, so it is not reported here.
+
+The validator never reads `resource` at any depth, never reads
+`integrity.signature` or `integrity.signature_key_id`, never reads
+`control_lineage.sentinel_finding_ids`, and never reads `tenant.account_id`,
+`actor.session_id`, `actor.api_key_fingerprint`, `correlation.run_id`,
+`correlation.parent_event_id`, `location.region` or `location.country`. It reads
+`control_lineage.control_id`, `sentinel_incident_id` and `policy_decision_id`
+only when `control_origin` is `sentinel_policy`, so those three are untyped on
+the other two origins.
+
+Two reasons for the full scope. The encoder must refuse an unencodable value in
+any case. A permissive validator only turns a clean validation error into a
+runtime `envelope_not_encodable` rejection, which is review finding F5's
+contract-valid but unencodable class. Validating up front makes "passes
+validation, therefore encodable" an invariant that S1 and S2 rely on. And a
+drift test that compares names only lets a later change loosen a type and reopen
+F1 without failing CI.
 
 ### R1-D: a separate change carries `src/spine/ledger.ts`, before S4
 
@@ -292,7 +422,7 @@ That change carries four defects: `KI-SENTINEL-20261102-011`,
 
 The reason to separate them: three of the four are not authentication defects.
 `-011`, `-016` and F34 are reachable or latent independently of envelope
-authentication, so they do not wait on the six open format decisions.
+authentication, so they do not wait on the format corrections.
 Separation also keeps S4 reviewable as an authentication change, and it keeps
 the reproduce-first evidence stage in recommendation 2 free of ledger failures.
 
@@ -331,6 +461,45 @@ the cross-tenant denial record is not a rejection: the ledger stores it with
 the `kind` and the `validation` labels, because the damage in `-016` comes from
 a record that falsely claims to be an accepted event.
 
+## Amendment 3: D-2's bound record count is superseded, and no new count is stated (by R1-A and R1-B)
+
+Ruling D-2 fixed the bound set at 41 records, "the 41 fixed records plus one
+record for each control-lineage finding id". **That count is superseded. This
+amendment states no replacement count, because the count is not yet
+determinable.**
+
+Two ruled corrections feed it, and only one of them is countable today:
+
+1. **R1-B** adds a presence record for each of the three optional parents, which
+   is three records.
+2. **R1-A** binds `integrity.signature` and `integrity.signature_key_id` where
+   they may legitimately appear. `01` currently states that the format does not
+   bind `integrity.signature`, because it is an output of the format. How many
+   records that binding adds, and in which contexts, is not settled by the
+   ruling, so the total cannot be derived from it.
+
+**An earlier draft of this amendment stated 43, and that number was wrong.** It
+counted R1-B's parents as two rather than three, and it ignored R1-A's records
+altogether. The number is retracted rather than corrected, because a stated
+count that no document can derive is the drift this plan set has already had to
+correct twice.
+
+Slice S1 derives and publishes the authoritative count, with the field table,
+the regenerated worked example and the golden vector in one place.
+
+D-2 also said a future authenticated field needs a versioned format change. That
+clause is not triggered here. These records correct a defect that review found in
+an unimplemented format, before any producer emits it. There is no installed base
+and nothing to version, consistent with the no-backwards-compatibility rule in
+`CLAUDE.md`.
+
+Four artifacts are stale, and slice S1 owns all four: the field table in `01`,
+which still has 41 rows; the worked example in `01`, which is 41 records and 1479
+bytes; the record **indices** cited across `01`, `02`, `04`, `05` and ADR-027,
+which shift when records are inserted; and the golden vector. The round-1
+reviewer reproduced the 1479-byte value byte for byte, so the regenerated example
+needs the same independent reproduction.
+
 ## Findings disposition
 
 | Finding | Owner disposition | Effect on this track |
@@ -347,8 +516,10 @@ Three boundaries, in order. Each needs its own explicit authorization.
    independent review. PR #32 was kept in draft for that, then merged on the
    owner's instruction as `79698ac`. Round 1 is complete and its verdict is
    "not safe to proceed to implementation authorization as written", so this
-   boundary is **not** cleared: a second round follows the owner's rulings on
-   the candidate fixes. Merging the documentation did not clear it.
+   boundary is **not** cleared. The owner ruled on all three format fixes on
+   2026-11-02, so what remains is round 2 against the corrected `01`, with a
+   frozen commit named before it starts. Merging the documentation did not clear
+   it, and neither did the rulings.
 2. **Implementation authorization.** Each slice in `05` needs the owner's
    explicit authorization. Design approval is not implementation authorization.
 3. **Production deployment authorization.** Separate again. The gateway stays

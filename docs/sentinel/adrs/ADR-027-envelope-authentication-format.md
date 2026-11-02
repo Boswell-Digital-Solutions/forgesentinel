@@ -1,6 +1,7 @@
 # ADR-027: Authenticate the Security-Relevant Event Envelope, Not Only the Payload Hash
 
 **Status:** Accepted for design (2026-11-02). Implementation is not authorized. Independent review round 1 returned blocking defects in the format; a second round is required.
+**Amended:** 2026-11-02, by owner rulings R1-A, R1-B and R1-C. The three blocking defects now have ruled fixes, and **the count of 41 records below is superseded.** A ruling is not a correction: the defects are settled in design and open in fact. Amendment 3 in `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` states why no replacement count is given, and slice S1 derives it.
 **Addresses:** `KI-SENTINEL-20261102-008`
 **Depends on:** `KI-SENTINEL-20261102-006` (corrected and verified), ADR-026
 **Plan set:** `docs/plans/Sentinel_Envelope_Authentication_Plan_Set_2026-11-02/` (`BDS-SNT-ENVELOPE-AUTH-001`)
@@ -33,14 +34,18 @@ versioned, deterministic byte format, `forgesentinel.event_auth.v1`, which is
 not yet proved: review round 1 found three defects that break it (see
 `07_REVIEW_ROUND_1_FINDINGS.md`, findings F1 to F3).
 
-1. **The format.** The authenticated bytes are a fixed, ordered list of 41
-   records, plus one record for each `control_lineage.sentinel_finding_ids`
-   element. One record is `name 0x1F tag 0x1F byte-length 0x1F value 0x1E`. The
-   name is a constant from the specification. The length is the exact UTF-8
-   byte count, so no value can create, hide or move a separator — the reviewer
-   confirmed this core property by implementing the spec and testing it. A tag
-   separates an absent field from a present empty string, but **not** an absent
-   parent object from a present empty one, which finding F2 must correct.
+1. **The format.** The authenticated bytes are a fixed, ordered record list,
+   plus one record for each `control_lineage.sentinel_finding_ids` element. One
+   record is `name 0x1F tag 0x1F byte-length 0x1F value 0x1E`. The name is a
+   constant from the specification. The length is the exact UTF-8 byte count, so
+   no value can create, hide or move a separator — the reviewer confirmed this
+   core property by implementing the spec and testing it. A tag separates an
+   absent field from a present empty string, but **not** an absent parent object
+   from a present empty one, which is finding F2. **Ruled by R1-B:** a presence
+   record for each of the three optional parents, `tenant`, `resource` and
+   `control_lineage`, so injectivity rests on the encoding and never on the
+   validator. **The list was 41 records and that count is superseded**, because
+   R1-B adds three and R1-A's binding adds an unsettled number more.
 2. **The version tag is inside the authenticated bytes.** Record 1 holds the
    format name, so it cannot be stripped or downgraded. The gateway holds the
    accepted name as a constant, and it reads no version from the event.
@@ -64,8 +69,10 @@ not yet proved: review round 1 found three defects that break it (see
    at the top level and in every bound object, so no unknown field escapes the
    binding. This version defines no extension point. Two **known** fields,
    `integrity.signature` and `integrity.signature_key_id`, are admitted and
-   unbound today; finding F3 must correct that, and an unknown-field refusal
-   cannot.
+   unbound today, which is finding F3, and an unknown-field refusal cannot reach
+   them. **Ruled by R1-A:** refuse both fields on an event whose family requires
+   no signature, **and** bind both where they may legitimately appear. The
+   binding contexts are not settled by the ruling, so slice S1 names them.
 8. **One external reason code.** Every authentication failure returns
    `producer_auth_failed` to the caller, with no field name. A closed set of
    internal categories stays in the operator evidence record.
@@ -103,7 +110,9 @@ migration changes the key material and not the authenticated bytes.
 - A producer must sign last. A field corrected after signing breaks its own
   authentication.
 - A future authenticated field requires a new format version, not an in-place
-  change.
+  change. Amendment 3 records that this clause is **not** triggered by the R1-A
+  and R1-B corrections: they correct a defect in an unimplemented format, with no
+  installed base and nothing to version.
 - Ed25519 under ADR-026 follows this correction, with the seven
   algorithm-transition safeguards in the plan set.
 - `KI-SENTINEL-20261102-009` (the dedupe key joins strings without length

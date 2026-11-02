@@ -13,9 +13,11 @@ Each implementation slice needs its own explicit authorization from the owner.
 The gateway stays in shadow mode, with no network ingress, until the correction
 is implemented and independently verified (owner requirement 5).
 
-The owner ruled all ten decisions on 2026-11-02, amended two of them, and added
-five implementation gates. The owner then checked the pull request and recorded
-four further **recommendations**, which are explicitly not approvals.
+The owner ruled all ten D-series decisions on 2026-11-02, amended three of them,
+and added five implementation gates. The owner then checked the pull request and
+recorded four further **recommendations**, which are explicitly not approvals.
+Review round 1 later raised eight more decisions, R1-A to R1-H; the owner ruled
+**five** of them on the same day, and **three stay open: R1-F, R1-G and R1-H**.
 **`06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` is the authoritative record,
 and it wins over any earlier text in this plan set.** It separates the rulings
 from the recommendations.
@@ -24,10 +26,19 @@ from the recommendations.
 to proceed to implementation authorization as written".** It found three
 blocking defects in the format itself: the encoding is not one to one, and two
 admitted envelope fields are not bound. `07_REVIEW_ROUND_1_FINDINGS.md` holds
-the findings. A second round is needed after the owner rules on the candidate
-fixes. No pull-request review is submitted on GitHub, so the review of record
+the findings. **The owner ruled all three fixes on 2026-11-02 — R1-A, R1-B and
+R1-C — and a ruling is not a correction**: the three defects are settled in
+design and open in fact. Gate 2 stays open until slice S1 applies them **and**
+review round 2 re-attacks them against a frozen commit.
+Round 2 reviews the corrected `01` and still needs a frozen commit named before
+it starts. No pull-request review is submitted on GitHub, so the review of record
 is that document. A green documentation check is not a substitute for any of
 this.
+
+**The record count in this plan set is superseded.** D-2 fixed it at 41, and
+amendment 3 in `06` supersedes that without stating a replacement, because R1-A's
+binding contexts are unsettled. The 41-row field table and the 1479-byte worked
+example in `01` are stale, and slice S1 regenerates them.
 
 The owner rules the correction a **P0 security priority**. The verified
 cross-tenant event re-targeting is a security-significant authentication
@@ -141,8 +152,8 @@ Not in scope for this plan set, and not changed by it:
 | `03_COMPATIBILITY_AND_CALLER_IMPACT.md` | No installed base, no shim; fixtures, `buildEvent`, test support |
 | `04_NEGATIVE_TEST_MATRIX.md` | The negative tests and the positive controls |
 | `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | Gates, the ruled decisions, risks, proposed slices, the plan registry request |
-| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | **Authoritative.** The ten rulings, the two amendments, the five implementation gates, the four recommendations pending ruling, the findings disposition, the authorization boundaries |
-| `07_REVIEW_ROUND_1_FINDINGS.md` | Independent review round 1: the verdict, the blocking defects, what was re-verified, and the open design decisions |
+| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | **Authoritative.** The ten D-series rulings, the three amendments, the five implementation gates, the four recommendations pending ruling, the five round-1 rulings R1-A to R1-E, the findings disposition, the authorization boundaries |
+| `07_REVIEW_ROUND_1_FINDINGS.md` | Independent review round 1: the verdict, the blocking defects, what was re-verified, and the design decisions — five ruled, three open |
 | `MANIFEST.md` | File sizes and SHA-256 digests |
 
 ## Sources read for this plan
