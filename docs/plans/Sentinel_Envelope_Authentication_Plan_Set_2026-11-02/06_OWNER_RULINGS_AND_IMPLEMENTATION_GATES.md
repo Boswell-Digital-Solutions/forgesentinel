@@ -140,8 +140,16 @@ producer-identity and control-lineage substitution.
 
 ### Gate 5: preserve operational evidence
 
-An authentication failure must produce protected security telemetry. The
-telemetry must not expose a credential or a sensitive payload.
+Every failure **before successful authentication** must produce protected
+security telemetry. The telemetry must not expose a credential or a sensitive
+payload.
+
+The gate was first written for an authentication failure alone. Ruling 5 of
+2026-11-02 extends it to every pre-authentication failure, on the principle that
+a malformed envelope is not more trustworthy than one with an invalid token. The
+five-element record below is the **maximum allowable shape** for all of them,
+and untrusted tenant information must not control routing, storage or evidence
+visibility.
 
 - **Corrected, review finding F30.** An earlier version of this section said
   the record stores the envelope and not the credential. The *token* does not
@@ -167,10 +175,12 @@ telemetry must not expose a credential or a sensitive payload.
   value can be marked observed and untrusted, while `tenant_id` is the one
   field used for access control (review finding F34). All three live in
   `src/spine/ledger.ts`, which `03` now lists in scope.
-  Recommendation 1 below states the recommended record shape. It is a
-  recommendation, not a ruling, so the slice must still state the chosen shape,
-  and `doc/system/03-runtime-boundary.md` must describe it. The `tenant_id`
-  part of that shape is no longer open, because R1-E rules it.
+  **No longer open: ruled on 2026-11-02.** The owner ruled a payload-free,
+  fail-closed quarantine record, narrower than recommendation 1. See "Ruling 1"
+  below for the five permitted elements and the two prohibitions. The slice no
+  longer chooses the record shape; it implements the ruled one, and
+  `doc/system/03-runtime-boundary.md` must describe it. The `tenant_id` part was
+  already closed by R1-E, and the ruling extends it from storage to routing.
 - **A fourth defect, `KI-SENTINEL-20261102-016`.** The ledger writes its own
   cross-tenant denial telemetry with `kind: "event"`, `validation: "accepted"`
   and the **requested** tenant's id (`src/spine/ledger.ts:115-127`). Three
@@ -191,12 +201,17 @@ telemetry must not expose a credential or a sensitive payload.
   evidence, so it may carry the internal category; the `IngestResult` returned
   to a caller must not.
 
-## Owner recommendations pending formal ruling (2026-11-02)
+## Owner recommendations, now ruled (2026-11-02)
+
+> **All four recommendations below are RULED as of 2026-11-02.** See
+> "Owner rulings on the four recommendations" after this section. The
+> recommendation text is kept because the rulings refer to it, and because
+> ruling 1 **tightens** recommendation 1 rather than adopting it unchanged.
 
 The owner checked PR #32 on GitHub and recorded four recommended rulings.
-**These are recommendations, not approvals.** The owner stated so explicitly.
-They are not recorded here as owner rulings, they do not authorize
-implementation, and the ten rulings above are unaffected by them.
+**At the time they were recommendations, not approvals.** The owner stated so
+explicitly. They did not authorize implementation, and the ten rulings above
+were unaffected by them.
 
 The owner's observations from that check: the pull request is a draft, it is
 mergeable, it is unmerged, every changed file is documentation, and GitHub
@@ -263,6 +278,231 @@ The corrected payload digest **and its adversarial tests** must be
 independently verified before envelope authentication may rely on it.
 **Merging S0 alone is insufficient.** `05` states this in the S0 row and in the
 S0 note.
+
+## Owner rulings on the four recommendations (2026-11-02)
+
+The owner ruled all four recommendations, and stated the dispositions as a
+table. The ruling opens with the principle that **green documentation CI does
+not establish security approval.**
+
+| Item | Disposition |
+|---|---|
+| Independent design review | **Authorize** |
+| Gate 5 rejection records | **Payload-free, fail-closed quarantine** |
+| S3/S4 ordering | **Approve the combined pull request, with separately demonstrated negative tests** |
+| S0 / `KI-SENTINEL-20261102-006` | **Require an independently verified digest correction** |
+| S1 to S5 | **Hold**, pending review and the prerequisites |
+| Plan registry | **Follow the authorized `forge` change process** |
+| PR #32 merge | **Hold** |
+
+The ruling restates one binding requirement from the first ruling: the newly
+discovered mutable fields must be **either authenticated or explicitly excluded
+with a documented security justification**. There is no third category.
+
+### Ruling 1: the quarantine record is narrower than recommendation 1
+
+The owner ruled a **payload-free, fail-closed quarantine** record, on the
+principle: **never trust an unauthenticated envelope's classification labels.**
+
+For an authentication failure the record holds only these five things:
+
+| Element | Source |
+|---|---|
+| A receipt timestamp | The gateway's own trusted clock. Never `occurred_at` or `observed_at`. |
+| A rejection identifier | Generated by the gateway. Never `event_id`. |
+| The failure reason | `producer_auth_failed`, plus one internal category from the closed set in `02`. |
+| Bounded non-sensitive diagnostics | A fixed, bounded set. Not free-form envelope content. |
+| A digest of the received bytes | So an operator can match a rejection to a known event. |
+
+Two prohibitions come with it. The record **must not** persist the untrusted
+payload, and the gateway **must not** use the envelope's purported tenant
+information for routing.
+
+**This is narrower than recommendation 1, and the difference matters.**
+Recommendation 1 retained "the permitted non-payload envelope metadata". The
+ruling does not. Envelope metadata is replaced by a fixed, bounded diagnostic
+set, because the envelope's `data_policy`, `tenant` and `actor` labels are all
+attacker-chosen on an unauthenticated event. Retaining the envelope retains
+attacker-chosen metadata, which is the defect rather than the fix.
+
+The three constraints in recommendation 1 survive unchanged, and the second one
+still applies: the digest is an **observed, untrusted** value, and the record
+must identify it that way. A matching digest is not evidence of authenticity.
+
+This closes the open design item under gate 5. Group K in `04` must assert the
+chosen shape, including the untrusted label on the digest. The slice no longer
+chooses the shape; it implements this one.
+
+**Consistency with R1-E.** R1-E already ruled that a record of unauthenticated
+provenance carries no top-level `tenant_id`. This ruling is consistent with it
+and goes further, because it also forbids *routing* on the purported tenant,
+not only storing it. The gateway interpolates the purported tenant into every
+rejection today — each failure path calls
+`this.reject(event, reasons, event.tenant?.tenant_id)` — so an authentication
+failure must stop doing that. Slice SL carries the ledger side under R1-D.
+
+**This case is now settled — see "Ruling 5" below.** An earlier version of this
+section left open whether the quarantine shape governs a **contract**-failure
+record, which happens before authentication. The owner ruled on 2026-11-02 that
+it does, and that the rule reaches **every** pre-authentication failure. The
+slice no longer raises it.
+
+### Ruling 2: the combined pull request structure is approved; implementing it is not
+
+**What is approved is the shape of the change, not permission to make it.** The
+owner clarified this on 2026-11-02, because the earlier wording approved "the
+combined pull request" while S1 to S5 were held, and a reader could take the
+first as overriding the second.
+
+Stated as two separate things:
+
+| Question | Answer |
+|---|---|
+| May S3 and S4 arrive as one pull request, rather than two? | **Yes.** The arrangement is approved. |
+| May anyone write, open or merge that pull request now? | **No.** Implementation and merge authorization are withheld. |
+
+So the combined-PR arrangement is the approved structure **for when
+implementation is authorized**. It is not itself an authorization. Approval of a
+structure never implies permission to build it, and the S1-to-S5 hold is
+unaffected by this ruling. Each slice still needs its own explicit
+authorization, and the required security gates must be satisfied before a merge.
+
+The condition on the structure: the reviewer captures evidence that the negative
+tests **fail against the vulnerable baseline** and **pass against the corrected
+implementation**, and that evidence is **preserved as a review artifact**.
+
+So the five-step procedure in recommendation 2 stands, with step 2 now binding
+rather than advisory, and with one addition: the reproduction record is an
+artifact that outlives the review conversation. A combined pull request that
+shows only a green result does not satisfy this gate. The artifact must show
+both runs.
+
+### Ruling 3: the independent design review is authorized
+
+Authorized, and round 1 is the review of record. This also answers **R1-H**:
+the owner authorized the review without requiring a submitted GitHub
+pull-request review, so `07_REVIEW_ROUND_1_FINDINGS.md` satisfies
+recommendation 3.
+
+A second review round is still required after the plan set is corrected,
+because round 1's verdict was *not safe to proceed to implementation
+authorization as written*.
+
+### Ruling 4: S0 stays a hard prerequisite, verified
+
+Unchanged from recommendation 4, now ruled. The corrected payload digest **and
+its adversarial tests** must be independently verified before envelope
+authentication relies on the digest. Merging S0 alone is insufficient.
+
+## Owner rulings on the PR #39 review (2026-11-02)
+
+The owner reviewed PR #39 on GitHub and recorded a third set of rulings. The
+disposition is: **accept the security direction, retain the new finding, and
+keep the implementation hold.** Two further rulings close the two items that
+PR #39 had left open or unclear.
+
+| Item | Ruling |
+|---|---|
+| PR #32 history | **Confirmed.** The merge was previously authorized and recorded. |
+| Gate 5 | **Accept** the stricter five-element quarantine model. |
+| Contract failures | **Apply** the same fail-closed quarantine requirements to every pre-authentication rejection. See ruling 5. |
+| `KI-SENTINEL-20261102-017` | **Accept** the finding. Require an explicit correction and regression tests. See ruling 6. |
+| R1-F / R1-G | **Remain open.** Each needs its own separate decision. |
+| Review round 2 | **Require a frozen commit and an independent adversarial assessment.** |
+| PR #39 | **Remain draft** until the two additional rulings are reflected and reviewed. |
+| S1 to S5 | **Continue holding** implementation authorization. |
+
+The owner also ruled on the scope of the new finding: it is legitimate on the
+documented reproduction, and it **does not justify declaring an authentication
+bypass**. `KI-SENTINEL-20261102-017` states that already, and it must keep
+stating it.
+
+### Ruling 5: a contract rejection must not become an alternate security path
+
+The principle the owner stated: **a malformed envelope is not more trustworthy
+than an envelope with an invalid authentication token.**
+
+So gate 5 extends to **every failure that occurs before successful
+authentication**, not only to an authentication failure. That covers a contract
+validation failure, a payload-hash mismatch, a producer-identity mismatch, an
+environment-boundary refusal, an event-type refusal, a tenant-required refusal,
+and an encoder refusal.
+
+Two constraints bind all of them:
+
+1. **The five-element record is the maximum allowable shape.** It is a ceiling,
+   not a template. A pre-authentication rejection may hold less. It may never
+   hold more.
+2. **Untrusted tenant information must not control routing, storage or evidence
+   visibility.** This is wider than the earlier wording, which named routing
+   alone. All three are now closed.
+
+The reason the earlier framing was wrong: a rejection path that keeps more of
+the envelope than the authentication path becomes the cheaper way to get
+attacker-chosen metadata into the evidence ledger. The weaker path then sets the
+real boundary, and the stricter one is decoration.
+
+This reaches more code than ruling 1 did. Every failure path in
+`EventGateway.ingest` currently calls
+`this.reject(event, reasons, event.tenant?.tenant_id)`, and the contract-failure
+paths run before any authentication. Slice SL carries the ledger side under
+R1-D. Group K in `04` must assert the shape for each pre-authentication failure
+class, not only for `producer_auth_failed`.
+
+### Ruling 6: correct `KI-SENTINEL-20261102-017` structurally, not by pattern alone
+
+The owner accepted the finding and ruled the shape of its correction. **Do not
+rely exclusively on field-pattern restrictions.** A pattern that forbids the
+separator is a denylist on a value, and it constrains what a legitimate key id
+may be.
+
+The ruled correction has two parts:
+
+1. **An injective composite-key encoding** for the registry key, so the map key
+   cannot be ambiguous whatever the field values are. The one-to-one encoder in
+   `01_CANONICAL_AUTHENTICATION_FORMAT.md` is the right basis, which is the same
+   reasoning that ruling D-8 applied to `dedupeKey`.
+2. **Independent verification of both identity fields after the lookup.** The
+   resolved registration's `service` and `key_id` must each be compared with the
+   credential's claimed value. The lookup succeeding is not the check.
+
+Together these preserve flexibility in what a key id may contain while
+preventing an ambiguous credential identity. A pattern may still be added, but
+it is not the control.
+
+The regression suite must include the **demonstrated colon-shift collision**:
+one registration with `service: "usage-metering"` and `key_id: "a:b"`, and the
+credential pair `{ service: "usage-metering:a", key_id: "b" }`, which
+authenticates today and must not after the correction.
+
+### Review round 2 requires a frozen commit
+
+The owner ruled that round 2 needs a **frozen commit** and an **independent
+adversarial assessment**. The revision under review must be pinned and named
+before the review starts, so the reviewer and the author are reading the same
+bytes.
+
+This closes a real process failure. A second adversarial review ran against
+`e0a4b52` while the plan set moved four pull requests ahead of it, and it
+rediscovered findings that round 1 had already recorded and that the owner had
+already ruled on. The process finding is recorded with the round-2 requirements
+in `07_REVIEW_ROUND_1_FINDINGS.md`.
+
+### The "PR #32 merge: Hold" line is already overtaken
+
+The ruling table says **PR #32 merge: Hold**. PR #32 was merged earlier the
+same day, as `79698ac`, **on the owner's own instruction**, and
+`KI-SENTINEL-20261102-008` records that merge and what it did not do. Four
+further pull requests merged after it — #33, #34, #35 and #36 — and master is
+at `fee3125`.
+
+So this is a stale line in the ruling, not a conflict between the owner and the
+repository. The hold was written against the state before that merge. It is
+recorded here only so a later reader of the ruling does not expect to find
+PR #32 open.
+
+The disposition that the merge **is not implementation authorization** stands,
+and the merge record already states it. S1 to S5 remain held.
 
 ### Review status, stated precisely
 

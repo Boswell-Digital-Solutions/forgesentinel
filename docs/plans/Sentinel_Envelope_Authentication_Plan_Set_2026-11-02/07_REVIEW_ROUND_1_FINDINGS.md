@@ -124,7 +124,7 @@ and F3 are settled in design and open in fact.
 | R1-E | **RULED, see `06`.** F34: a new `LedgerRecord` provenance field, or a rule that a rejection record carries no `tenant_id`. Ruled: the omission rule, bound on unauthenticated provenance rather than on the `rejection` kind, with the claimed tenant held in metadata. |
 | R1-F | F12: confirm that refusing `-0` is a deliberate divergence from `forge_contract_core`, and accept the ADR-025 cross-language consequence. |
 | R1-G | F13: which boundary enforces the duplicate-key rule, given that `JSON.parse` discards duplicates. |
-| R1-H | Whether this document satisfies the owner's recommendation 3, or a submitted GitHub review is required as well. |
+| R1-H | **RULED, see `06`.** Whether this document satisfies the owner's recommendation 3, or a submitted GitHub review is required as well. Ruled: the owner authorized the independent design review without requiring a submitted GitHub review, so this document satisfies recommendation 3. Round 1 stays the review of record. A second review round is still required. |
 
 ## What round 2 must cover
 
@@ -136,7 +136,42 @@ and F3 are settled in design and open in fact.
    draft said round 2 needed slices S1 and S2 to exist, which contradicted the
    authorization boundaries in `06`.
 2. The decoder round trip that replaces PROP-H02.
-3. The gate-5 record shape, once chosen, against `src/spine/ledger.ts`. R1-D
-   moves that file to slice SL, before S4, so round 2 assesses the shape against
-   SL and not against this track.
-4. A frozen commit, named before the review starts.
+3. The gate-5 record shape against `src/spine/ledger.ts`. The shape is no longer
+   "once chosen": ruling 1 fixed it at five elements, and **ruling 5 extends it
+   to every pre-authentication failure**, with the five-element record as a
+   maximum rather than a template. So round 2 must check each
+   pre-authentication failure class, not only `producer_auth_failed`. R1-D moves
+   that file to slice SL, before S4, so round 2 assesses the shape against SL
+   and not against this track.
+4. The ruled `KI-SENTINEL-20261102-017` correction: an injective composite-key
+   encoding for the registry key, plus independent verification of both identity
+   fields after the lookup. Ruling 6 forbids resting the fix on a field pattern
+   alone, so round 2 must check that the encoding and the post-lookup checks are
+   what carry it.
+5. **A frozen commit, named before the review starts.** Ruled by the owner on
+   2026-11-02, together with an independent adversarial assessment.
+
+### Why the frozen commit is a ruling and not a preference
+
+A second adversarial review ran against `e0a4b52` after round 1. It found no
+defect that round 1 had not already found. Its findings mapped one to one onto
+F1, F2, F3, F5, F6, F8 and `KI-SENTINEL-20261102-015` — all already recorded,
+and five already ruled on by the owner.
+
+Two causes, both avoidable:
+
+1. The review did not begin by reading the latest authoritative findings. Round 1
+   and the rulings were already on `master`.
+2. The revision under review was not frozen or announced. The plan set moved four
+   pull requests ahead while the review ran, so the reviewer assessed text the
+   repository had already corrected.
+
+So a review now starts with two steps, in this order: **read the current
+`docs/KNOWN_ISSUES.md` and the current review of record**, then **name and
+freeze the commit under review**. A review that skips the first step re-derives
+known findings and reports them as new. That costs effort, and it can read as
+independent confirmation when it is an echo.
+
+One finding did come out of that review, `KI-SENTINEL-20261102-017`, because it
+sat beside round-1 finding F8 rather than inside it. That is the yield to expect
+from a duplicated review: the margin, not the body.
