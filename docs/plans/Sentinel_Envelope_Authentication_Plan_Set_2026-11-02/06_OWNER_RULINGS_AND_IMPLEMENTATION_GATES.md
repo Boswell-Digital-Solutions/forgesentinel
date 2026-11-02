@@ -166,7 +166,20 @@ telemetry must not expose a credential or a sensitive payload.
   `src/spine/ledger.ts`, which `03` now lists in scope.
   Recommendation 1 below states the recommended record shape. It is a
   recommendation, not a ruling, so the slice must still state the chosen shape,
-  and `doc/system/03-runtime-boundary.md` must describe it.
+  and `doc/system/03-runtime-boundary.md` must describe it. The `tenant_id`
+  part of that shape is no longer open, because R1-E rules it.
+- **A fourth defect, `KI-SENTINEL-20261102-016`.** The ledger writes its own
+  cross-tenant denial telemetry with `kind: "event"`, `validation: "accepted"`
+  and the **requested** tenant's id (`src/spine/ledger.ts:115-127`). Three
+  readers trust those labels, so `events()` returns a body that is not an
+  envelope, `src/runtime.ts:255` throws and stops `runShadow`, `cloudProjection`
+  throws, and the probed tenant reads the denied principal and its home tenant.
+  It is latent, because only `test/` calls `queryByTenant`. It shares F34's root
+  cause: one `tenant_id` field means both "about" and "readable by".
+- **R1-D and R1-E are ruled (2026-11-02).** A separate authorized change carries
+  these four defects, sequenced before S4, and a record of unauthenticated
+  provenance carries no top-level `tenant_id`. See "Owner rulings on review
+  round 1" below. Neither ruling authorizes implementation.
 - The record must never hold the presented token, the expected bytes, the
   expected digest or a derived key.
 - D-3 applies here. An internal diagnostic category may say which group failed,
@@ -261,6 +274,62 @@ Round 1 found three blocking defects in the format, four in the test matrix and
 the rejection-record axis, and two false statements of present code behaviour.
 A second round is needed after the owner rules on the candidate fixes. Nothing
 in this plan set may be read as an approved design.
+
+## Owner rulings on review round 1 (2026-11-02)
+
+Independent review round 1 surfaced eight open decisions, R1-A to R1-H, in
+`07_REVIEW_ROUND_1_FINDINGS.md`. The owner ruled two of them. Six stay open:
+R1-A, R1-B, R1-C, R1-F, R1-G and R1-H.
+
+### R1-D: a separate change carries `src/spine/ledger.ts`, before S4
+
+**Ruled.** A separate authorized change carries the `src/spine/ledger.ts`
+defects. It is sequenced **before** S4, and not after, because gate 5 must have
+an implementable foundation when S4 records the rejection-record shape.
+
+That change carries four defects: `KI-SENTINEL-20261102-011`,
+`KI-SENTINEL-20261102-012`, `KI-SENTINEL-20261102-016` and review finding F34.
+
+The reason to separate them: three of the four are not authentication defects.
+`-011`, `-016` and F34 are reachable or latent independently of envelope
+authentication, so they do not wait on the six open format decisions.
+Separation also keeps S4 reviewable as an authentication change, and it keeps
+the reproduce-first evidence stage in recommendation 2 free of ledger failures.
+
+This ruling settles the question that the `src/spine/ledger.ts` row in
+`03_COMPATIBILITY_AND_CALLER_IMPACT.md` deferred.
+
+**This is not implementation authorization.** The separate change needs its own
+explicit authorization, as every slice does.
+
+### R1-E: an unauthenticated record carries no top-level `tenant_id`
+
+**Ruled.** The omission rule, with the observed value held in metadata.
+
+- A ledger record of unauthenticated provenance carries **no top-level
+  `tenant_id`**.
+- The claimed tenant stays inside the recommendation-1 metadata block, as an
+  explicitly named observed value.
+- No query path filters on that value.
+- `LedgerRecord` gets **no** new top-level provenance field.
+
+Why: `tenant_id` is optional already, so omission needs no shape change. An
+absent field cannot be filtered into a victim tenant's view, so the rule is
+fail-closed by construction. A second tenant-like top-level field is the trap
+that review finding F34 names, because a later reader filters on it.
+
+Verified by execution at `79698ac`. A rejection record with no `tenant_id`
+returns 0 records from `queryByTenant` for the claimed tenant, stays visible to
+`all()` for a system or auditor reader, and keeps the field absent through
+`appendCorrection`.
+
+**Amendment to R1-E as worded.** R1-E said "a rejection record carries no
+`tenant_id`". That wording does not reach `KI-SENTINEL-20261102-016`, because
+the cross-tenant denial record is not a rejection: the ledger stores it with
+`validation: "accepted"` and `kind: "event"`. The ruling therefore binds on
+**unauthenticated provenance**, and not on the `rejection` kind. It extends to
+the `kind` and the `validation` labels, because the damage in `-016` comes from
+a record that falsely claims to be an accepted event.
 
 ## Findings disposition
 
