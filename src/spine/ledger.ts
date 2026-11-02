@@ -67,11 +67,14 @@ export class EvidenceLedger {
   }
 
   append(input: Omit<LedgerRecord, "ledger_seq" | "ingested_at" | "source_hash"> & { ingested_at?: string }): LedgerRecord {
+    // Hash first: a body that cannot be hashed then throws before a sequence
+    // number is taken, so it cannot leave a gap (KI-SENTINEL-20261102-005).
+    const sourceHash = hashPayload(input.body);
     const record: LedgerRecord = {
       ...input,
       ledger_seq: ++this.seq,
       ingested_at: input.ingested_at ?? new Date().toISOString(),
-      source_hash: hashPayload(input.body),
+      source_hash: sourceHash,
     };
     this.records.push(record);
     this.bySeqIndex.set(record.ledger_seq, record);

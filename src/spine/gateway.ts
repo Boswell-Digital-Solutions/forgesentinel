@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { hashPayload, sha256Hex, type ValidationIssue } from "../contracts/common.js";
+import { canonicalJson, hashPayload, sha256Hex, type ValidationIssue } from "../contracts/common.js";
 import { validateEventEnvelope, type EventEnvelope } from "../contracts/envelope.js";
 import { lookupEventType } from "../contracts/families.js";
 import { HMAC_HEX_PATTERN, ProducerRegistry, isWellFormedCredential, type ProducerCredential } from "./producers.js";
@@ -37,6 +37,63 @@ export function dedupeKey(event: EventEnvelope): string {
       event.integrity.payload_hash,
     ].join("|"),
   );
+}
+
+/** The reserved key that marks a wrapped rejection body. */
+export const MALFORMED_INPUT_KEY = "malformed_input";
+
+/**
+ * The body a rejection record stores for `rawEvent`.
+ *
+ * - An object or array that JSON can serialize, and that has no own
+ *   `malformed_input` key, is stored as it is.
+ * - Every other input is wrapped as `{ malformed_input, input_type }`. This
+ *   includes an object that itself has the reserved key, so a stored body
+ *   with that key is always a wrapper, and two different inputs never give
+ *   the same body (KI-SENTINEL-20261102-004).
+ * - `malformed_input` holds a JSON-safe form of the input: the value for a
+ *   string, number or boolean; a decimal string for a BigInt; the description
+ *   for a Symbol; the object for a serializable object with the reserved key;
+ *   otherwise null. `input_type` records what the input was, so a function,
+ *   a Symbol or an unserializable object is not lost as `{}`
+ *   (KI-SENTINEL-20261102-005).
+ *
+ * The ledger hashes the body, and its integrity check verifies only an object
+ * or array body, so every rejection stays verifiable.
+ */
+export function rejectionBody(rawEvent: unknown): unknown {
+  const serializable = (value: unknown): boolean => {
+    try {
+      canonicalJson(value);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (typeof rawEvent === "object" && rawEvent !== null) {
+    const hasReservedKey = Object.prototype.hasOwnProperty.call(rawEvent, MALFORMED_INPUT_KEY);
+    if (!serializable(rawEvent)) return { [MALFORMED_INPUT_KEY]: null, input_type: "unserializable" };
+    if (!hasReservedKey) return rawEvent;
+    return { [MALFORMED_INPUT_KEY]: rawEvent, input_type: Array.isArray(rawEvent) ? "array" : "object" };
+  }
+  switch (typeof rawEvent) {
+    case "undefined":
+      return { [MALFORMED_INPUT_KEY]: null, input_type: "undefined" };
+    case "string":
+    case "boolean":
+      return { [MALFORMED_INPUT_KEY]: rawEvent, input_type: typeof rawEvent };
+    case "number":
+      // JSON writes NaN and Infinity as null; record the text so they stay distinct.
+      return { [MALFORMED_INPUT_KEY]: Number.isFinite(rawEvent) ? rawEvent : String(rawEvent), input_type: "number" };
+    case "bigint":
+      return { [MALFORMED_INPUT_KEY]: rawEvent.toString(), input_type: "bigint" };
+    case "symbol":
+      return { [MALFORMED_INPUT_KEY]: rawEvent.description ?? null, input_type: "symbol" };
+    case "function":
+      return { [MALFORMED_INPUT_KEY]: null, input_type: "function" };
+    default:
+      return { [MALFORMED_INPUT_KEY]: null, input_type: rawEvent === null ? "null" : typeof rawEvent };
+  }
 }
 
 /**
@@ -154,11 +211,7 @@ export class EventGateway {
       rejection_reasons: reasons,
       transformation_version: "ingest.1.0.0",
       ...(tenantId !== undefined ? { tenant_id: tenantId } : {}),
-      // The ledger hashes the body, and its integrity check verifies only an
-      // object or array body. A missing, null or primitive input is therefore
-      // wrapped, so the rejection stays verifiable (KI-SENTINEL-20261030-006
-      // item 2). JSON has no undefined, so a missing input is recorded as null.
-      body: typeof rawEvent === "object" && rawEvent !== null ? rawEvent : { malformed_input: rawEvent === undefined ? null : rawEvent },
+      body: rejectionBody(rawEvent),
     });
     const eventId =
       typeof rawEvent === "object" && rawEvent !== null && typeof (rawEvent as Record<string, unknown>)["event_id"] === "string"
