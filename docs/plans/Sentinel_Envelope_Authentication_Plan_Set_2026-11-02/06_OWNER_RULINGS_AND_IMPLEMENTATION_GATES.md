@@ -450,21 +450,67 @@ signature contract from becoming an authentication bypass.
 and R1-F, R1-G, R1-H and the independent design boundary come first. This
 sequencing ruling grants S6 no new implementation authorization.
 
-**The author's record: the declared field total is 51.** Measured at `4225489`,
-with the field list extracted from `src/contracts/envelope.ts` and not written by
-hand. `envelope.ts` declares **51** fields: **34** required and **17** optional.
+**The author's record: the declared field total is 51.** Measured at `fee3125`,
+whose `src/` and `fixtures/` are identical to `4225489`. The field list came from
+`src/contracts/envelope.ts` by extraction, and not by hand. `envelope.ts`
+declares **51** fields: **34** required and **17** optional.
 
-| Measure | Count |
-|---|---|
-| Declared fields | **51** — 34 required, 17 optional |
-| Admit a wrong-typed value | **17** — 15 optional, 2 required |
-| Already refuse a wrong-typed value | **34** — 32 required, 2 optional parents |
+**The admit count is conditional, and it must never be stated flat.** It depends
+on two envelope values. Every scenario below uses one probe for each of the 51
+fields, with a positive control for each field, and it accepts a refusal only
+when the refusal names the probed path.
 
-The 2 required fields that admit a wrong-typed value are
-`resource.resource_type` and `resource.resource_id`. Each one is reachable only
-through the optional `resource` parent, which the validator never reads, so this
-is a parent-reachability gap and not an optional-field gap. The 2 optional
-fields that already refuse are the `tenant` and `control_lineage` parents.
+| Family scoping | `control_origin` | Admit, of 51 | Optional | Required |
+|---|---|---|---|---|
+| tenant-scoped | `operator` or `standing_policy` | 17 | 15 of 17 | 2 of 34 |
+| tenant-scoped | `sentinel_policy` | 14 | 12 of 17 | 2 of 34 |
+| system-scoped | `operator` or `standing_policy` | **18** | 15 of 17 | **3 of 34** |
+| system-scoped | `sentinel_policy` | 15 | 12 of 17 | 3 of 34 |
+
+**18 of 51 is the worst case, and 14 of 51 is the best case.** A slice that
+reports one number without both conditions reports a scenario, and not the
+validator.
+
+Two axes move the count:
+
+- **`control_origin`** moves three optional fields. `validateEventEnvelope` reads
+  `control_id`, `sentinel_incident_id` and `policy_decision_id` only when
+  `control_origin` is `sentinel_policy` (`src/contracts/envelope.ts:221-225`). On
+  `operator` and on `standing_policy` it never reads them, so each admits a
+  wrong-typed value.
+- **Family scoping** moves one **required** field. `tenant.tenant_id` is declared
+  required. On a tenant-scoped family the validator reads it
+  (`src/contracts/envelope.ts:152-157`). On a system-scoped family the other
+  branch checks only `isRecord(tenant)` and never reads `tenant_id`
+  (`:158-160`), so `tenant.tenant_id: 123` is admitted. That is the third
+  admitting required field in the two system-scoped rows, and `tenant_id` is the
+  tenant isolation key.
+
+The other 2 required fields that admit are `resource.resource_type` and
+`resource.resource_id`. Each is reachable only through the optional `resource`
+parent, which the validator never reads, so that is a parent-reachability gap
+and not an optional-field gap. The 2 optional fields that always refuse are the
+`tenant` and `control_lineage` parents.
+
+**A probe count is not a field count, and this plan set does not report one.**
+`01` states that rule. Three method requirements follow from it, and slice S2's
+test must meet each one:
+
+1. Seed an optional parent in a minimal **valid** shape before probing a leaf
+   inside it. A naive write to `control_lineage.<leaf>` auto-creates the parent
+   as `{<leaf>: ...}`, which then fails for a missing `control_origin` and a
+   missing `policy_generated_effect`. That refusal says nothing about the probed
+   leaf. Under `sentinel_policy` the seed must also carry valid
+   `control_id`, `sentinel_incident_id` and `policy_decision_id`, because the
+   validator makes all three required in that case.
+2. Require the refusal to **name the probed path**. Check `issues[].path`, and
+   not only `ok === false`. A refusal for another reason is not evidence about
+   the field under probe.
+3. Run a **positive control** for every field, and require it to validate. Where
+   the fixture already carries a valid value, use that value. Synthesising one
+   measures the harness: an earlier measurement set each required parent to `{}`,
+   whose children then failed, and reported 8 fields as unmeasurable that are in
+   fact refused correctly.
 
 **The author's record: an approved representation already exists, per
 algorithm.** `02_SIGNATURE_BINDING.md` states the text form for each algorithm,
