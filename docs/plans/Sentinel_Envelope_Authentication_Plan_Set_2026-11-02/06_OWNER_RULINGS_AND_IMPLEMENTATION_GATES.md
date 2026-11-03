@@ -715,23 +715,53 @@ F1 without failing CI.
 
 #### R1-C, further owner rulings (2026-11-02)
 
-**Two** rulings extend R1-C after the measurement correction. Both are the
+**Three** rulings extend R1-C after the measurement correction. Each one is the
 owner's. The author's supporting record follows them, and is marked.
 
-> **Correction, 2026-11-03.** An earlier version of this subsection carried
-> **three** items and said "Each one is the owner's". The third — permission to
-> implement slice S2 before slice S6 — was **not** an owner ruling. The
-> owner-attributable source for this subsection carries the baseline ruling, the
-> signature-syntax ruling, and "S2 authorization held". It grants no sequencing
-> permission; what it contains is an author's note recommending that S2 *record*
-> the dependency. A recommendation to record a dependency is not permission to
-> resolve it.
+> **Attribution challenged, and upheld. 2026-11-03.**
 >
-> The owner ruled on 2026-11-03: **reject any invented sequencing authority. A
-> sequencing decision cannot become authoritative merely because it appears in
-> documentation.** The item is therefore moved below, into the author's record,
-> as an open proposal. Its substance is preserved; only its authority is
-> withdrawn.
+> An independent review reported the third ruling — the S2 and S6 sequencing —
+> as an invented owner ruling, on two grounds: that no owner-attributable source
+> in the repository carries a sequencing permission, and that the phrase "may be
+> implemented before" appears nowhere else. On that report, a correction was
+> merged that moved the item into the author's record, called it "never an owner
+> ruling", and said its authority was withdrawn. **That correction was wrong,
+> and this entry reverses it.**
+>
+> **The primary evidence.** The owner issued the ruling in an operator session
+> on **2026-11-02 at 19:48:46Z**, in a message recorded as human-origin from the
+> desktop client. His own heading was `Owner ruling — R1-C / S6 ordering`, and
+> his own words were: *"Approve a staged implementation dependency, not a
+> weakened validation requirement. S2 may be implemented before S6 only if its
+> contract validation remains fail-closed"*, followed by the five conditions
+> below and by *"This separates implementation scheduling from security
+> acceptance."* The same message closed with *"S2: Remains unauthorized."* The
+> five conditions in this document match that source.
+>
+> **The re-confirmation.** Challenged on 2026-11-03, the owner replied, at
+> 05:31:30Z and in full: *"the sequencing ruling stands, I issued it"*.
+>
+> **Why the challenge failed, stated so it is not repeated.** Neither ground was
+> evidence of invention. This file is where an operator-session ruling enters the
+> repository, so a ruling's first appearance here has **no earlier repository
+> trace by construction** — a search that finds none has measured only that the
+> ruling is new. Every undisputed ruling on this track shows the same absence.
+> The second ground, the unique phrase, is non-evidence for the same reason.
+>
+> **What the withdrawal cost.** Three documents were changed to say the owner
+> had withdrawn an authority he had in fact issued and then re-confirmed. No
+> artifact anywhere recorded such a withdrawal, so correcting an unsourced
+> owner-attributed grant was done by writing an unsourced owner-attributed
+> withdrawal. `KI-SENTINEL-20261102-020` records the episode and the control.
+>
+> **The one correct point in the challenge stands**, and is applied below:
+> "may be implemented before" is an **ordering constraint and not permission to
+> begin**. Slice S2 remains unauthorized.
+>
+> **How to challenge a ruling here.** A challenge goes to the owner, because the
+> repository cannot settle an attribution question on its own. A ruling the owner
+> withdraws is recorded as withdrawn, with the date and the owner's words, and
+> never as an invention.
 
 **1. The measurement is a baseline, and not a test inventory.** The measured
 admit count records the state at `4225489`, and it does not define what the test
@@ -746,19 +776,14 @@ that representation. An arbitrary hex-only rule must not go in while a
 cryptographic format is unsettled. The representation comes first, and the
 syntax rule follows it.
 
-**The author's proposal, not a ruling: sequencing against S6.** This item was
-previously numbered 3 and presented as the owner's. It is not. It is recorded
-here as a proposal that **needs its own ruling before anyone relies on it**, and
-nothing in this plan set may cite it as authority.
+**3. Sequencing against S6 is a staged implementation dependency, and not a
+weakened validation requirement.** This is the owner's ruling, issued
+2026-11-02 and re-confirmed 2026-11-03; the attribution note above holds the
+provenance and the challenge that failed against it.
 
-**The open question for the owner:** may slice S2 be implemented before slice
-S6, and if so under what conditions? Until that is ruled, the dependency is
-**recorded and unresolved**, and S2's position relative to S6 is undecided.
-
-The proposal, for the record. Sequencing against S6 would be a staged
-implementation dependency, and not a weakened validation requirement. S2 would
-precede S6 only while its contract validation stays fail-closed, under five
-conditions:
+In the owner's words: *"Approve a staged implementation dependency, not a
+weakened validation requirement. S2 may be implemented before S6 only if its
+contract validation remains fail-closed."* Five conditions hold:
 
 1. All **51** declared fields are inside S2's validation scope and inside its
    drift-test scope.
@@ -771,20 +796,20 @@ conditions:
 5. No security gate counts as satisfied by a skipped test, a deferred test or an
    expected-failing test.
 
-The proposal's intent is to separate implementation scheduling from security
-acceptance: to let development continue where that is safe, and to stop an
-unfinished signature contract from becoming an authentication bypass. That
-intent is sound. It is still a proposal.
+In the owner's words, this *"separates implementation scheduling from security
+acceptance."* The purpose is to let development continue where that is safe, and
+to stop an unfinished signature contract from becoming an authentication bypass.
 
-**Neither slice gains authorization, from this proposal or from anything else in
-this subsection.** S2 stays unauthorized, and R1-F, R1-G and the independent
-design boundary come first. Nothing here grants S6 any implementation
-authorization.
+**Neither slice gains authorization from this ruling.** S2 stays unauthorized,
+and R1-F, R1-G and the independent design boundary come first. The owner's own
+message said so in the same breath as the ruling: *"S2: Remains unauthorized."*
+This sequencing ruling grants S6 no implementation authorization either.
 
-The earlier text denied an implementation authorization in this paragraph while
-granting a sequencing one a few lines above it. That was the internal
-contradiction the owner's 2026-11-03 ruling resolves: the sequencing grant is
-withdrawn, and only the denial stands.
+**Ordering is not permission to begin.** A reviewer read "may be implemented
+before S6" as licence to start S2, and that reading is wrong. The ruling fixes
+an **order** between two slices for the time when each is authorized. It
+authorizes neither. That was the one sound point in the 2026-11-03 challenge,
+and it is kept.
 
 **The author's record: the declared field total is 51.** Measured at `fee3125`,
 whose `src/` and `fixtures/` are identical to `4225489`. The field list came from
