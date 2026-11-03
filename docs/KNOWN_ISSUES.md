@@ -246,7 +246,7 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Rulings R1-A, R1-B and R1-C (2026-11-02)**: The owner ruled the three format decisions, so five of the eight round-1 decisions are ruled and three stay open — R1-F, R1-G and R1-H.
   **R1-A**: refuse `integrity.signature` and `integrity.signature_key_id` on an event whose family requires no signature, **and** bind both where they may legitimately appear. Both, because binding alone leaves `KI-SENTINEL-20261102-014` open.
   **R1-B**: add a presence record for **each** of the three optional parents — `tenant`, `resource` and `control_lineage` — **and** tighten the validator. The reason is that gate 2 requires the encoding itself to be injective, so injectivity must not rest on the validator. An earlier draft exempted `control_lineage`, because `validateEventEnvelope` already refuses a present empty one, and the owner rejected that exemption for contradicting the ruling's own reason.
-  **R1-C**: `validateEventEnvelope` type-validates every declared field, and the R-5 drift test compares types as well as names. Measured at `4225489`: a wrong-typed value is admitted in **15 of 17** declared optional fields. An earlier draft said "18 of 18", which conflated 18 probes with the field count; three probes shared one field, two targeted fields that `EventResource` declares required, and the `tenant` and `control_lineage` parents are refused when wrongly typed.
+  **R1-C**: `validateEventEnvelope` type-validates every declared field, and the R-5 drift test compares types as well as names. Measured at `fee3125`, whose `src/` and `fixtures/` are identical to `4225489`: the admit count is **conditional on the family scoping and on `control_origin`**, and it runs from 14 to **18** of the 51 declared fields. The optional-field part is 15 of 17 when `control_origin` is `operator` or `standing_policy`, and 12 of 17 when it is `sentinel_policy`. Two earlier figures were stated flat and are superseded: "18 of 18", which reported a probe count as a field count, and "15 of 17", which named one of four scenarios. A probe count measures nothing about field coverage, so none is reported here. `KI-SENTINEL-20261102-018` holds the matrix, the two reasons and the three method rules.
   **Amendment 3**: D-2's bound record count of 41 is **superseded, and no replacement count is stated**. R1-B adds three records and R1-A's binding adds an unsettled number more, so the total is not derivable yet. Slice S1 derives and publishes it, and regenerates the 41-row field table in `01`, the record indices cited across `01`, `02`, `04`, `05` and ADR-027, the worked example and the golden vector.
   No ruling authorizes implementation.
 - **Still required to close**: the owner's rulings on the three open decisions R1-F, R1-G and R1-H; a corrected format that is one to one, which is now ruled in design and unimplemented in fact; independent review round 2 against a frozen commit; the verified `KI-SENTINEL-20261102-006` correction, per the D-1 condition; and then an authorized, implemented and independently verified correction for each slice, including slice SL.
@@ -526,6 +526,62 @@ Status: OPEN. Closed when a secret scan that runs on every change is added, and 
 - **Relation to review finding F34**: the same root cause. `LedgerRecord` carries one `tenant_id`, and that one field means both "the tenant this record is about" and "the tenant that may read it". The owner's open decision R1-E chooses between a provenance field and a rule that such a record carries no `tenant_id`, and either choice must cover this record as well as a rejection record.
 - **No change made**: This record changes no code.
 - **Status**: Open — recorded, unresolved until a correction is authorized and verified, or the owner accepts it.
+
+## KI-SENTINEL-20261102-018: The plan set states the wrong-typed admit count as a constant, and it is a range of 14 to 18 of 51 declared fields that moves with the event family and with `control_origin` — OPEN 2026-11-02 — plan-set measurement accuracy
+
+- **Classification**: Measurement accuracy in a ruled plan set. The figure is a documentation defect, and this record does not assert a code defect. The validator gap that the measurement exposes is recorded separately, as `KI-SENTINEL-20261102-019`. The underlying defect that review finding F5 names is real, and this record does not reduce it.
+- **What this record now carries.** Its first revision reported that R1-C's "18 of 18" was wrong, and it gave 15 of 17 as the replacement. **The refutation is confirmed and it landed**: a concurrent session corrected all five locations, and pull request #36 squash-merged as `fee3125`. **The replacement figure was also wrong, in a smaller way**, because it states one of four scenarios as though it were a property of the validator. Do not cite 15 of 17 on its own. This revision therefore drops the 18-against-17 correction as its subject, and records what is still unrecorded: the count is a **range**, and the plan set states it as a constant.
+- **Verified at**: `fee3125`, by execution against the compiled `dist/src/index.js`. `origin/master` is `58723e2` at the time of writing, and `git diff --stat fee3125..58723e2 -- src/ fixtures/` is empty, so the measurement holds for both. `git diff --stat 4225489..fee3125 -- src/ fixtures/` is also empty, so the code is identical to the commit the plan set cites. The field list came from `src/contracts/envelope.ts` by extraction, and not by hand.
+
+### The count is conditional on two envelope values
+
+Every scenario below probes each of the 51 declared fields once, with a positive control for each field, and counts a refusal only when the refusal names the probed path.
+
+| Family scoping | `control_origin` | Admit, of 51 | Optional | Required |
+|---|---|---|---|---|
+| tenant-scoped | `operator` or `standing_policy` | 17 | 15 of 17 | 2 of 34 |
+| tenant-scoped | `sentinel_policy` | 14 | 12 of 17 | 2 of 34 |
+| system-scoped | `operator` or `standing_policy` | **18** | 15 of 17 | **3 of 34** |
+| system-scoped | `sentinel_policy` | 15 | 12 of 17 | 3 of 34 |
+
+**18 of 51 is the worst case. 14 of 51 is the best case.** "15 of 17" is the optional-field count for two of the four scenarios, so a document that states it flat describes one scenario and calls it the validator.
+
+- **`control_origin` moves three optional fields.** `validateEventEnvelope` reads `control_id`, `sentinel_incident_id` and `policy_decision_id` only when `control_origin` is `sentinel_policy` (`src/contracts/envelope.ts:221-225`). On `operator` and on `standing_policy` it never reads them, so each admits a wrong-typed value. The three fields are declared optional, and the validator makes all three required under the one origin, so their verdict flips with that value.
+- **Family scoping moves one required field, and it is the tenant isolation key.** `tenant.tenant_id` is declared **required**. On a tenant-scoped family the validator reads it (`:152-157`). On a system-scoped family the other branch checks only `isRecord(tenant)` and never reads `tenant_id` (`:158-160`), so `tenant.tenant_id: 123` is admitted. **Three** event families are system-scoped — `sentinel`, `centipede` and `yellowjacket` (`SYSTEM_SCOPED_FAMILIES`, `src/contracts/families.ts:29`) — which is **14 of the 119 canonical event types**. This is the third admitting required field in the two system-scoped rows. `KI-SENTINEL-20261102-019` records that gap as a validator defect.
+  - **An earlier revision of this bullet said "fourteen of the canonical event families are system-scoped", and that was wrong.** Fourteen is the count of system-scoped event **types**, and it is also the total count of event families, which is why the sentence read plausibly. The constant it cited, `SYSTEM_SCOPED_FAMILIES`, has three members and disproves it. The error is the exact type-for-family conflation that this record exists to correct, and an independent reviewer caught it. Verified: `canonicalEventTypes().filter(t => !lookupEventType(t).tenant_scoped)` gives 14 types across 3 families, from 119 types across 14 families.
+- **The other two admitting required fields** are `resource.resource_type` and `resource.resource_id`. Each is reachable only through the optional `resource` parent, which the validator never reads, so that is a parent-reachability gap and not an optional-field gap.
+- **The two optional fields that always refuse** are the `tenant` and `control_lineage` parents, which carry an object-type check.
+
+### Two rules reach `integrity.signature`, and only one is R1-C's
+
+The field is declared `string`, so two probe values separate the rules. Both are admitted at `fee3125`.
+
+- `integrity.signature: 123` violates the **declared type**, so the field sits inside R1-C's type scope. An earlier revision of this record implied the field sat outside that scope, which was wrong.
+- `integrity.signature: "NOT-HEX"` is a valid `string` and violates **no declared type**. Only a syntax rule refuses it, and that is the R1-A and R1-C format measure. A type rule alone leaves a non-hex signature admitted.
+
+`integrity.payload_hash` shows the contrast, because it already carries a pattern (`PAYLOAD_HASH_PATTERN`, `:120`, `:207`). The hex rule itself **is** recorded: `docs/KNOWN_ISSUES.md:303` states that a signature is accepted only as 64 lowercase hex characters, and `src/spine/gateway.ts:186` applies `HMAC_HEX_PATTERN` to `integrity.signature` today. What no document separates is **which rule owns the field**: the type rule under R1-C, or the format rule under R1-A.
+
+### Three method rules, each of which cost a wrong number
+
+Two measurements on this track were wrong because they skipped these. Slice S2's test must meet all three, and a reader must reproduce rather than trust.
+
+1. **Seed an optional parent in a minimal valid shape** before probing a leaf inside it. The golden fixture `event.usage_tokens_recorded.json` carries no `control_lineage` and no `resource`. A naive write to `control_lineage.<leaf>` auto-creates the parent as `{<leaf>: ...}`, which then fails for a missing `control_origin` and a missing `policy_generated_effect`. That refusal says nothing about the probed leaf. Under `sentinel_policy` the seed must also carry valid `control_id`, `sentinel_incident_id` and `policy_decision_id`.
+2. **Require the refusal to name the probed path.** Check `issues[].path`, and not only `ok === false`. A refusal for another reason is not evidence about the field under probe.
+3. **Run a positive control for every field, and require it to validate.** Where the fixture already carries a valid value, use that value. Synthesising one measures the harness: a measurement that set each required parent to `{}` reported 8 required fields as unmeasurable, and all 8 in fact refuse correctly.
+
+### Two defects on `master` that this record names
+
+1. **`docs/KNOWN_ISSUES.md:249` publishes a probe breakdown that cannot derive its own figure.** It states that "18 of 18" conflated 18 probes with the field count, "three probes shared one field, two targeted fields that `EventResource` declares required". Three probes collapsing to one field takes 18 probes to 16 distinct paths, and removing the two required fields leaves **14** optional fields, which cannot support a count of 15 admitting. The same line also contradicts `01`, which states that a probe count "is not a measurement of field coverage and is not reported here". This revision corrects that line.
+2. **The conditional qualifier is missing wherever the figure appears.** Five locations state the figure without naming the family scoping or `control_origin`: in `docs/plans/Sentinel_Envelope_Authentication_Plan_Set_2026-11-02/`, the R1-C measurement section of `01_CANONICAL_AUTHENTICATION_FORMAT.md`, `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md:159`, the R1-C section of `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` and `07_REVIEW_ROUND_1_FINDINGS.md:122`; and `docs/KNOWN_ISSUES.md:249`. Two plan sets under `docs/plans/` each hold files named `01` through `07`, so a bare number is ambiguous and the full path is given here. This revision corrects `KNOWN_ISSUES`. Pull request #38 carries the four plan-set documents.
+
+### Assessment
+
+- **Impact**: the figure is the specification for slice S2's test, which must be table-driven over the declared field list. The list is 17 optional fields inside 51 declared fields, and the admit count is a range and not a constant. A test written to one scenario's number passes in that scenario and proves nothing in the other three. The R-5 drift test inherits the same defect.
+- **Bounds (verified)**: documentation only. The 402-test suite passes at `fee3125`. No code reads these counts.
+- **Severity assessment**: Low. The defect is a documentation figure, and every stated value changes no behavior. The validator gap the measurement exposed is **not** rated here, because a record classified as measurement accuracy is not where a security triage looks. `KI-SENTINEL-20261102-019` carries it with its own severity.
+- **Relation to R1-C**: the ruling's direction is unaffected. "Type-validate every declared field" stands, the drift test still compares types as well as names, and `06` holds the three further rulings. Only the measurement was wrong.
+- **No change made**: this record changes no code. Implementation stays unauthorized for S1, S2 and SL, and gate 2 stays open.
+- **Status**: Open — accepted by the owner, and retained as evidence. It closes when the plan set states the count as a range with both conditions named, and when the owner rules the record complete. The `tenant.tenant_id` gap closes under `KI-SENTINEL-20261102-019`, and not here.
 
 ## KI-SENTINEL-20261102-019: `tenant.tenant_id` is declared required and is not validated on a system-scoped family, so the tenant isolation key admits a wrong-typed value — OPEN 2026-11-02 — security-relevant integrity
 
