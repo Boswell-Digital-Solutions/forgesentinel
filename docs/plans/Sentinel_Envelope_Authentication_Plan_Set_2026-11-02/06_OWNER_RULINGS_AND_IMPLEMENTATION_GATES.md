@@ -672,9 +672,19 @@ field**, and the R-5 drift test compares **types as well as names**.
 The rest of this section is the plan author's record of the supporting facts, and
 not part of the ruling.
 
-**The measurement, stated precisely.** `EventEnvelope` and its member interfaces
-declare **17** optional fields. At `4225489`, **15 of those 17 admit a
-wrong-typed value**.
+**The measurement, stated precisely — this is what the code does, not what
+governance requires.** `EventEnvelope` and its member interfaces declare **17**
+optional fields. The number of those that admit a wrong-typed value is
+**conditional**, not flat: it is **15 of 17** when `control_origin` is
+`operator` or `standing_policy`, and **12 of 17** when it is `sentinel_policy`,
+measured at `4225489`. The matrix later in this section states both axes.
+
+An earlier version of this paragraph gave "15 of those 17" as a flat figure,
+which contradicted the rule two subsections below that the admit count "must
+never be stated flat". An independent reviewer caught the contradiction; this is
+the correction. The governance requirement is unaffected by the measurement:
+**S2 validates every declared field regardless of what admits a wrong-typed
+value today.**
 
 The two that hold are the `tenant` and `control_lineage` **parents**, which the
 validator type-checks: `tenant: 123` and `control_lineage: "x"` both fail
@@ -705,8 +715,23 @@ F1 without failing CI.
 
 #### R1-C, further owner rulings (2026-11-02)
 
-Three rulings extend R1-C after the measurement correction. Each one is the
+**Two** rulings extend R1-C after the measurement correction. Both are the
 owner's. The author's supporting record follows them, and is marked.
+
+> **Correction, 2026-11-03.** An earlier version of this subsection carried
+> **three** items and said "Each one is the owner's". The third — permission to
+> implement slice S2 before slice S6 — was **not** an owner ruling. The
+> owner-attributable source for this subsection carries the baseline ruling, the
+> signature-syntax ruling, and "S2 authorization held". It grants no sequencing
+> permission; what it contains is an author's note recommending that S2 *record*
+> the dependency. A recommendation to record a dependency is not permission to
+> resolve it.
+>
+> The owner ruled on 2026-11-03: **reject any invented sequencing authority. A
+> sequencing decision cannot become authoritative merely because it appears in
+> documentation.** The item is therefore moved below, into the author's record,
+> as an open proposal. Its substance is preserved; only its authority is
+> withdrawn.
 
 **1. The measurement is a baseline, and not a test inventory.** The measured
 admit count records the state at `4225489`, and it does not define what the test
@@ -721,9 +746,19 @@ that representation. An arbitrary hex-only rule must not go in while a
 cryptographic format is unsettled. The representation comes first, and the
 syntax rule follows it.
 
-**3. Sequencing against S6 is a staged implementation dependency, and not a
-weakened validation requirement.** Slice S2 may be implemented before slice S6
-only while its contract validation stays fail-closed. Five conditions hold:
+**The author's proposal, not a ruling: sequencing against S6.** This item was
+previously numbered 3 and presented as the owner's. It is not. It is recorded
+here as a proposal that **needs its own ruling before anyone relies on it**, and
+nothing in this plan set may cite it as authority.
+
+**The open question for the owner:** may slice S2 be implemented before slice
+S6, and if so under what conditions? Until that is ruled, the dependency is
+**recorded and unresolved**, and S2's position relative to S6 is undecided.
+
+The proposal, for the record. Sequencing against S6 would be a staged
+implementation dependency, and not a weakened validation requirement. S2 would
+precede S6 only while its contract validation stays fail-closed, under five
+conditions:
 
 1. All **51** declared fields are inside S2's validation scope and inside its
    drift-test scope.
@@ -736,13 +771,20 @@ only while its contract validation stays fail-closed. Five conditions hold:
 5. No security gate counts as satisfied by a skipped test, a deferred test or an
    expected-failing test.
 
-This separates implementation scheduling from security acceptance. The purpose
-is to let development continue where that is safe, and to stop an unfinished
-signature contract from becoming an authentication bypass.
+The proposal's intent is to separate implementation scheduling from security
+acceptance: to let development continue where that is safe, and to stop an
+unfinished signature contract from becoming an authentication bypass. That
+intent is sound. It is still a proposal.
 
-**Neither slice gains authorization from this ruling.** S2 stays unauthorized,
-and R1-F, R1-G, R1-H and the independent design boundary come first. This
-sequencing ruling grants S6 no new implementation authorization.
+**Neither slice gains authorization, from this proposal or from anything else in
+this subsection.** S2 stays unauthorized, and R1-F, R1-G and the independent
+design boundary come first. Nothing here grants S6 any implementation
+authorization.
+
+The earlier text denied an implementation authorization in this paragraph while
+granting a sequencing one a few lines above it. That was the internal
+contradiction the owner's 2026-11-03 ruling resolves: the sequencing grant is
+withdrawn, and only the denial stands.
 
 **The author's record: the declared field total is 51.** Measured at `fee3125`,
 whose `src/` and `fixtures/` are identical to `4225489`. The field list came from
@@ -820,8 +862,26 @@ S6 for it.
 
 | Algorithm | Text form | Where | State |
 |---|---|---|---|
-| HMAC-SHA256 | 64 lowercase hex | `02`, "The text form stays 64 lowercase hex characters" | Approved and enforced |
-| Ed25519 | 128 lowercase hex | `02`, "Ed25519 under ADR-026" | Specified, not implemented |
+| HMAC-SHA256 | 64 lowercase hex | `src/spine/producers.ts:62` (`HMAC_HEX_PATTERN`), applied to `integrity.signature` at `src/spine/gateway.ts:186` | Approved and enforced in code |
+| Ed25519 | 128 lowercase hex | `02`, the `HMAC_HEX_PATTERN` row — recorded as an **open implementation item**, not an approved representation | **Not approved. Not settled.** |
+
+**Two corrections to this table, 2026-11-03.**
+
+The HMAC row previously cited `02`, "The text form stays 64 lowercase hex
+characters". That sentence is in `02` under `## The credential`, and **its
+subject is `credential.token`, not `integrity.signature`**. `## The high-value
+signature` states no text form at all. The fact is still true for the
+signature — the gateway applies `HMAC_HEX_PATTERN` to it — but the authority is
+the code, not that sentence. An independent reviewer caught the misattribution.
+The argument "`02` already answers it" does not survive; the code does.
+
+The Ed25519 row previously read "Specified, not implemented", which overstated
+it. `02` records the 128-hex form in the row that says `HMAC_HEX_PATTERN` "needs
+a second constant, or one constant for each algorithm" — that is an open item,
+not a settled representation. The owner ruled: **do not introduce an arbitrary
+hex-only requirement while the cryptographic format is unsettled; the
+representation must be specified first.** So S2 must not enforce a 128-hex rule,
+and no document in this plan set may present one as approved.
 
 `HMAC_HEX_PATTERN` is `/^[0-9a-f]{64}$/` (`src/spine/producers.ts:62`), and the
 gateway applies it to `integrity.signature` today (`src/spine/gateway.ts:186`).
