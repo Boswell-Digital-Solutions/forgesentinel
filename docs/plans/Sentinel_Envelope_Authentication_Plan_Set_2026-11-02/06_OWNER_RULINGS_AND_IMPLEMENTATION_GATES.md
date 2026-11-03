@@ -380,13 +380,22 @@ field**, and the R-5 drift test compares **types as well as names**.
 The rest of this section is the plan author's record of the supporting facts, and
 not part of the ruling.
 
-**The measurement, stated precisely.** `EventEnvelope` and its member interfaces
-declare **17** optional fields. At `4225489`, **15 of those 17 admit a
-wrong-typed value**.
+**The measurement, stated precisely, and it is a range.** `EventEnvelope` and its
+member interfaces declare **17** optional fields, inside **51** declared fields.
+The number that admits a wrong-typed value **depends on the event family and on
+`control_origin`**, so no single figure states it. The matrix is below, in "the
+admit count is conditional". The optional-field part is 15 of 17 on `operator`
+and on `standing_policy`, and 12 of 17 on `sentinel_policy`.
 
-The two that hold are the `tenant` and `control_lineage` **parents**, which the
-validator type-checks: `tenant: 123` and `control_lineage: "x"` both fail
-validation, verified at `4225489`.
+**An earlier revision of this paragraph said "At `4225489`, 15 of those 17 admit
+a wrong-typed value", and named no condition.** That stated one scenario as a
+property of the validator, and it contradicted the rule below that the count
+must never be stated flat. The two statements reached this file from two separate
+changes, and the second appended a section rather than correcting the first.
+
+The two optional fields that hold in every scenario are the `tenant` and
+`control_lineage` **parents**, which the validator type-checks: `tenant: 123` and
+`control_lineage: "x"` both fail validation, verified at `4225489`.
 
 An earlier draft said "18 of 18 declared optional fields". That was wrong. It
 reported a count of ad-hoc probes as though it were a count of fields. Several
@@ -451,6 +460,25 @@ signature contract from becoming an authentication bypass.
 **Neither slice gains authorization from this ruling.** S2 stays unauthorized,
 and R1-F, R1-G, R1-H and the independent design boundary come first. This
 sequencing ruling grants S6 no new implementation authorization.
+
+**Read "may be implemented before" as an ordering constraint, and not as
+permission to begin.** The two are separate, and the owner's wording separates
+them: "This separates implementation scheduling from security acceptance." The
+ruling answers one question — *if* S2 is authorized, may it land before S6? — and
+it answers yes, under the five conditions. It does not answer whether S2 is
+authorized, and the answer to that stays no. So:
+
+| Question | Answer | Where it is settled |
+|---|---|---|
+| May slice S2 start? | **No.** Authorization is held. | The authorization boundaries below; R1-F, R1-G and R1-H stay open |
+| If S2 is authorized, may it land before S6? | **Yes**, under the five conditions above | This ruling |
+| Does S6 gain anything here? | **No** | This ruling |
+
+A sequencing decision does not become authoritative because it appears in a
+document. This subsection is the owner's ruling, recorded in the owner's words.
+Everything below the heading "The author's record" in this section is the plan
+author's, and it carries no authority. Where the two appear close together, the
+attribution line decides, and not the proximity.
 
 **The author's record: the declared field total is 51.** Measured at `fee3125`,
 whose `src/` and `fixtures/` are identical to `4225489`. The field list came from
@@ -521,22 +549,42 @@ test must meet each one:
    whose children then failed, and reported 8 fields as unmeasurable that are in
    fact refused correctly.
 
-**The author's record: an approved representation already exists, per
-algorithm.** `02_SIGNATURE_BINDING.md` states the text form for each algorithm,
-so condition 2 is satisfiable for the current algorithm, and S2 does not wait on
-S6 for it.
+**The author's record: the running code enforces a signature form, and the
+specification states one only for the current algorithm.** Separate the two,
+because the owner's condition 2 asks for an *approved representation* and the two
+sources carry different weight.
 
-| Algorithm | Text form | Where | State |
+| Algorithm | Form in force | Authority | State |
 |---|---|---|---|
-| HMAC-SHA256 | 64 lowercase hex | `02`, "The text form stays 64 lowercase hex characters" | Approved and enforced |
-| Ed25519 | 128 lowercase hex | `02`, "Ed25519 under ADR-026" | Specified, not implemented |
+| HMAC-SHA256 | 64 lowercase hex | `src/spine/gateway.ts:186` applies `HMAC_HEX_PATTERN` to `integrity.signature`; `docs/KNOWN_ISSUES.md:303` records it | **In force in code** |
+| Ed25519 | not settled | `02`, "Ed25519 under ADR-026"; `02`, the `HMAC_HEX_PATTERN` row, calls for a second constant | **Open. Not specified as a validated form** |
 
-`HMAC_HEX_PATTERN` is `/^[0-9a-f]{64}$/` (`src/spine/producers.ts:62`), and the
-gateway applies it to `integrity.signature` today (`src/spine/gateway.ts:186`).
-So the 64-hex form is not provisional and it is not arbitrary. It is the stated
-form of the approved algorithm, which D-4 puts under the gateway's control.
-Condition 3 therefore does not bar it. Condition 4 binds S6, and `02` already
-records that one pattern constant cannot express both lengths.
+**A citation correction.** An earlier revision of this section cited `02`, "The
+text form stays 64 lowercase hex characters", as the specification of the
+*signature* form. That sentence is in `02`'s `## The credential` section and its
+subject is `credential.token`, not `integrity.signature`. `02`'s
+`## The high-value signature` section gives
+`signature = hex( HMAC-SHA256( K_signature, AUTH("signature", integrity.signature_key_id, event) ) )`,
+so it states **hex encoding** for the signature and states **no character
+count**; 64 characters follows from SHA-256's 32-byte output rather than from the
+text. The operative authority for the 64-character form is therefore the code at
+`src/spine/gateway.ts:186`, and not that quotation.
+
+What this does and does not settle:
+
+- The HMAC form **is** in force, in code, and `HMAC_HEX_PATTERN` is
+  `/^[0-9a-f]{64}$/` (`src/spine/producers.ts:62`). It is neither provisional nor
+  arbitrary, and D-4 puts the algorithm under the gateway's control. Condition 3
+  does not bar a validator rule that matches what the gateway already enforces.
+- The **Ed25519** form is **not** settled, and this plan set must not pin one.
+  Any 128-character figure is a derivation from Ed25519's 64-byte signature, and
+  not an approved representation. Condition 4 binds S6, which must establish the
+  representation before a signature-bearing Ed25519 event is admissible.
+- **The open question**, which no document answers: whether a validator rule that
+  mirrors `HMAC_HEX_PATTERN` counts as validating against an "explicitly approved
+  representation" under condition 2, or whether condition 2 requires an approval
+  recorded in the specification rather than in the code. That is the owner's to
+  settle, and slice S2 must not assume either answer.
 
 **The author's record: three consequences S2 must carry.**
 

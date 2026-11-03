@@ -175,10 +175,21 @@ and the R-5 drift test must compare **types as well as names**.
 declares 51 fields, which is 34 required and 17 optional. The measurement below
 is a baseline, and it is not a test inventory. `integrity.signature`
 also gets syntax validation, for encoding, length and canonical form, against the
-approved representation for the algorithm in force. `02` states that form: 64
-lowercase hex for HMAC-SHA256, and 128 lowercase hex for Ed25519. A permissive
-string fallback is not authorized. `06` holds all three rulings and the five
-fail-closed conditions that let S2 precede S6.
+approved representation for the algorithm in force. A permissive string fallback
+is not authorized.
+
+The form in force for HMAC-SHA256 is **64 lowercase hex**, and the authority for
+it is the running code: `src/spine/gateway.ts:186` applies `HMAC_HEX_PATTERN` to
+`integrity.signature`, and `docs/KNOWN_ISSUES.md:303` records the behavior. `02`
+gives the signature as `hex( HMAC-SHA256( ... ) )`, which states the encoding and
+states no character count. **The Ed25519 form is not settled**, and this plan set
+pins none: `02` calls for a second pattern constant, and condition 4 binds slice
+S6 to establish the representation before an Ed25519 signature-bearing event is
+admissible. `06` holds the three rulings, the five fail-closed conditions, and
+the open question of whether a code-enforced form satisfies condition 2.
+
+**Sequencing is not permission.** The conditions describe the order S2 and S6 may
+land in, if S2 is authorized. S2 is **not** authorized.
 
 **Two different rules reach `integrity.signature`, and only one of them is
 R1-C's.** The field is declared `string`, so the two cases separate:
