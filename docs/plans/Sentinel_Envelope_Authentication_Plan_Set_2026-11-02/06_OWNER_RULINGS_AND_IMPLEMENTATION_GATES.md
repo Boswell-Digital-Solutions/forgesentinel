@@ -411,6 +411,150 @@ validation, therefore encodable" an invariant that S1 and S2 rely on. And a
 drift test that compares names only lets a later change loosen a type and reopen
 F1 without failing CI.
 
+#### R1-C, further owner rulings (2026-11-02)
+
+Three rulings extend R1-C after the measurement correction. Each one is the
+owner's. The author's supporting record follows them, and is marked.
+
+**1. The measurement is a baseline, and not a test inventory.** The measured
+admit count records the state at `4225489`, and it does not define what the test
+covers. Slice S2 validates **every declared field, including required nested
+fields**. The count is a **range** and not a constant, so do not cite "15 of 17"
+or any other single figure on its own. The matrix below states it.
+
+**2. `integrity.signature` needs syntax validation, and not a string-type check
+alone.** The field is validated against an explicitly approved representation.
+The validator checks the **encoding, the length and the canonical form** against
+that representation. An arbitrary hex-only rule must not go in while a
+cryptographic format is unsettled. The representation comes first, and the
+syntax rule follows it.
+
+**3. Sequencing against S6 is a staged implementation dependency, and not a
+weakened validation requirement.** Slice S2 may be implemented before slice S6
+only while its contract validation stays fail-closed. Five conditions hold:
+
+1. All **51** declared fields are inside S2's validation scope and inside its
+   drift-test scope.
+2. `integrity.signature` must be validated against an explicitly approved
+   representation **before any event that carries it is accepted**.
+3. No provisional hex-only rule is authorized, and no permissive string fallback
+   is authorized.
+4. If S6 establishes the final Ed25519 representation, S2 must enforce that
+   representation before a signature-bearing event becomes admissible.
+5. No security gate counts as satisfied by a skipped test, a deferred test or an
+   expected-failing test.
+
+This separates implementation scheduling from security acceptance. The purpose
+is to let development continue where that is safe, and to stop an unfinished
+signature contract from becoming an authentication bypass.
+
+**Neither slice gains authorization from this ruling.** S2 stays unauthorized,
+and R1-F, R1-G, R1-H and the independent design boundary come first. This
+sequencing ruling grants S6 no new implementation authorization.
+
+**The author's record: the declared field total is 51.** Measured at `fee3125`,
+whose `src/` and `fixtures/` are identical to `4225489`. The field list came from
+`src/contracts/envelope.ts` by extraction, and not by hand. `envelope.ts`
+declares **51** fields: **34** required and **17** optional.
+
+**The admit count is conditional, and it must never be stated flat.** It depends
+on two envelope values. Every scenario below uses one probe for each of the 51
+fields, with a positive control for each field, and it accepts a refusal only
+when the refusal names the probed path.
+
+| Family scoping | `control_origin` | Admit, of 51 | Optional | Required |
+|---|---|---|---|---|
+| tenant-scoped | `operator` or `standing_policy` | 17 | 15 of 17 | 2 of 34 |
+| tenant-scoped | `sentinel_policy` | 14 | 12 of 17 | 2 of 34 |
+| system-scoped | `operator` or `standing_policy` | **18** | 15 of 17 | **3 of 34** |
+| system-scoped | `sentinel_policy` | 15 | 12 of 17 | 3 of 34 |
+
+**18 of 51 is the worst case, and 14 of 51 is the best case.** A slice that
+reports one number without both conditions reports a scenario, and not the
+validator.
+
+Two axes move the count:
+
+- **`control_origin`** moves three optional fields. `validateEventEnvelope` reads
+  `control_id`, `sentinel_incident_id` and `policy_decision_id` only when
+  `control_origin` is `sentinel_policy` (`src/contracts/envelope.ts:221-225`). On
+  `operator` and on `standing_policy` it never reads them, so each admits a
+  wrong-typed value.
+- **Family scoping** moves one **required** field. `tenant.tenant_id` is declared
+  required. On a tenant-scoped family the validator reads it
+  (`src/contracts/envelope.ts:152-157`). On a system-scoped family the other
+  branch checks only `isRecord(tenant)` and never reads `tenant_id`
+  (`:158-160`), so `tenant.tenant_id: 123` is admitted. That is the third
+  admitting required field in the two system-scoped rows, and `tenant_id` is the
+  tenant isolation key. **Three** families are system-scoped — `sentinel`,
+  `centipede` and `yellowjacket` (`SYSTEM_SCOPED_FAMILIES`,
+  `src/contracts/families.ts:29`) — which is **14 of the 119 canonical event
+  types**. Count the families and the types separately here: 14 is also the
+  total family count, so "14 families" reads plausibly and is wrong.
+  `KI-SENTINEL-20261102-019` records this gap as a security finding, because the
+  correction belongs to the validator and not to this measurement. R1-C already
+  covers it, so it needs no new ruling.
+
+The other 2 required fields that admit are `resource.resource_type` and
+`resource.resource_id`. Each is reachable only through the optional `resource`
+parent, which the validator never reads, so that is a parent-reachability gap
+and not an optional-field gap. The 2 optional fields that always refuse are the
+`tenant` and `control_lineage` parents.
+
+**A probe count is not a field count, and this plan set does not report one.**
+`01` states that rule. Three method requirements follow from it, and slice S2's
+test must meet each one:
+
+1. Seed an optional parent in a minimal **valid** shape before probing a leaf
+   inside it. A naive write to `control_lineage.<leaf>` auto-creates the parent
+   as `{<leaf>: ...}`, which then fails for a missing `control_origin` and a
+   missing `policy_generated_effect`. That refusal says nothing about the probed
+   leaf. Under `sentinel_policy` the seed must also carry valid
+   `control_id`, `sentinel_incident_id` and `policy_decision_id`, because the
+   validator makes all three required in that case.
+2. Require the refusal to **name the probed path**. Check `issues[].path`, and
+   not only `ok === false`. A refusal for another reason is not evidence about
+   the field under probe.
+3. Run a **positive control** for every field, and require it to validate. Where
+   the fixture already carries a valid value, use that value. Synthesising one
+   measures the harness: an earlier measurement set each required parent to `{}`,
+   whose children then failed, and reported 8 fields as unmeasurable that are in
+   fact refused correctly.
+
+**The author's record: an approved representation already exists, per
+algorithm.** `02_SIGNATURE_BINDING.md` states the text form for each algorithm,
+so condition 2 is satisfiable for the current algorithm, and S2 does not wait on
+S6 for it.
+
+| Algorithm | Text form | Where | State |
+|---|---|---|---|
+| HMAC-SHA256 | 64 lowercase hex | `02`, "The text form stays 64 lowercase hex characters" | Approved and enforced |
+| Ed25519 | 128 lowercase hex | `02`, "Ed25519 under ADR-026" | Specified, not implemented |
+
+`HMAC_HEX_PATTERN` is `/^[0-9a-f]{64}$/` (`src/spine/producers.ts:62`), and the
+gateway applies it to `integrity.signature` today (`src/spine/gateway.ts:186`).
+So the 64-hex form is not provisional and it is not arbitrary. It is the stated
+form of the approved algorithm, which D-4 puts under the gateway's control.
+Condition 3 therefore does not bar it. Condition 4 binds S6, and `02` already
+records that one pattern constant cannot express both lengths.
+
+**The author's record: three consequences S2 must carry.**
+
+- **Seven families require a signature**: `billing`, `license`, `cssa`,
+  `sentinel`, `operator`, `hermes` and `smith`
+  (`SIGNATURE_REQUIRED_FAMILIES`, `src/contracts/families.ts:28`). A rule that
+  refused every signature-bearing event would make all seven inadmissible, so
+  condition 2 must be met by enforcing the HMAC form, and not by blanket
+  refusal.
+- **No golden event fixture carries `integrity.signature`.** The two golden
+  fixtures that carry a `signature` are *directives*, which
+  `validateControlDirectiveShape` validates. The three replay fixtures carry
+  none. So this rule breaks no existing event fixture.
+- **The constant must not be duplicated.** `HMAC_HEX_PATTERN` lives in
+  `src/spine/producers.ts`, and `validateEventEnvelope` lives in
+  `src/contracts/`. S2 must choose where one shared constant lives, because two
+  copies drift, and risk R-5 names that drift.
+
 ### R1-D: a separate change carries `src/spine/ledger.ts`, before S4
 
 **Ruled.** A separate authorized change carries the `src/spine/ledger.ts`

@@ -171,13 +171,60 @@ the event with the reason code `envelope_not_encodable`:
 sufficient. `validateEventEnvelope` must type-validate **every declared field**,
 and the R-5 drift test must compare **types as well as names**.
 
-**The measurement, stated precisely.** `EventEnvelope` and its member interfaces
-declare **17** optional fields. At `4225489`, **15 of those 17 admit a
-wrong-typed value**. That is the figure to cite.
+**The scope is all 51 declared fields, by a further R1-C ruling.** `envelope.ts`
+declares 51 fields, which is 34 required and 17 optional. The measurement below
+is a baseline, and it is not a test inventory. `integrity.signature`
+also gets syntax validation, for encoding, length and canonical form, against the
+approved representation for the algorithm in force. `02` states that form: 64
+lowercase hex for HMAC-SHA256, and 128 lowercase hex for Ed25519. A permissive
+string fallback is not authorized. `06` holds all three rulings and the five
+fail-closed conditions that let S2 precede S6.
 
-The two that hold are the `tenant` and `control_lineage` **parents**, which the
-validator type-checks: `tenant: 123` and `control_lineage: "x"` both fail
-validation, verified at `4225489`.
+**Two different rules reach `integrity.signature`, and only one of them is
+R1-C's.** The field is declared `string`, so the two cases separate:
+
+- `integrity.signature: 123` violates the **declared type**. It is admitted
+  today, so the field counts inside R1-C's type scope.
+- `integrity.signature: "NOT-HEX"` is a valid `string`, so it violates **no
+  declared type**. It is also admitted today. Only the syntax rule refuses it,
+  and that rule is the R1-A and R1-C format measure, not a type check.
+
+A type rule alone therefore leaves a non-hex signature admitted. The encoder
+would still refuse to bind it, which is review finding F5's class, so the syntax
+rule is what closes the gap at validation time.
+
+**The measurement, stated precisely, and it is conditional.** `EventEnvelope` and
+its member interfaces declare **17** optional fields, inside **51** declared
+fields. The number that admit a wrong-typed value depends on two envelope
+values, so **no single figure states it**. `06` holds the full matrix. The
+summary:
+
+| Family scoping | `control_origin` | Admit, of 51 | Optional |
+|---|---|---|---|
+| tenant-scoped | `operator` or `standing_policy` | 17 | 15 of 17 |
+| tenant-scoped | `sentinel_policy` | 14 | 12 of 17 |
+| system-scoped | `operator` or `standing_policy` | **18** | 15 of 17 |
+| system-scoped | `sentinel_policy` | 15 | 12 of 17 |
+
+**Cite 18 of 51 as the worst case, and name both conditions.** "15 of 17" is the
+optional-field count for two of the four scenarios, and an earlier revision of
+this section stated it flat, which was wrong.
+
+`control_origin` moves three optional fields, because the validator reads
+`control_id`, `sentinel_incident_id` and `policy_decision_id` only when
+`control_origin` is `sentinel_policy` (`src/contracts/envelope.ts:221-225`).
+Family scoping moves one **required** field, because `tenant.tenant_id` is read
+on a tenant-scoped family (`:152-157`) and never read on a system-scoped one
+(`:158-160`).
+
+The two optional fields that always hold are the `tenant` and `control_lineage`
+**parents**, which the validator type-checks: `tenant: 123` and
+`control_lineage: "x"` both fail validation.
+
+A probe count is not a field count, and this document does not report one. Slice
+S2's test must seed each optional parent in a valid shape, require each refusal
+to name the probed path, and run a positive control for every field. `06`
+records why each rule exists.
 
 An earlier draft of this section said "18 of 18 declared optional fields". That
 was wrong. It reported a count of ad-hoc probes as though it were a count of
