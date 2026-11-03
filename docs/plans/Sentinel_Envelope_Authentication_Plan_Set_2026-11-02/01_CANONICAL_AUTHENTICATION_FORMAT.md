@@ -184,9 +184,10 @@ approved representation for the algorithm in force. For HMAC-SHA256 that form is
 open implementation item that needs a second pattern constant, and the owner
 ruled that the representation must be specified before any hex-only requirement
 goes in. A permissive string fallback is not authorized either. `06` holds the
-**two** further R1-C rulings. **Whether S2 may precede S6 is an open question
-awaiting an owner ruling** — the sequencing grant that an earlier version cited
-is withdrawn, because it was never an owner ruling.
+**three** further R1-C rulings, including the owner's sequencing ruling of
+2026-11-02, which he re-confirmed on 2026-11-03 after a challenge. "May be
+implemented before S6" fixes an **order** and is not permission to begin; S2
+remains unauthorized.
 
 **Two different rules reach `integrity.signature`, and only one of them is
 R1-C's.** The field is declared `string`, so the two cases separate:

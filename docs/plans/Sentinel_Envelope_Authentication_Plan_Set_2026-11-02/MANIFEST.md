@@ -4,7 +4,7 @@
 - Finding: **KI-SENTINEL-20261102-008**
 - Generated: **2026-11-02**
 - Revision: **rulings R1-A to R1-E recorded; amendment 3 supersedes D-2's bound record count of 41 and states no replacement; slice SL added; three further R1-C rulings recorded — the measurement is a conditional baseline (14 to 18 of 51, by family scoping and `control_origin`) and S2's scope is all 51 declared fields, and `integrity.signature` gets syntax validation; owner rulings on the four recommendations applied; PR #39 review rulings 5 and 6 applied; gate 5 extended to every pre-authentication failure; two round-1 decisions open (R1-F, R1-G; R1-H ruled); implementation stays unauthorized**
-- Remediated: **blocking items 6, 7 and 8 are corrected (2026-11-03). The S2-before-S6 sequencing grant is withdrawn from the ruling section and recorded as the author's open proposal, because it was never an owner ruling. No Ed25519 representation is presented as approved. The HMAC text-form citation now names the code that enforces it rather than a sentence about `credential.token`. The flat admit figure is stated conditionally. Sites corrected: `01`, `05`, `06` and `docs/sentinel/adrs/ADR-027-envelope-authentication-format.md`.**
+- Remediated: **blocking items 7 and 8 are corrected (2026-11-03): no Ed25519 representation is presented as approved, the HMAC text-form citation names the code that enforces it rather than a sentence about `credential.token`, and the flat admit figure is stated conditionally. Blocking item 6 was **withdrawn as a finding**: the S2-before-S6 sequencing ruling is the owner's, issued 2026-11-02 and re-confirmed 2026-11-03, and the text that called it invented is removed. `KI-SENTINEL-20261102-020` records that episode and its control.**
 - Amended on: **4225489**, then **fee3125**, then **6c492dd**
 - Base commit: **432337c**
 - Merged as: **79698ac**
@@ -13,13 +13,13 @@
 | File | Bytes | SHA-256 |
 |---|---:|---|
 | `00_README.md` | 11758 | `a1e430174b275516c0dd6632e185f3fba1b09ec134d4f0252e6093cb4583ea8e` |
-| `01_CANONICAL_AUTHENTICATION_FORMAT.md` | 37654 | `79532fdafbf4d4451f2c247829214b48a712e59336275cb8649b76ad9898ef63` |
+| `01_CANONICAL_AUTHENTICATION_FORMAT.md` | 37691 | `767739a0eb2cfe2c8798c3eeb18bdf8dc43e3e7d8072f90d8b60a910ff4ee34a` |
 | `02_SIGNATURE_BINDING.md` | 13763 | `0a3229eba0d78777121061ff126f48ecb865c6dc6dca927ae7082c5a28aa47d1` |
 | `03_COMPATIBILITY_AND_CALLER_IMPACT.md` | 9965 | `5868b52f6f3a8197fb73731146cbf75381412f0ca62ca12d6f68f88589b6d3ba` |
 | `04_NEGATIVE_TEST_MATRIX.md` | 29204 | `afb21f53e2c856726190c264019da813b03058149db759ae39cf58ae3cc667a6` |
-| `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | 23039 | `eea60b1c0c54684b8c7ac1996d7261dfa7a65c1a81cf4d4c641dd8f15b052184` |
-| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | 58140 | `f6bcb3ea23e81c8f90008f3ef348823d7edd8bda2dfc69cf2548369ed80262eb` |
-| `07_REVIEW_ROUND_1_FINDINGS.md` | 17181 | `bb7b7925430ad698669e417b8ca6f0f62072d97fb05e19aa4fb77cb7e22b4f06` |
+| `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | 23154 | `9d60ec4da89f8c64b7aa52c960553e08a3937bfe3e14d052c9adeb64fb95bce7` |
+| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | 59815 | `f263ec1c5cff635b77e9d2fbd7a86296eda099e574f4e2fd1a0c4239f006d272` |
+| `07_REVIEW_ROUND_1_FINDINGS.md` | 17270 | `8c6e945c7b0941bbfe0c09010777c6253ad7ac27edc2f3a5c812691bee1a7634` |
 
 The hashes above cover the documents as they stand. They are not a statement that the content is current.
 
