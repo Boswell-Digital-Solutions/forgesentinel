@@ -10,6 +10,24 @@ This document is the authoritative record of the owner's rulings on
 plan set disagree, this document wins, and the earlier document must be
 corrected.
 
+**How to read a ruling in this file, and how not to challenge one.** The owner
+issues a ruling in an operator session. This file is where that ruling **enters**
+the repository, so a ruling's first appearance here has no earlier repository
+trace by construction. A review that searches the repository, finds no prior
+source and finds the wording nowhere else has measured only that the ruling is
+new. That is not evidence that the ruling was invented. One ruling on this track
+was reported as invented on exactly that reasoning, and the owner re-confirmed
+it; the provenance note under R1-C ruling 3 records the exchange.
+
+Two rules follow:
+
+- **Challenge a ruling to the owner, not to the record.** Ask the owner to
+  confirm or withdraw. A ruling that the owner withdraws is recorded as
+  **withdrawn**, with the date, and never as an invention.
+- **Mark the boundary in every section.** A ruling carries the owner's authority;
+  the plan author's supporting record carries none. Each section states which is
+  which, and the attribution line decides, not the proximity of the text.
+
 ## Priority
 
 The owner rules the envelope-authentication correction a **P0 security
@@ -441,6 +459,30 @@ syntax rule follows it.
 **3. Sequencing against S6 is a staged implementation dependency, and not a
 weakened validation requirement.** Slice S2 may be implemented before slice S6
 only while its contract validation stays fail-closed. Five conditions hold:
+
+> **Provenance of this ruling, recorded because a review challenged it.** The
+> owner issued this ruling on 2026-11-02, in an operator session, under the
+> heading "Owner ruling — R1-C / S6 ordering" and the decision "Approve a staged
+> implementation dependency, not a weakened validation requirement." The owner's
+> own wording is "S2 may be implemented before S6 only if its contract validation
+> remains fail-closed", followed by the five numbered conditions below and the
+> sentence "This separates implementation scheduling from security acceptance."
+>
+> An independent review of 2026-11-03 reported this subsection as an invented
+> owner ruling, on the ground that no owner-attributable source in the repository
+> contains a sequencing permission and that the phrase "may be implemented
+> before" appears nowhere else. Both observations are accurate about the
+> repository and neither is evidence of invention: the ruling arrived in an
+> operator session, and this subsection is where it entered the repository.
+>
+> **The owner re-confirmed the ruling on 2026-11-03**, after the challenge, with
+> "the sequencing ruling stands, I issued it." The ruling therefore stands as
+> written. If it is ever withdrawn, record it as **withdrawn by the owner**, and
+> not as an invention.
+>
+> The challenge did carry one correct point, and it is applied below: "may be
+> implemented before" must not read as permission to begin. See "Read 'may be
+> implemented before' as an ordering constraint".
 
 1. All **51** declared fields are inside S2's validation scope and inside its
    drift-test scope.
