@@ -170,6 +170,10 @@ and `KI-SENTINEL-20261104-004` to `-006` — and it authorizes no implementation
 `docs/KNOWN_ISSUES.md` and this document, then reviews `3cae2dd`. Round 2's findings become a
 document of record in this plan set, as round 1's did.
 
+**Round 2 ran on 2026-11-04** against `3cae2dd`. Its findings are `08_REVIEW_ROUND_2_FINDINGS.md`:
+verdict **safe to proceed to implementation authorization with the conditions listed**, with two
+blocking findings that hold slices SL, S2, S3 and S4 (not the S1 encoder).
+
 ### Why the frozen commit is a ruling and not a preference
 
 A second adversarial review ran against `e0a4b52` after round 1. It found no

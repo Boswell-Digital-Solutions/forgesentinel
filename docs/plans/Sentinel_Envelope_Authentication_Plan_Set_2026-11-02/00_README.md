@@ -155,6 +155,7 @@ Not in scope for this plan set, and not changed by it:
 | `04_NEGATIVE_TEST_MATRIX.md` | The negative tests and the positive controls |
 | `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | Gates, the ruled decisions, risks, proposed slices, the plan registry request |
 | `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | **Authoritative.** The ten D-series rulings, the three amendments, the five implementation gates, the four recommendations and their four rulings, rulings 5 and 6, the six round-1 rulings (R1-A to R1-E, and R1-H through ruling 3), the owner ruling on `KI-SENTINEL-20261104-001`, the findings disposition, the authorization boundaries |
+| `08_REVIEW_ROUND_2_FINDINGS.md` | Independent review round 2, against the frozen commit `3cae2dd`: verdict **safe to proceed to implementation authorization with the conditions listed**; two blocking findings (R2-F1, R2-F2), six should-fix, four new owner decisions. The review of record for round 2 if the owner accepts it. |
 | `07_REVIEW_ROUND_1_FINDINGS.md` | Independent review round 1: the verdict, the blocking defects, what was re-verified, and the design decisions — six ruled, two open (R1-F, R1-G) |
 | `MANIFEST.md` | File sizes and SHA-256 digests |
 

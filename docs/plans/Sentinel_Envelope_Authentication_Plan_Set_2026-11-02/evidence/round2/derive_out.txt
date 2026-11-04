@@ -1,0 +1,219 @@
+payload digest method reproduces the golden digest (benign payload only): true
+POSITIVE CONTROL old layout on the golden event: 41 records, 1479 bytes, sha256 00db04fbadd0a6048d35caf3c8c5b8f1ca97b5db53594774425d4a258c89aeb1 (round 1 verified 41 records and 1479 bytes): PASS
+
+NEW LAYOUT: 46 fixed records, plus one record for each finding id
+| # | Field name | Kind |
+| 1 | auth_format | field |
+| 2 | context | field |
+| 3 | key_id | field |
+| 4 | producer.service | field |
+| 5 | producer.instance_id | field |
+| 6 | producer.version | field |
+| 7 | producer.environment | field |
+| 8 | event_id | field |
+| 9 | event_type | field |
+| 10 | schema_version | field |
+| 11 | occurred_at | field |
+| 12 | observed_at | field |
+| 13 | tenant | presence |
+| 14 | tenant.tenant_id | field |
+| 15 | tenant.account_id | field |
+| 16 | actor.actor_type | field |
+| 17 | actor.actor_id | field |
+| 18 | actor.session_id | field |
+| 19 | actor.api_key_fingerprint | field |
+| 20 | subject.subject_type | field |
+| 21 | subject.subject_id | field |
+| 22 | resource | presence |
+| 23 | resource.resource_type | field |
+| 24 | resource.resource_id | field |
+| 25 | resource.classification | field |
+| 26 | correlation.trace_id | field |
+| 27 | correlation.run_id | field |
+| 28 | correlation.parent_event_id | field |
+| 29 | location.execution_lane | field |
+| 30 | location.region | field |
+| 31 | location.country | field |
+| 32 | data_policy.content_included | field |
+| 33 | data_policy.sensitivity | field |
+| 34 | data_policy.retention_class | field |
+| 35 | data_policy.cloud_allowed | field |
+| 36 | integrity.payload_hash | field |
+| 37 | integrity.idempotency_key | field |
+| 38 | integrity.signature_key_id | field |
+| 39 | integrity.signature | field |
+| 40 | control_lineage | presence |
+| 41 | control_lineage.control_origin | field |
+| 42 | control_lineage.policy_generated_effect | field |
+| 43 | control_lineage.sentinel_incident_id | field |
+| 44 | control_lineage.policy_decision_id | field |
+| 45 | control_lineage.control_id | field |
+| 46 | control_lineage.sentinel_finding_ids.count | count, then elements |
+
+EXAMPLE A (committed golden event): context=credential key_id=key_usage_01: 46 records, 1597 bytes, sha256 ecb0d8f47b26861ecb4c6413a70571a891e83019744318ff74da2015d37cf998
+auth_format\x1fs\x1f27\x1fforgesentinel.event_auth.v1\x1e
+context\x1fs\x1f10\x1fcredential\x1e
+key_id\x1fs\x1f12\x1fkey_usage_01\x1e
+producer.service\x1fs\x1f14\x1fusage-metering\x1e
+producer.instance_id\x1fs\x1f17\x1fusage-metering-01\x1e
+producer.version\x1fs\x1f5\x1f1.0.0\x1e
+producer.environment\x1fs\x1f10\x1fproduction\x1e
+event_id\x1fs\x1f16\x1fevt_golden_usage\x1e
+event_type\x1fs\x1f21\x1fusage.tokens.recorded\x1e
+schema_version\x1fs\x1f5\x1f1.0.0\x1e
+occurred_at\x1fs\x1f24\x1f2026-06-09T12:00:00.000Z\x1e
+observed_at\x1fs\x1f24\x1f2026-06-09T12:00:00.000Z\x1e
+tenant\x1fb\x1f4\x1ftrue\x1e
+tenant.tenant_id\x1fs\x1f8\x1ften_demo\x1e
+tenant.account_id\x1fs\x1f9\x1facct_2041\x1e
+actor.actor_type\x1fs\x1f7\x1fservice\x1e
+actor.actor_id\x1fs\x1f18\x1fneuroforge-gateway\x1e
+actor.session_id\x1f-\x1f0\x1f\x1e
+actor.api_key_fingerprint\x1f-\x1f0\x1f\x1e
+subject.subject_type\x1fs\x1f7\x1faccount\x1e
+subject.subject_id\x1fs\x1f9\x1facct_2041\x1e
+resource\x1fb\x1f5\x1ffalse\x1e
+resource.resource_type\x1f-\x1f0\x1f\x1e
+resource.resource_id\x1f-\x1f0\x1f\x1e
+resource.classification\x1f-\x1f0\x1f\x1e
+correlation.trace_id\x1fs\x1f20\x1ftrc_evt_golden_usage\x1e
+correlation.run_id\x1f-\x1f0\x1f\x1e
+correlation.parent_event_id\x1f-\x1f0\x1f\x1e
+location.execution_lane\x1fs\x1f5\x1fcloud\x1e
+location.region\x1f-\x1f0\x1f\x1e
+location.country\x1f-\x1f0\x1f\x1e
+data_policy.content_included\x1fb\x1f5\x1ffalse\x1e
+data_policy.sensitivity\x1fs\x1f8\x1finternal\x1e
+data_policy.retention_class\x1fs\x1f13\x1fsecurity_365d\x1e
+data_policy.cloud_allowed\x1fb\x1f4\x1ftrue\x1e
+integrity.payload_hash\x1fs\x1f71\x1fsha256:3188a5357f5c7b5f0514fe1708f52faddfeb23bc31b43af7240b99cd595f4e61\x1e
+integrity.idempotency_key\x1fs\x1f16\x1fevt_golden_usage\x1e
+integrity.signature_key_id\x1f-\x1f0\x1f\x1e
+integrity.signature\x1f-\x1f0\x1f\x1e
+control_lineage\x1fb\x1f5\x1ffalse\x1e
+control_lineage.control_origin\x1f-\x1f0\x1f\x1e
+control_lineage.policy_generated_effect\x1f-\x1f0\x1f\x1e
+control_lineage.sentinel_incident_id\x1f-\x1f0\x1f\x1e
+control_lineage.policy_decision_id\x1f-\x1f0\x1f\x1e
+control_lineage.control_id\x1f-\x1f0\x1f\x1e
+control_lineage.sentinel_finding_ids.count\x1f-\x1f0\x1f\x1e
+
+EXAMPLE B1 (constructed, signature input): context=signature key_id=key_billing_01: 48 records, 1841 bytes, sha256 76d0514ca6070d43a57529565a04a48e943bc6e4fc3951aea6c7832789b694d4
+auth_format\x1fs\x1f27\x1fforgesentinel.event_auth.v1\x1e
+context\x1fs\x1f9\x1fsignature\x1e
+key_id\x1fs\x1f14\x1fkey_billing_01\x1e
+producer.service\x1fs\x1f15\x1fbilling-service\x1e
+producer.instance_id\x1fs\x1f18\x1fbilling-service-01\x1e
+producer.version\x1fs\x1f5\x1f1.4.0\x1e
+producer.environment\x1fs\x1f10\x1fproduction\x1e
+event_id\x1fs\x1f19\x1fevt_example_billing\x1e
+event_type\x1fs\x1f28\x1fbilling.subscription.changed\x1e
+schema_version\x1fs\x1f5\x1f1.0.0\x1e
+occurred_at\x1fs\x1f24\x1f2026-11-04T09:00:00.000Z\x1e
+observed_at\x1fs\x1f24\x1f2026-11-04T09:00:01.000Z\x1e
+tenant\x1fb\x1f4\x1ftrue\x1e
+tenant.tenant_id\x1fs\x1f8\x1ften_demo\x1e
+tenant.account_id\x1fs\x1f9\x1facct_2041\x1e
+actor.actor_type\x1fs\x1f8\x1foperator\x1e
+actor.actor_id\x1fs\x1f10\x1fop_charlie\x1e
+actor.session_id\x1f-\x1f0\x1f\x1e
+actor.api_key_fingerprint\x1f-\x1f0\x1f\x1e
+subject.subject_type\x1fs\x1f12\x1fsubscription\x1e
+subject.subject_id\x1fs\x1f8\x1fsub_7781\x1e
+resource\x1fb\x1f4\x1ftrue\x1e
+resource.resource_type\x1fs\x1f12\x1fsubscription\x1e
+resource.resource_id\x1fs\x1f8\x1fsub_7781\x1e
+resource.classification\x1fs\x1f12\x1fconfidential\x1e
+correlation.trace_id\x1fs\x1f23\x1ftrc_evt_example_billing\x1e
+correlation.run_id\x1fs\x1f6\x1frun_42\x1e
+correlation.parent_event_id\x1f-\x1f0\x1f\x1e
+location.execution_lane\x1fs\x1f5\x1fcloud\x1e
+location.region\x1fs\x1f9\x1fus-east-1\x1e
+location.country\x1f-\x1f0\x1f\x1e
+data_policy.content_included\x1fb\x1f5\x1ffalse\x1e
+data_policy.sensitivity\x1fs\x1f12\x1fconfidential\x1e
+data_policy.retention_class\x1fs\x1f13\x1fsecurity_365d\x1e
+data_policy.cloud_allowed\x1fb\x1f4\x1ftrue\x1e
+integrity.payload_hash\x1fs\x1f71\x1fsha256:39de473dec94c28e7c2376880a524c31572d13096ea06ea64e8fa1de6060adfe\x1e
+integrity.idempotency_key\x1fs\x1f19\x1fevt_example_billing\x1e
+integrity.signature_key_id\x1fs\x1f14\x1fkey_billing_01\x1e
+integrity.signature\x1f-\x1f0\x1f\x1e
+control_lineage\x1fb\x1f4\x1ftrue\x1e
+control_lineage.control_origin\x1fs\x1f15\x1fsentinel_policy\x1e
+control_lineage.policy_generated_effect\x1fb\x1f4\x1ftrue\x1e
+control_lineage.sentinel_incident_id\x1fs\x1f8\x1finc_0091\x1e
+control_lineage.policy_decision_id\x1fs\x1f7\x1fpd_0117\x1e
+control_lineage.control_id\x1fs\x1f20\x1fctl_cloud_route_hold\x1e
+control_lineage.sentinel_finding_ids.count\x1fc\x1f1\x1f2\x1e
+control_lineage.sentinel_finding_ids.0\x1fs\x1f8\x1ffnd_0301\x1e
+control_lineage.sentinel_finding_ids.1\x1fs\x1f8\x1ffnd_0302\x1e
+
+EXAMPLE B2 (constructed, credential input): context=credential key_id=key_billing_01: 48 records, 1908 bytes, sha256 c8bf31c6f7de8aa9207615822ed0beccb82a0139e69850a8648eaa0344943ec2
+auth_format\x1fs\x1f27\x1fforgesentinel.event_auth.v1\x1e
+context\x1fs\x1f10\x1fcredential\x1e
+key_id\x1fs\x1f14\x1fkey_billing_01\x1e
+producer.service\x1fs\x1f15\x1fbilling-service\x1e
+producer.instance_id\x1fs\x1f18\x1fbilling-service-01\x1e
+producer.version\x1fs\x1f5\x1f1.4.0\x1e
+producer.environment\x1fs\x1f10\x1fproduction\x1e
+event_id\x1fs\x1f19\x1fevt_example_billing\x1e
+event_type\x1fs\x1f28\x1fbilling.subscription.changed\x1e
+schema_version\x1fs\x1f5\x1f1.0.0\x1e
+occurred_at\x1fs\x1f24\x1f2026-11-04T09:00:00.000Z\x1e
+observed_at\x1fs\x1f24\x1f2026-11-04T09:00:01.000Z\x1e
+tenant\x1fb\x1f4\x1ftrue\x1e
+tenant.tenant_id\x1fs\x1f8\x1ften_demo\x1e
+tenant.account_id\x1fs\x1f9\x1facct_2041\x1e
+actor.actor_type\x1fs\x1f8\x1foperator\x1e
+actor.actor_id\x1fs\x1f10\x1fop_charlie\x1e
+actor.session_id\x1f-\x1f0\x1f\x1e
+actor.api_key_fingerprint\x1f-\x1f0\x1f\x1e
+subject.subject_type\x1fs\x1f12\x1fsubscription\x1e
+subject.subject_id\x1fs\x1f8\x1fsub_7781\x1e
+resource\x1fb\x1f4\x1ftrue\x1e
+resource.resource_type\x1fs\x1f12\x1fsubscription\x1e
+resource.resource_id\x1fs\x1f8\x1fsub_7781\x1e
+resource.classification\x1fs\x1f12\x1fconfidential\x1e
+correlation.trace_id\x1fs\x1f23\x1ftrc_evt_example_billing\x1e
+correlation.run_id\x1fs\x1f6\x1frun_42\x1e
+correlation.parent_event_id\x1f-\x1f0\x1f\x1e
+location.execution_lane\x1fs\x1f5\x1fcloud\x1e
+location.region\x1fs\x1f9\x1fus-east-1\x1e
+location.country\x1f-\x1f0\x1f\x1e
+data_policy.content_included\x1fb\x1f5\x1ffalse\x1e
+data_policy.sensitivity\x1fs\x1f12\x1fconfidential\x1e
+data_policy.retention_class\x1fs\x1f13\x1fsecurity_365d\x1e
+data_policy.cloud_allowed\x1fb\x1f4\x1ftrue\x1e
+integrity.payload_hash\x1fs\x1f71\x1fsha256:39de473dec94c28e7c2376880a524c31572d13096ea06ea64e8fa1de6060adfe\x1e
+integrity.idempotency_key\x1fs\x1f19\x1fevt_example_billing\x1e
+integrity.signature_key_id\x1fs\x1f14\x1fkey_billing_01\x1e
+integrity.signature\x1fs\x1f64\x1f0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\x1e
+control_lineage\x1fb\x1f4\x1ftrue\x1e
+control_lineage.control_origin\x1fs\x1f15\x1fsentinel_policy\x1e
+control_lineage.policy_generated_effect\x1fb\x1f4\x1ftrue\x1e
+control_lineage.sentinel_incident_id\x1fs\x1f8\x1finc_0091\x1e
+control_lineage.policy_decision_id\x1fs\x1f7\x1fpd_0117\x1e
+control_lineage.control_id\x1fs\x1f20\x1fctl_cloud_route_hold\x1e
+control_lineage.sentinel_finding_ids.count\x1fc\x1f1\x1f2\x1e
+control_lineage.sentinel_finding_ids.0\x1fs\x1f8\x1ffnd_0301\x1e
+control_lineage.sentinel_finding_ids.1\x1fs\x1f8\x1ffnd_0302\x1e
+
+CHECK the signature input is independent of integrity.signature: PASS
+CHECK the credential input binds integrity.signature: PASS
+CHECK F3 (old layout): a changed signature_key_id leaves the credential input unchanged: yes, as round 1 found
+CHECK F3 (new layout): a changed signature_key_id changes the credential input: PASS
+CHECK F2 (old layout): absent and empty resource collide: yes, as round 1 found
+CHECK F2 (new layout, presence record alone, without the failure rule): absent and empty resource differ: PASS
+CHECK F2 (new layout, with the failure rule): an empty resource is refused, because a present resource needs resource_type and resource_id: PASS
+CHECK required object (without the failure rule): actor absent, {}, null and [] give 1 distinct encoding(s)
+CHECK required object (with the failure rule): all four are refused: PASS
+CHECK a missing required field is refused: PASS
+CHECK a signature context whose key id differs from integrity.signature_key_id is refused: PASS
+CHECK a signature context with no integrity.signature_key_id is refused: PASS
+CHECK a hole in sentinel_finding_ids is refused: PASS
+CHECK an empty sentinel_finding_ids is the count 0 with no element records: PASS
+CHECK a value containing 0x1E and 0x1F still counts 46 records: PASS
+CHECK a tenant transplant changes the signature input: PASS
+CHECK a tenant transplant changes the credential input: PASS
+
+Example B payload (record 36 is its digest): {"plan_from":"team","plan_to":"business","seats":12}

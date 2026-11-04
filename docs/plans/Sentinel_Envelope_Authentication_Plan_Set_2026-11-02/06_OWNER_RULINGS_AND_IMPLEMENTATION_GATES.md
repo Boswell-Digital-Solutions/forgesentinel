@@ -1109,7 +1109,10 @@ Three boundaries, in order. Each needs its own explicit authorization.
    boundary is **not** cleared. The owner ruled on all three format fixes on
    2026-11-02, so what remains is round 2 against the corrected `01`, with a
    frozen commit named before it starts. The commit is named: `3cae2dd`
-   (`07`, 2026-11-04). Merging the documentation did not clear
+   (`07`, 2026-11-04). **Round 2 ran the same day** (`08`): verdict "safe to
+   proceed to implementation authorization with the conditions listed". Whether
+   that clears this boundary is the owner's decision, and `08` becomes the review
+   of record only if the owner accepts it. Merging the documentation did not clear
    it, and neither did the rulings.
 2. **Implementation authorization.** Each slice in `05` needs the owner's
    explicit authorization. Design approval is not implementation authorization.

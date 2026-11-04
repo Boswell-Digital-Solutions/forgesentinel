@@ -727,3 +727,27 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **Lesson**: a sweep that claims "none left" must be driven by a list measured independently of the author's own search patterns, and must report its count. The retest's citation checker and counted phrase searches are kept with the retest evidence.
 - **Scope**: closed.
 
+## KI-SENTINEL-20261104-008: The gate-5 rejection-record shape cannot be implemented as written, and rulings R1-E and 1 disagree about the claimed tenant — OPEN 2026-11-04 — design — blocks slices SL and S4 — needs owner decisions
+
+- **Classification**: Design (gate 5, rejection-record confidentiality). Review round 2 finding R2-F1, blocking.
+- **Discovery source**: independent review round 2 against `3cae2dd` (`08_REVIEW_ROUND_2_FINDINGS.md`).
+- **What is wrong**: (1) R1-E keeps the claimed tenant "inside the recommendation-1 metadata block, as an explicitly named observed value" (`06`, R1-E), while ruling 1 removes all envelope metadata from the record and EVD-K02 asserts nothing from the envelope; `06` calls the two consistent, and they are not. (2) The record's "digest of the received bytes" has no defined input: `ingest` receives a parsed value, and different texts give one `hashPayload`. (3) The five-element maximum is not mapped onto the ten fields of a `LedgerRecord` in `src/spine/ledger.ts`.
+- **Owner decisions**: O-1 in `08`, whether the record keeps the claimed tenant at all; O-4, how the digest is defined and from which bytes.
+- **Scope**: open. Slices SL and S4 must not be authorized until it is corrected (`08`, condition 2).
+
+## KI-SENTINEL-20261104-009: A contract-failure message copies unbounded attacker text into the ledger and back to the caller — OPEN 2026-11-04 — security — blocks slices S2, S3 and S4
+
+- **Classification**: Security (rejection-record confidentiality, resource exhaustion). Review round 2 finding R2-F2, blocking. A different site from `KI-SENTINEL-20261102-013`, which covers the credential text.
+- **Discovery source**: independent review round 2.
+- **What is wrong**: `validateEventEnvelope` writes event values into its messages unbounded — for example `src/contracts/envelope.ts:148` puts the whole `event_type` in the `unknown_event_type` message, and `common.ts:57` and `version.ts:39` do the same. Measured: a 100,000-character `event_type` gives a 100,104-character message, and NUL bytes pass through. Ruling 5 extends gate 5 to every pre-authentication failure, but no failure-reason vocabulary exists for the six classes other than authentication, the S2 unknown-field refusal would add another channel, and group K has no case for each class.
+- **Scope**: open. Slices S2, S3 and S4 must not be authorized until it is corrected (`08`, condition 2).
+
+## KI-SENTINEL-20261104-010: Review round 2 ran against `3cae2dd`, and found two errors of the plan author's — CLOSED 2026-11-04 — governance record
+
+- **Classification**: Governance record.
+- **What ran**: independent review round 2, commissioned on the operator's tentative authorization of 2026-11-04, against the frozen commit `3cae2dd` named in `07`. The reviewer read this file and `07` first, as the process finding requires.
+- **Verdict**: safe to proceed to implementation authorization with the conditions listed. The format, the HKDF key derivation and the tenant binding held every attack, including an independent encoder that reproduced all three worked examples byte for byte and a 60,000-envelope fuzz with no collision. Blocking findings: R2-F1 (`-008`) and R2-F2 (`-009`). Should-fix: R2-F3 to R2-F8. New owner decisions: O-1 to O-4.
+- **Two errors of the plan author's, corrected in the same pull request**: R2-F3 — the encoder failure rules added after the four-lane retest refuse a present empty parent, but ADV-H10, NEG-L04 and PROP-H01 in `04` still expected it to encode; the rules changed and the tests that depend on them did not. R2-F7 — R-9 in `05` still gave example B's superseded byte counts after example B was regenerated; the old values were never searched for.
+- **Lesson**: after changing a rule or regenerating a value, search the whole plan set for the tests and the figures that depend on it, by the old value itself.
+- **Still open**: R2-F4, R2-F5, R2-F6 and R2-F8; `-008` and `-009`; the owner decisions O-1 to O-4, R1-F, R1-G and `-004` to `-006`. Whether round 2 clears authorization boundary 1, and whether `08` is the review of record, are the owner's decisions.
+- **Scope**: closed.
