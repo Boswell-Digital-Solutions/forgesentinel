@@ -54,7 +54,7 @@ not yet proved: review round 1 found three defects that break it (see
    (`KI-SENTINEL-20261102-006`), so it cannot authenticate. The format uses its
    own encoding, which never rebuilds an object and never relies on
    `JSON.stringify` for a bound field.
-4. **The payload binding is the corrected digest.** Record 34 binds
+4. **The payload binding is the corrected digest.** Record 36 binds
    `integrity.payload_hash`, which the gateway already recomputes from the real
    payload. The `KI-SENTINEL-20261102-006` correction must be verified before
    envelope authentication relies on it.
@@ -73,7 +73,7 @@ not yet proved: review round 1 found three defects that break it (see
    unbound today, which is finding F3, and an unknown-field refusal cannot reach
    them. **Ruled by R1-A:** refuse both fields on an event whose family requires
    no signature, **and** bind both where they may legitimately appear. The
-   binding contexts are not settled by the ruling, so slice S1 names them.
+   binding contexts are not settled by the ruling; the design settled them in `01`, regenerated on 2026-11-04 under the owner ruling on `KI-SENTINEL-20261104-001`, and slice S1 implements them.
 8. **One external reason code.** Every authentication failure returns
    `producer_auth_failed` to the caller, with no field name. A closed set of
    internal categories stays in the operator evidence record.

@@ -36,12 +36,11 @@ it starts. No pull-request review is submitted on GitHub, so the review of recor
 is that document. A green documentation check is not a substitute for any of
 this.
 
-**The record count in this plan set is superseded.** D-2 fixed it at 41, and
-amendment 3 in `06` supersedes that without stating a replacement, because R1-A's
-binding contexts are unsettled. The 41-row field table and the 1479-byte worked
-example in `01` are stale. Under the owner ruling on `KI-SENTINEL-20261104-001` in `06` (2026-11-04),
-a documentation-only regeneration of `01` corrects them before round 2; slice S1
-implements the reviewed format and cannot define it.
+**The record count is regenerated.** D-2 fixed it at 41, and amendment 3 in `06`
+superseded that. the regeneration of `01` (2026-11-04) settled R1-A's binding contexts and derived the
+replacement: **46 fixed records**, plus one for each finding id. The field table and
+the worked examples in `01` are current, and its derivation script is in `evidence/`. Slice S1 implements the reviewed format and cannot define it (the owner ruling on
+`KI-SENTINEL-20261104-001` in `06`, 2026-11-04).
 
 The owner rules the correction a **P0 security priority**. The verified
 cross-tenant event re-targeting is a security-significant authentication
