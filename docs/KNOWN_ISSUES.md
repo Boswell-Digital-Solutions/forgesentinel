@@ -734,6 +734,7 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **What is wrong**: (1) R1-E keeps the claimed tenant "inside the recommendation-1 metadata block, as an explicitly named observed value" (`06`, R1-E), while ruling 1 removes all envelope metadata from the record and EVD-K02 asserts nothing from the envelope; `06` calls the two consistent, and they are not. (2) The record's "digest of the received bytes" has no defined input: `ingest` receives a parsed value, and different texts give one `hashPayload`. (3) The five-element maximum is not mapped onto the ten fields of a `LedgerRecord` in `src/spine/ledger.ts`.
 - **Owner decisions**: O-1 in `08`, whether the record keeps the claimed tenant at all; O-4, how the digest is defined and from which bytes.
 - **Scope**: open. Slices SL and S4 must not be authorized until it is corrected (`08`, condition 2).
+- **Owner direction (2026-11-04, disposition on review round 2)**: O-1 — "Preserve the claimed tenant as untrusted observational metadata in the rejection record, never as authenticated identity or routing authority." This amends ruling 1 for the claimed tenant only, on R1-E's side. O-4 — "Define a domain-separated SHA-256 digest over the exact received envelope bytes, before parsing or normalization. If exact bytes are unavailable, record that explicitly; never reconstruct them." The owner states that these "establish design intent, not a complete rejection-record schema": the record mapping onto `LedgerRecord`, the byte-availability semantics and the handling of a malformed envelope still need specification and adversarial testing. Open until that is done and independently verified.
 
 ## KI-SENTINEL-20261104-009: A contract-failure message copies unbounded attacker text into the ledger and back to the caller — OPEN 2026-11-04 — security — blocks slices S2, S3 and S4
 
@@ -741,6 +742,7 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **Discovery source**: independent review round 2.
 - **What is wrong**: `validateEventEnvelope` writes event values into its messages unbounded — for example `src/contracts/envelope.ts:148` puts the whole `event_type` in the `unknown_event_type` message, and `common.ts:57` and `version.ts:39` do the same. Measured: a 100,000-character `event_type` gives a 100,104-character message, and NUL bytes pass through. Ruling 5 extends gate 5 to every pre-authentication failure, but no failure-reason vocabulary exists for the six classes other than authentication, the S2 unknown-field refusal would add another channel, and group K has no case for each class.
 - **Scope**: open. Slices S2, S3 and S4 must not be authorized until it is corrected (`08`, condition 2).
+- **Owner direction (2026-11-04, disposition on review round 2)**: "Validation failures must use bounded, structured error codes and fixed-size messages. No attacker-controlled raw strings in ledger messages." Open until the correction is specified, implemented and independently verified.
 
 ## KI-SENTINEL-20261104-010: Review round 2 ran against `3cae2dd`, and found two errors of the plan author's — CLOSED 2026-11-04 — governance record
 
@@ -751,3 +753,18 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **Lesson**: after changing a rule or regenerating a value, search the whole plan set for the tests and the figures that depend on it, by the old value itself.
 - **Still open**: R2-F4, R2-F5, R2-F6 and R2-F8; `-008` and `-009`; the owner decisions O-1 to O-4, R1-F, R1-G and `-004` to `-006`. Whether round 2 clears authorization boundary 1, and whether `08` is the review of record, are the owner's decisions.
 - **Scope**: closed.
+
+## KI-SENTINEL-20261104-011: Audience binding is now required (O-2), and its mechanism decides whether the v1 layout that S1 implements is final — OPEN 2026-11-04 — design — blocks S1's authorization until ruled
+
+- **Classification**: Design requirement, with an open mechanism.
+- **Source**: the owner's direction O-2 in the disposition on review round 2 (2026-11-04): "Require explicit audience binding for authenticated envelopes. The audience must be validated against the intended receiving authority." Round 2 (`08`) had raised it: no record binds an audience or a deployment.
+- **Why it is open**: the direction does not say how the audience is bound, and each way changes S1. (a) A bound audience record changes the v1 layout, the 46 records and the frozen vectors that S1 must match, and needs its own review. (b) Binding it in key derivation leaves the layout unchanged and changes S1's `deriveAuthKey`. (c) Binding it in the registration needs the O-3 scope model (`-012`) first.
+- **Request**: `09` asks the owner to rule the mechanism before S1 is authorized.
+- **Scope**: open.
+
+## KI-SENTINEL-20261104-012: Registrations must carry an explicit scope (O-3), and no scope or authorization model exists — OPEN 2026-11-04 — design — blocks registration changes
+
+- **Classification**: Design requirement.
+- **Source**: the owner's direction O-3 (2026-11-04): "Do not approve tenant-unscoped registrations by default. Require an explicit registration scope and authorization model before implementation." Round 2 had raised it: a registration is not scoped to a tenant, so a producer's key can sign for any tenant.
+- **What is missing**: the scope model — what a registration's scope names, how the gateway enforces it against the authenticated tenant, and how the secrets file declares it (a schema change that `KI-SENTINEL-20261030-002` and slice S6 also touch).
+- **Scope**: open. No registration change may be implemented until the model is specified and approved. S1 makes no registration change.

@@ -187,8 +187,11 @@ All in `round2-work/` next to this file: `r2_encoder.mjs`, `r2_reproduce.mjs`, `
 
 *Archival note, added by the plan author when this review entered the plan set (2026-11-04). Nothing
 above this line is changed. The artifacts listed under "Artifacts" are copied unchanged to
-`evidence/round2/`; run them from that directory as "Method" describes, with a detached worktree of
-`3cae2dd` where a probe needs the compiled code. `MANIFEST.md` pins each file. Two should-fix
+`evidence/round2/`. They expect the layout "Method" describes, with the frozen export as a sibling
+directory: export `3cae2dd` to `round2-frozen/`, copy `evidence/round2/` to `round2-work/` beside it,
+and run each script from `round2-work/`; a probe that needs the compiled code also needs a detached
+worktree of `3cae2dd`. (Corrected 2026-11-04: an earlier version of this note said to run them from
+`evidence/round2/` itself, which fails.) `MANIFEST.md` pins each file. Two should-fix
 findings were corrected in the same pull request, because they were the author's own errors: R2-F3
 in `04` (ADV-H10, NEG-L04, PROP-H01) and R2-F7 in `05` (R-9). The other findings stay open, with the
 conditions this review lists. This document becomes the review of record for round 2 if the owner

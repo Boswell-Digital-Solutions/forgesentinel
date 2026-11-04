@@ -3,24 +3,25 @@
 - Plan ID: **BDS-SNT-ENVELOPE-AUTH-001**
 - Finding: **KI-SENTINEL-20261102-008**
 - Generated: **2026-11-02**
-- Revision: **rulings R1-A to R1-E recorded; amendment 3 supersedes D-2's bound record count of 41 and states no replacement; slice SL added; three further R1-C rulings recorded — the measurement is a conditional baseline (14 to 18 of 51, by family scoping and `control_origin`) and S2's scope is all 51 declared fields, and `integrity.signature` gets syntax validation; owner rulings on the four recommendations applied; PR #39 review rulings 5 and 6 applied; gate 5 extended to every pre-authentication failure; two round-1 decisions open (R1-F, R1-G; R1-H ruled); the owner ruling on KI-SENTINEL-20261104-001 (2026-11-04) moves the format's count, contexts, field table and worked example to a documentation-only regeneration of `01` before round 2; **`01` regenerated 2026-11-04: 46 fixed records, R1-A's binding contexts settled, signing coverage enumerated, worked examples derived by `evidence/derive_01_regeneration.mjs`**; **revised after the four-lane retest of `de52ad3` (KI-SENTINEL-20261104-007): encoder failure rules for required fields and objects, the signature-context key-id rule, example B with one key id; three owner decisions recorded open (KI-SENTINEL-20261104-004 to -006)**; **round 2's frozen commit named in `07`: `3cae2dd` (2026-11-04), operator authorization tentative; KI-SENTINEL-20261104-001 closed**; **review round 2 ran against `3cae2dd` (`08`): safe to proceed to implementation authorization with the conditions listed; R2-F3 and R2-F7 corrected**; implementation stays unauthorized**
+- Revision: **rulings R1-A to R1-E recorded; amendment 3 supersedes D-2's bound record count of 41 and states no replacement; slice SL added; three further R1-C rulings recorded — the measurement is a conditional baseline (14 to 18 of 51, by family scoping and `control_origin`) and S2's scope is all 51 declared fields, and `integrity.signature` gets syntax validation; owner rulings on the four recommendations applied; PR #39 review rulings 5 and 6 applied; gate 5 extended to every pre-authentication failure; two round-1 decisions open (R1-F, R1-G; R1-H ruled); the owner ruling on KI-SENTINEL-20261104-001 (2026-11-04) moves the format's count, contexts, field table and worked example to a documentation-only regeneration of `01` before round 2; **`01` regenerated 2026-11-04: 46 fixed records, R1-A's binding contexts settled, signing coverage enumerated, worked examples derived by `evidence/derive_01_regeneration.mjs`**; **revised after the four-lane retest of `de52ad3` (KI-SENTINEL-20261104-007): encoder failure rules for required fields and objects, the signature-context key-id rule, example B with one key id; three owner decisions recorded open (KI-SENTINEL-20261104-004 to -006)**; **round 2's frozen commit named in `07`: `3cae2dd` (2026-11-04), operator authorization tentative; KI-SENTINEL-20261104-001 closed**; **review round 2 ran against `3cae2dd` (`08`): safe to proceed to implementation authorization with the conditions listed; R2-F3 and R2-F7 corrected**; **owner disposition on round 2 recorded (2026-11-04): `08` accepted as the review of record, boundary 1 cleared conditionally for S1 only, directions O-1 to O-4 and R2-F2; R2-F4 corrected; `09` requests S1 authorization — nothing authorized**; implementation stays unauthorized**
 - Remediated: **blocking items 7 and 8 are corrected (2026-11-03): no Ed25519 representation is presented as approved, the HMAC text-form citation names the code that enforces it rather than a sentence about `credential.token`, and the flat admit figure is stated conditionally. Blocking item 6 was **withdrawn as a finding**: the S2-before-S6 sequencing ruling is the owner's, issued 2026-11-02 and re-confirmed 2026-11-03, and the text that called it invented is removed. `KI-SENTINEL-20261102-020` records that episode and its control.**
 - Amended on: **4225489**, then **fee3125**, then **6c492dd**
 - Base commit: **432337c**
 - Merged as: **79698ac**
-- Markdown documents: **9**
+- Markdown documents: **10**
 
 | File | Bytes | SHA-256 |
 |---|---:|---|
-| `00_README.md` | 12438 | `bb9da03d35c7e2a1fcf800f8e8111e65d2b607eee8f761302685ce788d518988` |
+| `00_README.md` | 12754 | `462819e5e7d924cfd1b2c1c91d978c73e444bac45d5a898548501b798a484c4e` |
 | `01_CANONICAL_AUTHENTICATION_FORMAT.md` | 57944 | `4eba639b0c1ae84b0ee0009253f90e39da7fe096ae83e8fd427e461245eefd32` |
 | `02_SIGNATURE_BINDING.md` | 14383 | `f79decc5b256a335052191c03437a21588b9879b6b34406de8b27240b024cdc1` |
 | `03_COMPATIBILITY_AND_CALLER_IMPACT.md` | 10220 | `e3bf4f401618060de72b8c9b0bb39f218435c1f0d38f9345214a4c863e6de471` |
-| `04_NEGATIVE_TEST_MATRIX.md` | 30853 | `97b240c3ea4e618464510b827723fb51be87e7e5de0f1f9c9a603ff8efdb2760` |
-| `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | 24013 | `3401b267c3df8bf5366bc20c015b8ca29c30e6974e36836b5a46632460d3b590` |
-| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | 65371 | `cd6454764c6c9ebd4bfbed852d941e9e96fccae106a87dc87e3186a32ba5f0b1` |
-| `07_REVIEW_ROUND_1_FINDINGS.md` | 18995 | `623b8973166695a9a059a08c75ce3616c2de186656e64643c623f499d1644bf5` |
-| `08_REVIEW_ROUND_2_FINDINGS.md` | 26214 | `6c6ce5aa5a63655ced1bbd6211d1cbff5940403c65d6732fc39ec9d4300797f1` |
+| `04_NEGATIVE_TEST_MATRIX.md` | 31500 | `4518f30d25f44a5752a438884733e4dcb89a876d23e0fc49c1d6ead3213127bd` |
+| `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | 24177 | `4032c2b12b39274a20af2650a99570d4173f21c83c91c826a3426909587e64fc` |
+| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | 69534 | `cc8bdb91b6eb68aa042e8fbbd5f8de2ca60a8ec5c561055d10e5ae6f167ac0c9` |
+| `07_REVIEW_ROUND_1_FINDINGS.md` | 19179 | `637cfc1beb055cfb6f04b318bcf134d167d3771bae39f34e557567bfddf8094b` |
+| `08_REVIEW_ROUND_2_FINDINGS.md` | 26507 | `1bc306650b95894a8efa025789c5d2a1b94b375c2724f328a7e7fa61cfe231ea` |
+| `09_S1_IMPLEMENTATION_AUTHORIZATION_REQUEST.md` | 11344 | `06740abddf4222242b3a891dae337bc713a92c77d4ab41232f7f88f54063bbc4` |
 
 Design evidence, frozen with the documents:
 
@@ -36,6 +37,8 @@ Design evidence, frozen with the documents:
 | `evidence/round2/r2_probe_parents.mjs` | 1491 | `7f6ed9bff532df7f6dd676db8ed2eb204e748e7babc45f1bad9547c1f95f31c5` |
 | `evidence/round2/r2_probe_proph02.mjs` | 891 | `48bd7df3fadc17d079e0d049ffb349d806e27163aaa1091fcd41d235abd5136f` |
 | `evidence/round2/r2_reproduce.mjs` | 3053 | `518e5be001429bf146df4316ea5fa76e0a0dddc019bf41e6f81d789c30874f1e` |
+| `evidence/s1_preconditions/r2f3_matrix_check.mjs` | 3029 | `078e88b244be008d8a12ceb79e176a08570b2f49e757e262821c6f057e152799` |
+| `evidence/s1_preconditions/r2f4_proph02_check.mjs` | 3309 | `31ba536d905a80776a53cd44ef4c57b031bb9f8247d6d7c2d8724749d75b33b8` |
 
 The hashes above cover the documents as they stand. They are not a statement that the content is current.
 
