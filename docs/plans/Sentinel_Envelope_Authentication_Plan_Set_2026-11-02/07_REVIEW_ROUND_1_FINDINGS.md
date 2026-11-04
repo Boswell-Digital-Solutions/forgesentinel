@@ -132,7 +132,8 @@ and F3 are settled in design and open in fact.
 1. The ruled fixes for F1, F2 and F3, re-attacked. R1-A, R1-B and R1-C name
    them, so round 2 attacks a corrected design and not a candidate. In scope:
    the three parent presence records, the R1-A binding and refusal, the R1-C type
-   rules, the regenerated field table, and the record count that slice S1 derives.
+   rules, the regenerated field table, the worked example and the record count,
+   all produced by the design-stage regeneration of `01` that the owner ruling on `KI-SENTINEL-20261104-001` in `06` (2026-11-04) requires before round 2.
    Round 2 reviews the corrected `01`, not a running implementation — an earlier
    draft said round 2 needed slices S1 and S2 to exist, which contradicted the
    authorization boundaries in `06`.

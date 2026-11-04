@@ -39,7 +39,9 @@ this.
 **The record count in this plan set is superseded.** D-2 fixed it at 41, and
 amendment 3 in `06` supersedes that without stating a replacement, because R1-A's
 binding contexts are unsettled. The 41-row field table and the 1479-byte worked
-example in `01` are stale, and slice S1 regenerates them.
+example in `01` are stale. Under the owner ruling on `KI-SENTINEL-20261104-001` in `06` (2026-11-04),
+a documentation-only regeneration of `01` corrects them before round 2; slice S1
+implements the reviewed format and cannot define it.
 
 The owner rules the correction a **P0 security priority**. The verified
 cross-tenant event re-targeting is a security-significant authentication

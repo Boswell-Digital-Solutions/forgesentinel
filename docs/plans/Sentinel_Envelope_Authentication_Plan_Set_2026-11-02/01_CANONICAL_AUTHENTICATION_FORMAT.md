@@ -24,7 +24,7 @@ produce them:
 1. The bound record count of 41 is **superseded, and no replacement count is
    stated**. R1-B adds a presence record for each of the three optional parents,
    and R1-A's binding adds an unsettled number more, so the total is not yet
-   derivable. Amendment 3 in `06` records that, and slice S1 derives and
+   derivable. Amendment 3 in `06` records that. Under the owner ruling on `KI-SENTINEL-20261104-001` in `06` (2026-11-04), the documentation-only regeneration of this document derives and
    publishes the count. **The field table below still has 41 rows and is stale.**
 2. The worked example below — 41 records and 1479 bytes — is **superseded**. It
    must be regenerated, and the round-1 reviewer reproduced the old value byte
@@ -271,8 +271,9 @@ adds a presence record for each of `tenant`, `resource` and `control_lineage`,
 and R1-A binds `integrity.signature` and `integrity.signature_key_id` where they
 may appear. Both change the rows and the numbering. Every record **index** cited
 in this document and in `02`, `04`, `05` and ADR-027 shifts when a record is
-inserted, so those citations are stale too. Slice S1 regenerates this table, the
-indices and the derived count together. Amendment 3 in `06` records the scope.
+inserted, so those citations are stale too. Under the owner ruling on `KI-SENTINEL-20261104-001` in `06` (2026-11-04), the documentation-only
+regeneration of this document corrects this table, the indices and the derived count together,
+before round 2. Amendment 3 in `06` records the scope.
 
 | # | Field name | Tag | Source |
 |---:|---|---|---|
@@ -333,8 +334,8 @@ legitimately appear, so the sentence above no longer holds for the whole format.
 It still holds in one direction that no ruling can change: a value cannot be
 bound into the bytes it signs, so `integrity.signature` cannot be an input to the
 `signature` context that produces it. Which contexts bind which field is **not
-settled by the ruling**. Slice S1 names them, and amendment 3 in `06` records
-that the bound record count cannot be derived until it does.
+settled by the ruling**. Under the owner ruling on `KI-SENTINEL-20261104-001` in `06` (2026-11-04), the design names them before round 2, and
+the bound record count is derived once it does. Slice S1 does not define them.
 
 **BLOCKING DEFECT, review finding F3.** `integrity.signature_key_id` is also
 unbound in the `credential` context: record 3 carries it only when the context
@@ -610,8 +611,10 @@ The example above has 41 records and 1479 bytes. R1-B adds three parent presence
 records and R1-A binds the two signature fields, so a corrected example has more
 records and a different byte count. **This document states no corrected count**,
 because R1-A's binding contexts are not settled, so the total is not derivable
-yet. Amendment 3 in `06` records that. The example is not regenerated here,
-because that is encoder work and slice S1 owns it, together with the count.
+yet. Amendment 3 in `06` records that. Under the owner ruling on `KI-SENTINEL-20261104-001` in `06` (2026-11-04), the example is regenerated in
+this document before round 2, as a documentation-only change, using a disposable derivation script
+kept as design evidence that nothing in `src/` imports; the round-2 reviewer reproduces it
+independently.
 
 The round-1 reviewer reproduced the 1479-byte value byte for byte before making
 any claim, which is why the stale value is called out rather than quietly left.
