@@ -48,6 +48,8 @@ owner amended this. The two values must now use independent keys.
 - `K_credential = HKDF-SHA256(ikm = producer secret, salt = the format name, info = "credential|" + key_id, L = 32)`
 - `K_signature  = HKDF-SHA256(ikm = producer secret, salt = the format name, info = "signature|" + key_id, L = 32)`
 
+> **Superseded for `info` (2026-11-04).** The O-2 derivation contract replaces the `info` above. The salt and `L` do not change. `02` ("Key derivation") and `09` section 3 state the current contract. The ruling text above stays as it was given.
+
 The `context` record stays. Separation then holds at the key and at the
 message. `node:crypto.hkdfSync` provides HKDF-SHA256, so the repository stays
 dependency-free.

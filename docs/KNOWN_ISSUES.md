@@ -793,4 +793,10 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **F2 (Low)**: `09` sections 3.1 and 3.3 cap the audience at 255 characters, and the grammar alone allows 515. No input reaches the cap, so removing it passes all 21 checks (mutant M1; the author confirmed it).
 - **F3 (Low, documentation)**: `09` section 4 said "no MAC or key value appears in the plan set", which was not true after revision 3. `-011` said "Still open: the owner's approval of the contract" after the owner had approved it.
 - **Disposition**: the owner made F1 and F2 S1 acceptance-test requirements. `09` revision 4 states them: T-18 adds a non-ASCII key-id known answer, with its UTF-8 length checked, and T-16 adds the 255/256 audience boundary. F3 is corrected in `09` section 4 and in `-011`. The evidence script stays as reviewed at `f143b23`.
+- **Review of the `02` revision (PR #51, `adb95e2`)**: Grok Bot's independent review gave PASS and four findings, kept on PR #51.
+  - **R1** (`06` Amendment 1 still summarized the retired `info`): corrected. A pointer to the O-2 contract was added, and the ruling text stays.
+  - **R2** (`02` paraphrased the audience grammar more loosely than `09` section 3.1): corrected. `02` now quotes the regular expression.
+  - **R3**: no change. The owner already approved the one-audience gateway rule as a design requirement (`06`).
+  - **R4**: closed. PR #50 keeps the G8 review and the author's re-check.
+  - The owner authorized the R1 and R2 corrections (2026-11-04). Their head goes for re-review before its merge.
 - **Scope**: open for F1 and F2 until S1's suite passes T-16 and T-18 at the G8 review of S1. F3 is closed by the `02` revision, when that revision merges. **F1 and F2 are not resolved by a document.**
