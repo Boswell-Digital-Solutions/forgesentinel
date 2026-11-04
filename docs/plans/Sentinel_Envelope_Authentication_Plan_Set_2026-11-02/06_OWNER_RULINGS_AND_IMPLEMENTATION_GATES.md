@@ -1085,8 +1085,10 @@ regeneration brings them into line in the same change, or round 2 would review a
 The golden vector stays with S1, and it must reproduce the reviewed worked example byte for byte.
 
 **What it does not do.** It authorizes no implementation, enforcement, deployment, credential change
-or merge. It does not rule R1-F or R1-G. `KI-SENTINEL-20261104-001` stays open until the regenerated
-`01` exists and round 2 can start against a frozen commit.
+or merge. It does not rule R1-F or R1-G. `KI-SENTINEL-20261104-001` stayed open until the regenerated
+`01` exists and round 2 can start against a frozen commit. Both conditions were met on
+2026-11-04: the regenerated `01` is on `master` (#46, corrected by #47), and `07` names round 2's
+frozen commit, `3cae2dd`. The entry is closed.
 
 ## Findings disposition
 
@@ -1106,7 +1108,8 @@ Three boundaries, in order. Each needs its own explicit authorization.
    "not safe to proceed to implementation authorization as written", so this
    boundary is **not** cleared. The owner ruled on all three format fixes on
    2026-11-02, so what remains is round 2 against the corrected `01`, with a
-   frozen commit named before it starts. Merging the documentation did not clear
+   frozen commit named before it starts. The commit is named: `3cae2dd`
+   (`07`, 2026-11-04). Merging the documentation did not clear
    it, and neither did the rulings.
 2. **Implementation authorization.** Each slice in `05` needs the owner's
    explicit authorization. Design approval is not implementation authorization.

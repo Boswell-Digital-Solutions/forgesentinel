@@ -153,6 +153,23 @@ and F3 are settled in design and open in fact.
 5. **A frozen commit, named before the review starts.** Ruled by the owner on
    2026-11-02, together with an independent adversarial assessment.
 
+### Round 2: the frozen commit (named 2026-11-04)
+
+**Round 2 reviews commit `3cae2dd` (`3cae2dd560ba20e69b6249f21cb2174db13e8f4d`)**, `master` after pull
+request #47. That commit carries the regenerated `01`, its derivation script, and the corrections
+of the four-lane retest (`KI-SENTINEL-20261104-007`). The review reads those bytes and no later
+ones: a change merged after `3cae2dd` is not under review, and a finding that a later commit already
+corrects is still reported against `3cae2dd`.
+
+**Authorization.** The operator authorized round 2 on 2026-11-04 in these words: "proceed —
+tentatively authorized". The authorization is recorded as tentative. It covers naming this commit
+and commissioning the independent review. It decides none of the open owner decisions — R1-F, R1-G,
+and `KI-SENTINEL-20261104-004` to `-006` — and it authorizes no implementation.
+
+**Order, per the process finding above.** The reviewer first reads the current
+`docs/KNOWN_ISSUES.md` and this document, then reviews `3cae2dd`. Round 2's findings become a
+document of record in this plan set, as round 1's did.
+
 ### Why the frozen commit is a ruling and not a preference
 
 A second adversarial review ran against `e0a4b52` after round 1. It found no

@@ -647,7 +647,7 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
   5. A reviewer's report is a claim. Before acting on one that contradicts an owner attribution, check the primary record.
 - **Status**: Closed — the attribution is settled by primary evidence, the record is corrected, and the control is written above. The sequencing ruling stands. Slice S2 remains unauthorized, and Gate 2 stays open.
 
-## KI-SENTINEL-20261104-001: Review round 2 cannot start, because the corrected format it must review is owned by slice S1, which cannot be authorized before round 2 — OPEN 2026-11-04 — governance — ruled and regenerated the same day, awaiting round 2's frozen commit
+## KI-SENTINEL-20261104-001: Review round 2 cannot start, because the corrected format it must review is owned by slice S1, which cannot be authorized before round 2 — CLOSED 2026-11-04 — governance
 
 - **Classification**: Governance and sequencing. No code. It blocks the envelope authentication track at authorization boundary 1. These open security findings name the track or one of its slices in their own entries, so they wait on it: `-006`, `-008` (P0), `-009`, `-011` (high), `-012`, `-016`, `-017` and `-019`. `07` ties `-014` to ruling R1-A as well. Other open findings may depend on the track without saying so; this list counts only the stated ties.
 - **Discovery source**: a review of `master` at `263b7b1` on 2026-11-04. Measured by reading the cited lines, not inferred.
@@ -668,6 +668,7 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **Scope**: open until the regenerated `01` exists and round 2 can start against a frozen commit. The ruling settles the sequencing. It does not do the regeneration.
 - **Progress (2026-11-04)**: `01` is regenerated, documentation only, in the pull request that follows #45. It settles R1-A's binding contexts, enumerates the signing coverage the ruling requires, reconciles all 51 declared fields, derives the count (46 fixed records, plus one per finding id) and regenerates the worked examples with `evidence/derive_01_regeneration.mjs`, whose positive control reproduces the superseded 1479-byte example. The record indices in `02`, `04`, `05`, ADR-027 and this file are renumbered. This entry closes when that change is merged and the frozen commit for round 2 is named in `07`.
 
+- **Closed (2026-11-04)**: both conditions are met. The regenerated `01` is on `master` (#46 `de52ad3`, corrected by #47 `3cae2dd`), and `07` names round 2's frozen commit: `3cae2dd`. The operator authorized round 2 on 2026-11-04, tentatively ("proceed — tentatively authorized"). The authorization decides none of the open owner decisions (R1-F, R1-G, `-004` to `-006`) and authorizes no implementation.
 ## KI-SENTINEL-20261104-002: Four statements said three round-1 decisions stay open after ruling 3 had answered R1-H — CLOSED 2026-11-04 — governance record
 
 - **Classification**: Governance record accuracy. No code, no security impact.

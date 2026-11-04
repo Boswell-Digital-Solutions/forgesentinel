@@ -31,8 +31,8 @@ the findings. **The owner ruled all three fixes on 2026-11-02 — R1-A, R1-B and
 R1-C — and a ruling is not a correction**: the three defects are settled in
 design and open in fact. Gate 2 stays open until slice S1 applies them **and**
 review round 2 re-attacks them against a frozen commit.
-Round 2 reviews the corrected `01` and still needs a frozen commit named before
-it starts. No pull-request review is submitted on GitHub, so the review of record
+Round 2 reviews the corrected `01` at the frozen commit `3cae2dd`, named in `07`
+on 2026-11-04. No pull-request review is submitted on GitHub, so the review of record
 is that document. A green documentation check is not a substitute for any of
 this.
 
