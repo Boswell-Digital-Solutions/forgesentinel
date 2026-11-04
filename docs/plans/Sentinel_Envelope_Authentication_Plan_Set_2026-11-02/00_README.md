@@ -154,8 +154,8 @@ Not in scope for this plan set, and not changed by it:
 | `03_COMPATIBILITY_AND_CALLER_IMPACT.md` | No installed base, no shim; fixtures, `buildEvent`, test support |
 | `04_NEGATIVE_TEST_MATRIX.md` | The negative tests and the positive controls |
 | `05_VERIFICATION_DECISIONS_RISKS_AND_SLICES.md` | Gates, the ruled decisions, risks, proposed slices, the plan registry request |
-| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | **Authoritative.** The ten D-series rulings, the three amendments, the five implementation gates, the four recommendations pending ruling, the five round-1 rulings R1-A to R1-E, the findings disposition, the authorization boundaries |
-| `07_REVIEW_ROUND_1_FINDINGS.md` | Independent review round 1: the verdict, the blocking defects, what was re-verified, and the design decisions — five ruled, three open |
+| `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` | **Authoritative.** The ten D-series rulings, the three amendments, the five implementation gates, the four recommendations and their four rulings, rulings 5 and 6, the six round-1 rulings (R1-A to R1-E, and R1-H through ruling 3), the owner ruling on `KI-SENTINEL-20261104-001`, the findings disposition, the authorization boundaries |
+| `07_REVIEW_ROUND_1_FINDINGS.md` | Independent review round 1: the verdict, the blocking defects, what was re-verified, and the design decisions — six ruled, two open (R1-F, R1-G) |
 | `MANIFEST.md` | File sizes and SHA-256 digests |
 
 ## Sources read for this plan

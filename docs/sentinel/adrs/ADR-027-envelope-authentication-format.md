@@ -1,7 +1,7 @@
 # ADR-027: Authenticate the Security-Relevant Event Envelope, Not Only the Payload Hash
 
 **Status:** Accepted for design (2026-11-02). Implementation is not authorized. Independent review round 1 returned blocking defects in the format; a second round is required.
-**Amended:** 2026-11-02, by owner rulings R1-A, R1-B and R1-C. The three blocking defects now have ruled fixes, and **the count of 41 records below is superseded.** A ruling is not a correction: the defects are settled in design and open in fact. Amendment 3 in `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` states why no replacement count is given, and slice S1 derives it.
+**Amended:** 2026-11-02, by owner rulings R1-A, R1-B and R1-C. The three blocking defects now have ruled fixes, and **the count of 41 records below is superseded.** A ruling is not a correction: the defects are settled in design and open in fact. Amendment 3 in `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` states why no replacement count was given then. The regeneration of `01` (2026-11-04), under the owner ruling on `KI-SENTINEL-20261104-001`, derived it: **46 fixed records**, plus one for each finding id.
 **Amended again:** 2026-11-02, by three further R1-C rulings in `06`. The validator's scope is all **51** declared envelope fields, which is 34 required and 17 optional. The count that admits a wrong-typed value is **conditional on the family scoping and on `control_origin`**, and it runs from 14 to **18** of 51, so no flat figure states it; `06` holds the matrix. That range is a baseline and not a test inventory. `integrity.signature` gets **syntax validation** for encoding, length and canonical form, against the approved representation for the algorithm in force. For HMAC-SHA256 that is 64 lowercase hex, enforced in code by `HMAC_HEX_PATTERN` at `src/spine/gateway.ts:186`. **No Ed25519 representation is approved**: `02` records the 128-hex form as an open implementation item needing a second pattern constant, and the owner ruled that the representation must be specified before any hex-only requirement goes in. A provisional hex-only rule and a permissive string fallback are both unauthorized. **Slice S2 may precede slice S6 under five fail-closed conditions**, by the owner's ruling of 2026-11-02, re-confirmed on 2026-11-03 after a challenge reported it as invented; `06` holds the provenance. The ordering is not permission to begin. Neither slice gains implementation authorization.
 **Addresses:** `KI-SENTINEL-20261102-008`
 **Depends on:** `KI-SENTINEL-20261102-006` (corrected and verified), ADR-026
@@ -46,7 +46,7 @@ not yet proved: review round 1 found three defects that break it (see
    record for each of the three optional parents, `tenant`, `resource` and
    `control_lineage`, so injectivity rests on the encoding and never on the
    validator. **The list was 41 records and that count is superseded**, because
-   R1-B adds three and R1-A's binding adds an unsettled number more.
+   R1-B adds three and R1-A's binding added a number unsettled at the time; `01` has since derived the total, 46.
 2. **The version tag is inside the authenticated bytes.** Record 1 holds the
    format name, so it cannot be stripped or downgraded. The gateway holds the
    accepted name as a constant, and it reads no version from the event.
@@ -124,4 +124,4 @@ migration changes the key material and not the authenticated bytes.
 
 This ADR records an accepted design. It does not authorize implementation.
 The owner set three boundaries, in order: design review, then implementation
-authorization for each slice, then production deployment authorization.
+authorization for each slice, then deployment authorization.

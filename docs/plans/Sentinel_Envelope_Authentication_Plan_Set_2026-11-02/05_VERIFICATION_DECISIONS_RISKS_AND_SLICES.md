@@ -58,7 +58,7 @@ with every condition. The summary:
 | ID | Decision | Ruling | The condition that binds the implementation |
 |---|---|---|---|
 | D-1 | How the payload is bound | Approved | Depend on `KI-SENTINEL-20261102-006`. The corrected digest must be **verified** before envelope authentication relies on it. |
-| D-2 | The bound field set | Approved; **the count is superseded** | Bind all fixed records plus one record for each control-lineage finding id. **The count of 41 is superseded by rulings R1-A and R1-B, and no replacement is stated**: R1-B adds three parent presence records, and R1-A's binding adds an unsettled number more. The regeneration of `01` (2026-11-04) derived it: **46 fixed records**, plus one for each finding id. See amendment 3 in `06`. A future authenticated field needs a versioned format change. |
+| D-2 | The bound field set | Approved; **the count is superseded** | Bind all fixed records plus one record for each control-lineage finding id. **The count of 41 is superseded by rulings R1-A and R1-B, and no replacement is stated**: R1-B adds three parent presence records, and R1-A's binding added a number unsettled at the time. The regeneration of `01` (2026-11-04) derived it: **46 fixed records**, plus one for each finding id. See amendment 3 in `06`. A future authenticated field needs a versioned format change. |
 | D-3 | The rejection reason code | Approved | `producer_auth_failed` externally. Keep internal diagnostic categories, and do not leak them. |
 | D-4 | Version and algorithm handling | Approved | The gateway controls both. Refuse an unsupported version. Never negotiate an algorithm from event input. |
 | D-5 | Unknown envelope fields | Approved | Refuse them. Define permitted extension points, if any, in a future version. |
@@ -82,7 +82,7 @@ each lives in `04_NEGATIVE_TEST_MATRIX.md`:
 | Gate | Proof |
 |---|---|
 | 1 No unauthenticated compatibility fallback | NEG-E07, and gate G9 below |
-| 2 The canonical encoding must be injective | Group H: a seeded property suite and seven adversarial cases |
+| 2 The canonical encoding must be injective | Group H: a seeded property suite and nine adversarial cases (ADV-H03 to ADV-H11) |
 | 3 Verify before side effects | Group J |
 | 4 Test tenant isolation explicitly | Group B and group I |
 | 5 Preserve operational evidence | Group K |
@@ -135,7 +135,7 @@ authorizes the first slice.
 | R-2 | Enforcement before the `KI-SENTINEL-20261102-006` correction authenticates the envelope and leaves the payload malleable. | D-1, as ruled: the corrected digest must be **verified**, not only landed. Cases NEG-F06 and NEG-F07 hold the track open. The owner's disposition forbids closing `KI-SENTINEL-20261102-006` on passing tests alone. |
 | R-3 | A test helper that both signs and verifies hides a defect, and every test still passes. | Rule 2 in `04`: a case builds its own input and does not call `resign` or `buildEvent` for the value under test. |
 | R-4 | A producer that corrects `observed_at`, a data-policy field or a trace id after signing breaks its own authentication. | This is a producer-implementation cost, not a migration cost. No producer exists yet. State the rule in `doc/system/03-runtime-boundary.md`: sign last. |
-| R-5 | A new envelope field is added later, and nobody adds it to the field list. It is then unbound and malleable. | Add a drift test: the bound field list must cover every field that `validateEventEnvelope` admits, minus a **named** exclusion list with a reason for each entry. Review finding F7 showed the test is unimplementable without that list, because `payload` (bound through record 36), `integrity.signature` and `integrity.signature_key_id` are admitted and not bound; an unstated exclusion list is exactly where finding F3 re-enters. The test must also compare leaf **types**, not only field names (review finding F5). **R1-C rules that type comparison in (2026-11-02), and R1-A shrinks the exclusion list.** Under R1-A, `integrity.signature` and `integrity.signature_key_id` are refused on a no-signature event and bound where they may appear, so they leave the exclusion list instead of sitting on it unstated. That removes the route by which F3 re-entered. `payload` stays on the exclusion list, bound through the payload-digest record. Whether it is the **only** remaining entry is for slice S2 to determine and name, because R1-C widens what the validator admits a type rule for, and because `01` still describes `integrity.signature` as an output of the format rather than an input to it. R1-A does not by itself settle that tension. **The drift test covers all 51 declared fields, by R1-C's further ruling.** A newly declared field with no type rule must fail the test, so the test reads the declared field list and does not hold a hand-written copy of today's 17 admissions. |
+| R-5 | A new envelope field is added later, and nobody adds it to the field list. It is then unbound and malleable. | Add a drift test: the bound field list must cover every field that `validateEventEnvelope` admits, minus a **named** exclusion list with a reason for each entry. Review finding F7 showed the test is unimplementable without that list, because `payload` (bound through record 36), `integrity.signature` and `integrity.signature_key_id` are admitted and not bound; an unstated exclusion list is exactly where finding F3 re-enters. The test must also compare leaf **types**, not only field names (review finding F5). **R1-C rules that type comparison in (2026-11-02), and R1-A shrinks the exclusion list.** Under R1-A, `integrity.signature` and `integrity.signature_key_id` are refused on a no-signature event and bound where they may appear, so they leave the exclusion list instead of sitting on it unstated. That removes the route by which F3 re-entered. `payload` stays on the exclusion list, bound through the payload-digest record. Whether it is the **only** remaining entry is for slice S2 to determine and name, because R1-C widens what the validator admits a type rule for, and because `01` described `integrity.signature` as an output of the format rather than an input to it. The regeneration of `01` (2026-11-04) settled that: the signature is bound in the `credential` context and is the absent form in the `signature` context, and `01`'s reconciliation names `payload` as the one exclusion, bound through the digest. **The drift test covers all 51 declared fields, by R1-C's further ruling.** A newly declared field with no type rule must fail the test, so the test reads the declared field list and does not hold a hand-written copy of today's 17 admissions. |
 | R-6 | The Ed25519 slice changes `ProducerRegistration`, the secrets-file schema and the strength rules, which `KI-SENTINEL-20261030-002` also owns. | D-9. Do not run the two tracks at the same time. |
 | R-7 | 103 fixture lines change at once, and a reviewer cannot read 103 token changes. | G5: a scripted check that only `credential.token` and `integrity.signature` changed. |
 | R-8 | A real producer is built in another repository and implements the old token. | The golden vector is the cross-repository agreement. No repository implements the token today, so nothing is stranded now. |
@@ -171,8 +171,8 @@ adversarial tests for the corrected digest must be independently verified.
 SL is a prerequisite too, by ruling R1-D. It is not a part of this track, and it
 comes before S4, because gate 5 must have an implementable foundation when S4
 records the rejection-record shape. Three of its four defects — `-011`, `-016`
-and F34 — are not authentication defects, so they do not wait on the six open
-format decisions. The separation also keeps recommendation 2's reproduce-first
+and F34 — are not authentication defects, so they do not wait on the open
+format decisions (R1-F and R1-G). The separation also keeps recommendation 2's reproduce-first
 evidence stage free of ledger failures, because a reviewer reproducing the
 negative-test failures against the pinned vulnerable base must not have to sort
 an authentication failure from a ledger failure.
@@ -204,7 +204,8 @@ commit, and what the result was.
 #### The recommended evidence procedure
 
 The owner recommends option 1 with an ordered evidence procedure (recommendation
-2 in `06`; a recommendation, not yet a ruling):
+2 in `06`, since ruled as ruling 2: the combined pull-request structure is
+approved, and implementing it is not):
 
 1. The independent reviewer reproduces the negative-test failures **against the
    pinned vulnerable base**, before reading the corrected implementation.
@@ -229,6 +230,6 @@ no longer judge whether they would have caught the defect.
   independent reviewer confirms them.
 
 The owner set three authorization boundaries, in order: **design review first,
-implementation authorization second, production deployment authorization
+implementation authorization second, deployment authorization
 separately.** Design approval is not implementation authorization, and a merged
 implementation is not deployment authorization.

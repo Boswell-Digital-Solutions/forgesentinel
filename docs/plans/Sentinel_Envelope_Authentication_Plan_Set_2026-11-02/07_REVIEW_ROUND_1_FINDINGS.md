@@ -4,7 +4,7 @@
 - **Reviewed:** the plan set at `568b97d`, plus the live source at that head
 - **Reviewer:** an independent session with no exposure to the plan author's reasoning. It was given the plan set, the source, the owner's six binding requirements, the five implementation gates and the owner's six review axes.
 - **Verdict:** **not safe to proceed to implementation authorization as written.**
-- **Status:** No pull-request review is submitted on GitHub. This document is the review of record. The owner decides whether it satisfies recommendation 3.
+- **Status:** No pull-request review is submitted on GitHub. This document is the review of record. The owner ruled that it satisfies recommendation 3 (R1-H, answered by ruling 3 in `06`).
 
 The reviewer implemented the format from `01` and reproduced the worked example
 byte for byte — 41 records, 1479 bytes — before making any claim, so the
@@ -43,7 +43,7 @@ These were attacked and held:
 |---|---|---|---|
 | F1 | `control_lineage.sentinel_finding_ids` type confusion collides. `["a","b"]`, `"ab"` and `{0:"a",1:"b",length:2}` encode identically, and `validateEventEnvelope` admits all three. The spec refused only a bad array **element**, never a non-array. | Yes. All three validate; `length`, `[0]` and `[1]` are identical for the first three. | `01`, the encoder failure rules; ADV-H11 and NEG-L03 in `04` |
 | F2 | An absent optional parent object and a present empty one encode identically. `resource` absent against `resource: {}` — both valid, both accepted, same bytes. The same holds for `tenant` on a system-scoped family. | Yes, including the gateway accepting `resource: {}` with the original credential. | `01`, the absent-field section; ADV-H10 and NEG-L04 in `04` |
-| F3 | `integrity.signature` and `integrity.signature_key_id` are admitted, unbound in the credential context, and unverified on an event that needs no signature. | Yes. A 64-character bogus signature with `signature_key_id: "key_attacker"` was accepted and stored; so was a non-hex signature with a numeric key id. | `01`, the outputs section; `KI-SENTINEL-20261102-014`; ADV-H08 and NEG-L02 in `04` |
+| F3 | `integrity.signature` and `integrity.signature_key_id` are admitted, unbound in the credential context, and unverified on an event that needs no signature. | Yes. A 64-character bogus signature with `signature_key_id: "key_attacker"` was accepted and stored; so was a non-hex signature with a numeric key id. | `01`, "Ruling R1-A, settled in the design"; `KI-SENTINEL-20261102-014`; ADV-H08 and NEG-L02 in `04` |
 | F16 | ADV-H08 documented one of those collisions as correct behaviour, on the false premise that the strict validator would refuse the pair. Both are known fields that the validator never reads. | Yes, by F3. | `04`, ADV-H08 rewritten |
 | F30 | `06` stated as verified that the rejection record does not hold the credential. The token does not, but `credential.service` and `credential.key_id` are interpolated into the failure message, which reaches the ledger **and** the caller. Both are unbounded, unvalidated input. | Yes. A 200-character `key_id` with a NUL byte reached both; the caller message was 259 characters. | `06`, gate 5 corrected; `KI-SENTINEL-20261102-013`; EVD-K09 in `04` |
 | F31 | `cloudProjection` returns a rejection record's whole body before any data-policy check, so a `restricted`, `content_included: true`, `cloud_allowed: false` payload is published in full whenever an event is rejected. The same payload on an accepted event is correctly suppressed. | Yes. The projection of the rejection contained the manuscript string and the API key; the accepted event projected `null`. | `KI-SENTINEL-20261102-011`; EVD-K10 in `04`; `03` scope |
@@ -108,8 +108,8 @@ amendment to R1-E's wording, which did not reach the denial record in
 ruling 3 in `06` later answered R1-H, so **six are ruled and two stay open: R1-F
 and R1-G**. The table below gives each one. Amendment 3 in `06`
 supersedes D-2's bound record count of 41 and states no replacement (which the regeneration of `01` (2026-11-04) later derived: 46 fixed records), because
-R1-B adds three parent presence records and R1-A's binding adds an unsettled
-number more.
+R1-B adds three parent presence records and R1-A's binding added a number
+unsettled at the time.
 
 Round 1's findings and its verdict are unchanged by those rulings. The verdict
 stands: not safe to proceed to implementation authorization as written. The
