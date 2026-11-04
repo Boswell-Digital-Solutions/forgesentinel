@@ -260,8 +260,13 @@ let a forged event suppress a genuine one, which is the defect class of
 
 ## Group K: operational evidence (gate 5)
 
-Gate 5: an authentication failure must produce protected security telemetry,
-and must not expose a credential or a sensitive payload.
+Gate 5: every failure before successful authentication must produce protected
+security telemetry, and must not expose a credential or a sensitive payload.
+Ruling 5 in `06` extends the gate from an authentication failure to that whole
+class — a contract failure, a payload-hash mismatch, a producer-identity
+mismatch, an environment-boundary refusal, an event-type refusal, a
+tenant-required refusal and an encoder refusal — and this group must assert the
+record shape for each class.
 
 | Case | Construction | Required |
 |---|---|---|
@@ -269,7 +274,7 @@ and must not expose a credential or a sensitive payload.
 | EVD-K09 | The same, with a `credential.service` and a `credential.key_id` of 200 attacker-chosen characters including a NUL byte. | Neither value reaches the record, and neither reaches the caller's message. Verified to fail today: both reach both (`KI-SENTINEL-20261102-013`). |
 | EVD-K10 | Ingest a `restricted`, `content_included: true`, `cloud_allowed: false` event that fails any check. Call `cloudProjection` on the rejection record. | It returns no payload content and no `data_policy` from the rejected envelope. Verified to fail today: the projection returns the whole body, with no data-policy check at all (`KI-SENTINEL-20261102-011`). |
 | EVD-K11 | Ingest a failing event naming another tenant. Call `queryByTenant` for that tenant. | The forged record is not in that tenant's view. Verified to fail today (`KI-SENTINEL-20261102-012`). |
-| EVD-K02 | The same, with a `restricted` payload and `content_included: true`. | The record holds the shape the slice chose under gate 5, and the slice states that shape. The recommended shape is the permitted non-payload envelope metadata, plus a payload digest, plus the generic external code, plus the restricted internal category. |
+| EVD-K02 | The same, with a `restricted` payload and `content_included: true`. | The record holds exactly the five elements of ruling 1 in `06` — the gateway's own receipt timestamp, a gateway-generated rejection identifier, the failure reason, the fixed bounded set of non-sensitive diagnostics, and a digest of the received bytes labelled as observed and untrusted — and nothing from the envelope. |
 | EVD-K06 | Read the record's payload digest field. | It is labelled an observed, untrusted value. A reader cannot mistake it for proof that the producer sent the event. |
 | EVD-K07 | Ingest a failing event whose `data_policy` claims `sensitivity: public` and `cloud_allowed: true`, and one that claims `restricted`. | **Absolute predicate, not a comparison:** the record and its cloud projection carry no payload content and no `data_policy` field from the rejected envelope, whatever it claimed. Review finding F32: the original comparative wording passes against today's broken code, which treats both classifications identically by publishing both. |
 | EVD-K08 | Ingest a failing event with a forged `tenant.tenant_id` naming another tenant. | The record does not become readable to that tenant on the strength of the forged value. |
@@ -277,9 +282,10 @@ and must not expose a credential or a sensitive payload.
 | EVD-K04 | The same. Read the rejection record. | It carries one internal category from the closed set in `02_SIGNATURE_BINDING.md`. |
 | EVD-K05 | Ingest an event whose authentication fails. Read every log line and every thrown error. | No secret, no derived key and no token appears. |
 
-EVD-K02 depends on a design choice the slice must make and record. The test
-asserts the chosen shape. It must not be written to pass whatever the code
-happens to do.
+EVD-K02 asserts the shape that ruling 1 fixed. An earlier version left the shape
+to the slice and recommended keeping non-payload envelope metadata; ruling 1
+removed that metadata, and the slice no longer chooses the shape. The test must
+not be written to pass whatever the code happens to do.
 
 EVD-K06 to EVD-K08 come from recommendation 1 in `06`. They exist because every
 value on a failing event is attacker-chosen: the digest is observed and not
@@ -348,7 +354,7 @@ Sentinel Prime and the policy decisions must give the same output as before.
 | Owner implementation gate | Cases |
 |---|---|
 | 1 No unauthenticated compatibility fallback | NEG-E07, plus a source check that no module computes an HMAC over the payload hash alone |
-| 2 Injective canonical encoding | PROP-H01, PROP-H02, ADV-H03 to ADV-H09 |
+| 2 Injective canonical encoding | PROP-H01, PROP-H02, ADV-H03 to ADV-H11 |
 | 3 Verify before side effects | ORD-J01 to ORD-J05 |
 | 4 Explicit tenant isolation | NEG-B01 to NEG-B06, SUB-I01 to SUB-I10 |
 | 5 Protected operational evidence | EVD-K01 to EVD-K11 |

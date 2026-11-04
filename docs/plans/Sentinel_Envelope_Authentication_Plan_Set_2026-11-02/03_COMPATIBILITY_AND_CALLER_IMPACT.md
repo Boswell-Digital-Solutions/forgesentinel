@@ -56,7 +56,7 @@ second change merges. The golden vector in this plan exists for that purpose.
 | `src/spine/producers.ts` | `producerToken` takes the authenticated bytes, not the payload hash. `ProducerRegistry.authenticate` takes the validated event. `HMAC_HEX_PATTERN` is unchanged. |
 | `src/spine/gateway.ts` | `ingest` passes the event to `authenticate`. The signature check builds the `signature` context bytes. A new reason code, `envelope_not_encodable`, covers an envelope the encoder refuses. |
 | `src/spine/build.ts` | `buildEvent` builds the token and the signature from the encoder. The envelope is assembled first, then signed, because the signature covers the whole envelope. |
-| `src/contracts/envelope.ts` | `validateEventEnvelope` refuses an unknown field, at the top level and in each bound object (ruling D-5). Without this, an unbound field stays malleable. |
+| `src/contracts/envelope.ts` | `validateEventEnvelope` refuses an unknown field, at the top level and in each bound object (ruling D-5). Without this, an unbound field stays malleable. It also refuses `integrity.signature` and `integrity.signature_key_id` on a family that requires no signature (R1-A), type-validates all 51 declared fields (R1-C), and validates the syntax of `integrity.signature` (R1-C); `05`, slice S2, holds the scope. |
 | `src/index.ts` | Exports the new module. |
 
 `src/spine/ledger.ts` is **not** in this track, by ruling R1-D (2026-11-02).

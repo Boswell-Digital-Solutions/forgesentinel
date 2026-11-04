@@ -27,7 +27,7 @@ incident happened.
 | Decision | Ruling | Condition | Where the plan now states it |
 |---|---|---|---|
 | D-1 Payload binding | **Approved** | Depend on `KI-SENTINEL-20261102-006`. The corrected payload digest must be verified before envelope authentication relies on it. | `01`, "The payload digest"; slice S0 in `05` |
-| D-2 Bound field set | **Approved; the count is superseded by R1-A and R1-B** | Bind all fixed records plus one record for each control-lineage finding id. **The count of 41 is superseded, and amendment 3 states no replacement**: R1-B adds three parent presence records, and R1-A's binding adds an unsettled number more, so the total was not derivable when amendment 3 was written. The regeneration of `01` (2026-11-04) derived it: **46 fixed records**, plus one for each finding id. A future authenticated field needs a versioned format change; this correction does not trigger that clause. | Amendment 3 below. The field table in `01` is stale and still shows 41 rows. |
+| D-2 Bound field set | **Approved; the count is superseded by R1-A and R1-B** | Bind all fixed records plus one record for each control-lineage finding id. **The count of 41 is superseded, and amendment 3 states no replacement**: R1-B adds three parent presence records, and R1-A's binding added a number unsettled at the time, so the total was not derivable when amendment 3 was written. The regeneration of `01` (2026-11-04) derived it: **46 fixed records**, plus one for each finding id. A future authenticated field needs a versioned format change; this correction does not trigger that clause. | Amendment 3 below. The field table in `01` is regenerated: 46 fixed rows (2026-11-04). |
 | D-3 Rejection reason code | **Approved** | Use `producer_auth_failed` externally. Keep useful internal diagnostic categories, and do not leak them to a caller. | `02`, "One reason code"; gate 5 below |
 | D-4 Version and algorithm | **Approved** | The gateway controls the algorithm and the version. Refuse an unsupported version. Never negotiate an algorithm from event input. | `01`, "Format name and version tag"; `02`, "Why the format carries no algorithm record" |
 | D-5 Unknown fields | **Approved** | Refuse an unknown envelope field. Define the permitted extension points, if any, in a future version. | `01`, "Why the format is one to one"; `03`, the `envelope.ts` row |
@@ -104,9 +104,11 @@ Two different supported events must never give the same authenticated bytes.
   showed the property does not hold as specified** — findings F1, F2 and F3 —
   so this gate is open, and the length-prefix core is sound while the field set
   and the type rules are not. **The three corrections are ruled (R1-A, R1-B and
-  R1-C, 2026-11-02) and not yet applied.** The gate stays open until slice S1
-  implements them and review round 2 re-attacks them against a frozen commit. A
-  ruling is not a correction.
+  R1-C, 2026-11-02), applied in the design by the regeneration of `01`
+  (2026-11-04), and not yet applied in code.** Review round 2 attacks the design
+  against a frozen commit. The gate stays open until slice S1 implements the
+  corrections and an independent review verifies the implementation. A ruling is
+  not a correction, and a design is not one either.
 - Proof: group H in `04`. It has a property test over a seeded generator and
   adversarial cases. The repository has no property-testing dependency, and it
   stays dependency-free, so the generator is a small seeded function in the
@@ -559,8 +561,8 @@ Independent design review **round 1 is complete**, and its verdict is **not
 safe to proceed to implementation authorization as written**.
 `07_REVIEW_ROUND_1_FINDINGS.md` holds the findings, the verdict and what this
 author re-verified. No pull-request review is submitted on GitHub, so the
-review of record is that document and not a GitHub review state; the owner
-decides whether it satisfies recommendation 3.
+review of record is that document and not a GitHub review state. The owner
+ruled that it satisfies recommendation 3 (R1-H, answered by ruling 3).
 
 Round 1 found three blocking defects in the format, four in the test matrix and
 the rejection-record axis, and two false statements of present code behaviour.
@@ -623,9 +625,12 @@ than on the credential binding.
 measure 1 needs no new lookup.
 
 **Two details are not settled by this ruling, and slice S1 or S2 must settle and
-record them.** The refusal needs a reason code, and `unknown_envelope_field` is
+record them.** *(Later: the second detail, the binding contexts, was settled in
+the design by the regeneration of `01` on 2026-11-04, under the owner ruling on
+`KI-SENTINEL-20261104-001`. The first, the refusal's reason code, stays with
+slice S2.)* The refusal needs a reason code, and `unknown_envelope_field` is
 the wrong one, because both fields are known — that is review finding F16's
-lesson. And `01` states that the format does not bind `integrity.signature`,
+lesson. And `01` stated then that the format does not bind `integrity.signature`,
 because it is an output of the format, so measure 2 needs the contexts named
 before the bound record count can be derived. Amendment 3 covers the second
 point.
@@ -995,7 +1000,7 @@ Two ruled corrections feed it, and only one of them is countable today:
 1. **R1-B** adds a presence record for each of the three optional parents, which
    is three records.
 2. **R1-A** binds `integrity.signature` and `integrity.signature_key_id` where
-   they may legitimately appear. `01` currently states that the format does not
+   they may legitimately appear. `01` then stated that the format does not
    bind `integrity.signature`, because it is an output of the format. How many
    records that binding adds, and in which contexts, is not settled by the
    ruling, so the total cannot be derived from it.

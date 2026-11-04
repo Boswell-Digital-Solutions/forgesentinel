@@ -150,6 +150,12 @@ so an operator gains a triage category and a person gains no oracle. Gate 5 in
 
 ## Ed25519 under ADR-026
 
+**Open contradiction, `KI-SENTINEL-20261104-004`.** The two lines below sign the token and the
+signature with one `producer_private_key`, and safeguard 6 lets the `context` record carry the
+domain separation alone. The owner's D-6 amendment in `06` requires **independent keys**, not one
+key with two contexts. This section is not corrected here, because the choice — two key pairs for
+each producer, or an amendment of D-6 for slice S6 — is the owner's.
+
 ADR-026 requires Ed25519 before any non-shadow deployment. It names
 `spine/producers.ts` as one of the three call sites. The format in `01` does
 not change for Ed25519. Only the primitive and the key material change:
@@ -230,9 +236,11 @@ must implement and prove.
    refuses the old value from that moment.
 4. **No downgrade.** Once a producer is registered for Ed25519, an HMAC token
    for that producer must fail. A test must show that.
-5. **Distinct text forms.** An HMAC token is 64 lowercase hex characters. An
-   Ed25519 signature is 128. The pattern for each algorithm is separate, so a
-   value of the wrong length fails before any verification.
+5. **Distinct text forms.** An HMAC token is 64 lowercase hex characters. The
+   Ed25519 text form is **not approved**: the table above records it as an open
+   item, and `06` rules that no document may present one as approved. Once it is
+   specified and approved, the pattern for each algorithm is separate, so a value
+   of the wrong length fails before any verification.
 6. **The derivation does not carry over.** HKDF derivation exists because HMAC
    is symmetric. An Ed25519 key is not derived from a shared secret, so the
    `info` strings are retired for that producer, and the `context` record then

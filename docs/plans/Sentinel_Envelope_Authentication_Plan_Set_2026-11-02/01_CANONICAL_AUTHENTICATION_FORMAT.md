@@ -8,8 +8,9 @@ The owner ruled on this document on 2026-11-02. D-1, D-2, D-4 and D-5 are
 approved with conditions, and D-7 is amended: the numeric rule must exist
 before implementation. See `06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md`.
 
-**Review round 1 found three blocking defects in this document.** The format as
-specified here is **not** one to one, and two admitted fields are not bound.
+**Review round 1 found three blocking defects in the version it reviewed.** That version was
+**not** one to one, and two admitted fields were not bound. The regeneration below corrects them in
+the design; they stay open in the code until slice S1.
 `07_REVIEW_ROUND_1_FINDINGS.md` holds the findings, each reproduced by
 execution. The defects are marked in place below.
 
@@ -32,6 +33,10 @@ independent review verifies it.
   uses is the format round 1 verified.
 - **The golden vector stays with slice S1**, and it must reproduce example A below byte for byte.
 - **R1-F and R1-G stay open.** This regeneration does not decide them.
+- **Revised after a four-lane retest of `de52ad3` (2026-11-04)**: an independent re-implementation,
+  a consistency audit, an adversarial attack and a code-health check. The retest added the failure
+  rules for required fields and objects and the `signature`-context key-id rule, made example B use
+  one key id, and fixed the derivation script. `KI-SENTINEL-20261104-007` records it.
 
 ## Format name and version tag
 
@@ -91,6 +96,11 @@ The tags are:
 | `b` | A present boolean | The text `true` or `false` |
 | `c` | A present count | The count as decimal ASCII digits, with no sign and no leading zero, exactly as `<length>` is written. A zero count is the single digit `0`. (Pinned by review finding F6; the earlier text left the form open to a second-language implementer.) |
 | `-` | An absent field | None. The length is `0`. |
+
+An absent record keeps all of its separators: `<name> 0x1F - 0x1F 0 0x1F 0x1E`. Only the value is
+empty. No value and no name is Unicode-normalized: the bytes are the UTF-8 of the string exactly as
+the event carries it, so `é` as one code point and as `e` plus a combining accent are two different
+values.
 
 ## How an absent optional field is represented
 
@@ -156,7 +166,19 @@ the event with the reason code `envelope_not_encodable`:
 - a string that contains an unpaired surrogate. Node replaces an unpaired
   surrogate with `U+FFFD` during UTF-8 conversion. Two different strings would
   then give the same bytes, so the encoding would stop being one to one;
-- a bound object field that is present but is not an object;
+- a bound object field that is present but is not a plain object. `null` and an array are not
+  objects. This applies to the three optional parents and to the seven required objects alike;
+- **a required object that is absent** — `producer`, `actor`, `subject`, `correlation`,
+  `location`, `data_policy` or `integrity`. (Added after the retest of 2026-11-04, below.)
+- **a required field that is absent.** A field the contract declares required is refused when it
+  is absent, with one exception: a required field of an optional parent (`tenant.tenant_id`,
+  `resource.resource_type`, `resource.resource_id`, `control_lineage.control_origin`,
+  `control_lineage.policy_generated_effect`) is absent, with the tag `-`, when its parent is absent.
+  When the parent is present, the field is required like any other. (Added after the retest of
+  2026-11-04, below.)
+- **in the `signature` context, a key id that is not `integrity.signature_key_id`**, or an event
+  with no `integrity.signature_key_id`. Record 3 then holds that one value, so record 38 equals record
+  3 by rule, not by chance. (Added after the retest of 2026-11-04, below.)
 - a `sentinel_finding_ids` that is not an array, or an array with an element
   that is not a string. **This rule is new, from review finding F1, and the
   owner ruled it under R1-C.** The earlier text refused only a bad element, so a
@@ -169,6 +191,16 @@ the event with the reason code `envelope_not_encodable`:
   other — it is `false` for both `"ab"` and `{0:"a",1:"b",length:2}` — and it
   does not need to. The rule refuses everything that is not an array, so one
   array test is enough, and the two non-arrays need no distinction.
+- **a `sentinel_finding_ids` array with a hole**, such as `[ , "a"]`. Each index from `0` to
+  `length - 1` must hold a string. JSON input cannot carry a hole, but a library caller can.
+
+**Why the two required-field rules exist (retest of 2026-11-04).** An independent re-implementation
+of this document found that an absent `actor`, `actor: {}`, `actor: null` and `actor: []` all gave
+the same bytes, because every leaf of an absent object is the absent form. The format was then one
+to one for required objects only because the validator refuses those events first — the dependency
+that ruling R1-B forbids for the optional parents. With the two rules the encoder refuses all four,
+so injectivity no longer rests on the validator for any object. The derivation script shows both:
+without the rules the four give one encoding, with them all four are refused.
 
 **RULED, R1-C (2026-11-02).** The encoder rule above is necessary and not
 sufficient. `validateEventEnvelope` must type-validate **every declared field**,
@@ -327,7 +359,9 @@ had 41 rows; the derivation script's control reproduces that layout, and the sec
 The count at record 46 comes before the elements. The count binds the array
 length, so a person cannot add or remove an element and keep the signature.
 When `sentinel_finding_ids` is absent, record 46 uses `-` and no element record
-follows.
+follows. When it is an empty array, record 46 is the count `0` with the tag `c`, and no element
+record follows. An element's name is the field name, a dot, and its index in plain decimal with no
+leading zero: `.0` to `.9`, then `.10`, `.11` and so on.
 
 `credential.token` is an output of the format and is never bound. `integrity.signature` is the
 output of the `signature` context and is bound only in the `credential` context (below).
@@ -373,6 +407,17 @@ verbatim replay of an unchanged event into the same tenant is not a format quest
 idempotency key is bound (record 37), and the de-duplication defects are
 `KI-SENTINEL-20261102-009` and `-015`.
 
+**The limits of that guarantee, stated plainly.** "Cannot be transplanted" holds against a party
+that does not hold the producer's key. Three things it does not cover:
+
+- **A producer's key can sign for any tenant.** A registration is not scoped to a tenant, so a
+  holder of the key mints a valid event for whichever tenant it names. Tenant scoping of
+  registrations is outside this format.
+- **No record binds an audience or a deployment.** Two gateways that share a registration accept
+  each other's events; replay between them is left to de-duplication (`-015`).
+- **The gateway holds the HMAC root secret**, so it can derive both keys. `02` states this limit,
+  and Ed25519 (D-9) is what removes it.
+
 ### Ruling R1-A, settled in the design
 
 R1-A ruled both measures, and left open which contexts bind the two signature fields. The design
@@ -380,7 +425,10 @@ settles that:
 
 1. **Refuse.** `validateEventEnvelope` refuses `integrity.signature` and
    `integrity.signature_key_id` on an event whose family requires no signature. Such an event
-   therefore encodes both records as `-`.
+   therefore encodes both records as `-`. **Open, `KI-SENTINEL-20261104-005`:** the gateway also
+   requires a signature when the *producer* registration requires one, so a signature-required
+   producer emitting a no-signature family can never be accepted. Where the refusal runs is the
+   owner's decision.
 2. **Bind, in every context where they may appear.**
    - `integrity.signature_key_id` is record 38 in **both** contexts. In the `signature` context it
      equals record 3, so it is bound twice; the duplication is harmless and keeps one layout.
@@ -406,7 +454,7 @@ Each is covered in exactly one way:
 |---|---|---|
 | Leaf | 40: the 38 leaves of the earlier table, and `integrity.signature` and `integrity.signature_key_id` | One record each (records 4 to 12, 14 to 21, 23 to 39, 41 to 46). `sentinel_finding_ids` is one leaf with a count record and one record per element. |
 | Optional object | 3: `tenant`, `resource`, `control_lineage` | A presence record each (13, 22, 40), and its leaves. |
-| Required object | 7: `producer`, `actor`, `subject`, `correlation`, `location`, `data_policy`, `integrity` | Through its leaves. A required object is always present, so its presence carries no information. |
+| Required object | 7: `producer`, `actor`, `subject`, `correlation`, `location`, `data_policy`, `integrity` | Through its leaves. The encoder refuses a required object that is absent or not a plain object, and a required field that is absent (the failure rules above), so an encodable event always has the object, and its presence carries no information. |
 | Payload | 1: `payload` | Through `integrity.payload_hash` (record 36), which the gateway recomputes from the payload. This depends on the `KI-SENTINEL-20261102-006` correction (D-1). |
 
 40 + 3 + 7 + 1 = 51. No declared field is left unbound and unexplained, which is the owner's rule
@@ -419,13 +467,25 @@ digest.
 These are choices of this design, not rulings. Round 2 assesses each:
 
 1. **The presence record is named after its parent** (`tenant`, `resource`, `control_lineage`), with
-   tag `b`. A parent name cannot collide with a leaf name, because every leaf name has a dot.
+   tag `b`. No other record uses those three names, so the names are unique in the table. An earlier
+   version gave a false reason, that every leaf name has a dot: eight do not (`auth_format`,
+   `context`, `key_id`, `event_id`, `event_type`, `schema_version`, `occurred_at`, `observed_at`).
+   The names never have to separate records anyway, because the order is fixed.
 2. **One layout for both contexts.** Record 39 is a constant absent form in the `signature`
    context, rather than two field lists with two index sets.
 3. **The signature is computed before the credential**, because the credential binds it.
 4. **`integrity.signature_key_id` is bound twice in the `signature` context**, as records 3 and 38.
 5. **The placement of the new records**: each presence record directly before its parent's
    fields, and the two signature fields after `integrity.idempotency_key`.
+6. **The encoder refuses a missing required field or object** (added after the retest). This makes
+   the encoding one to one for required objects without the validator, at the cost of a second
+   place that knows which fields are required. Risk R-5's drift test must hold the encoder's
+   required set equal to the contract's.
+7. **In the `signature` context, record 3 must be `integrity.signature_key_id`** (added after the
+   retest). The registration has one key id, and the gateway already requires
+   `signature_key_id` to equal it (`src/spine/gateway.ts:189`), so all three are one value.
+8. **No cap on a value's length.** A record carries any length. A size limit belongs at the intake
+   boundary, not in the format; this design does not set one.
 
 ### A future authenticated field needs a versioned format change
 
@@ -452,15 +512,18 @@ Record numbers are those of the regenerated table.
   5 and 6 are not compared today, and the check confirmed that both are
   alterable.
 - Records 16, 20 and 26 to 28 bind the actor type, the subject type and the
-  correlation. The check confirmed that all are alterable. A changed
+  correlation. Records 18 and 19 bind the actor's session id and API key
+  fingerprint. The check confirmed that all are alterable. A changed
   `subject_type` moves an event to another subject class.
 - Records 22 to 25 bind the resource and its presence (R1-B).
-- Records 29 to 35 bind the execution lane and the data policy. These fields
+- Records 29 to 31 bind the execution lane and the location (`region`,
+  `country`). Records 32 to 35 bind the data policy. These fields
   govern privacy and retention. The check confirmed that a person can change
   `sensitivity`, `retention_class` and `cloud_allowed` on a signed event.
 - Record 37 binds the idempotency key.
 - Records 38 and 39 bind the two signature fields (R1-A, above).
-- Records 40 to 47 bind the control lineage and its presence. ADR-022 uses the
+- Records 40 to 46, and the element records from 47, bind the control lineage
+  and its presence. ADR-022 uses the
   lineage to stop a policy-produced effect counting as independent confirmation.
   The check confirmed that a person can remove the lineage from a signed event,
   and can add one to an event that had none. An unbound lineage defeats ADR-022.
@@ -538,15 +601,17 @@ because ADR-025 makes cross-language parity a contract property.
 
 **Owner decision R1-F is open:** confirm that refusing `-0` is a deliberate divergence from
 `forge_contract_core`, and accept the ADR-025 cross-language consequence. This regeneration does
-not decide it.
+not decide it. **`KI-SENTINEL-20261104-006` is open beside it:** JavaScript's `JSON.parse` admits
+the tokens `1.0` and `1e2` as the integers `1` and `100`, where a Python parser types them as floats
+and refuses them. The owner decides it with R1-F.
 
 ### Where the rule applies
 
 **No bound field is typed as a number.** The fixed records are strings,
 booleans and one count, each finding-id record is a string, and the encoder
 produces the count from the array length. R1-B adds three parent presence
-records, and all three are booleans, so this statement still holds whatever the
-final count is.
+records, and all three are booleans, so this statement holds for the regenerated
+layout of 46 fixed records.
 
 That is a statement about the format, not about what the envelope admits.
 Review finding F14 corrected an earlier, stronger sentence here. Verified by
@@ -627,10 +692,17 @@ this when the slice lands.
 ## Worked example
 
 **Regenerated on 2026-11-04** by `evidence/derive_01_regeneration.mjs`, a disposable derivation
-script kept as design evidence (the owner ruling on `KI-SENTINEL-20261104-001`). It uses the Node
-standard library only and reads nothing from `src/`, so a reviewer can reproduce every value below
-with `node derive_01_regeneration.mjs` and nothing else. The escaped form shows `0x1F` as `\x1f`
-and `0x1E` as `\x1e` with a line break. The real bytes have no line break.
+script kept as design evidence (the owner ruling on `KI-SENTINEL-20261104-001`), and **revised the
+same day after the four-lane retest** (below). It uses the Node standard library only and reads
+nothing from `src/`, so a reviewer can reproduce every value below with nothing else. Run it from
+the plan-set directory:
+
+```text
+node evidence/derive_01_regeneration.mjs
+```
+
+The escaped form shows `0x1F` as `\x1f` and `0x1E` as `\x1e`, one record to a line. The real bytes
+have no line break.
 
 The digests below are SHA-256 over the authenticated bytes, so a reviewer can compare a
 reproduction in one value. They are not HMACs: S1's golden vector carries the HMACs over a published
@@ -638,9 +710,10 @@ test key.
 
 **The script's positive control.** On the committed golden event it first encodes the superseded
 41-record layout, and it stops unless that gives 41 records and 1479 bytes — the example that round
-1 reproduced byte for byte. It also checks that its payload-digest method reproduces the golden
-event's digest. Both pass, so the encoder below is the format round 1 verified, with the
-regeneration applied.
+1 reproduced byte for byte. The control's digest is `00db04fbadd0a6048d35caf3c8c5b8f1ca97b5db53594774425d4a258c89aeb1`. An independent re-implementation
+from this document's text gave the same digest. The script also checks that its payload-digest
+method reproduces the golden event's digest; that method covers a benign payload only and is not
+`hashPayload` (it does not reproduce `KI-SENTINEL-20261102-006`).
 
 ### Example A — the committed golden event, `credential` context
 
@@ -705,19 +778,25 @@ control_lineage.sentinel_finding_ids.count\x1f-\x1f0\x1f\x1e
 **This envelope is constructed for the design.** No committed fixture holds an event of a
 signature-required family. It uses `billing.subscription.changed`, the billing event type the
 repository's tests use most, and it exercises every new record: all three parents present, two
-finding ids and both signature fields. Its payload digest is computed the way the golden digest is.
-Its `integrity.signature` is an illustrative value of the approved syntax, 64 lowercase hex, and
-not an HMAC.
+finding ids and both signature fields.
 
-**B1, the signature input** — `AUTH("signature", "key_billing_sig_01", event)`, the bytes the
-high-value signature covers. Record 39 is the absent form, whatever the event carries.
+- **One key id**, `key_billing_01`, is the registration's key id, the credential's key id and
+  `integrity.signature_key_id`. A registration has one key id, and the gateway requires
+  `signature_key_id` to equal it. An earlier version of this example used two key ids, which the
+  specified gateway refuses as `signature_key_mismatch`; the retest found it.
+- **The payload** is `{"plan_from":"team","plan_to":"business","seats":12}`. Record 36 is its digest, computed the way the golden digest is.
+- **`integrity.signature`** is an illustrative value of the approved syntax, 64 lowercase hex, and
+  not an HMAC.
 
-**48 records, 1849 bytes, SHA-256 `bc47a1f77a6ccecd3ed2f6f1e5a2449f085f0912880f3a730e70cddfde316279`.**
+**B1, the signature input** — `AUTH("signature", "key_billing_01", event)`, the bytes the high-value
+signature covers. Record 39 is the absent form, whatever the event carries.
+
+**48 records, 1841 bytes, SHA-256 `76d0514ca6070d43a57529565a04a48e943bc6e4fc3951aea6c7832789b694d4`.**
 
 ```text
 auth_format\x1fs\x1f27\x1fforgesentinel.event_auth.v1\x1e
 context\x1fs\x1f9\x1fsignature\x1e
-key_id\x1fs\x1f18\x1fkey_billing_sig_01\x1e
+key_id\x1fs\x1f14\x1fkey_billing_01\x1e
 producer.service\x1fs\x1f15\x1fbilling-service\x1e
 producer.instance_id\x1fs\x1f18\x1fbilling-service-01\x1e
 producer.version\x1fs\x1f5\x1f1.4.0\x1e
@@ -752,7 +831,7 @@ data_policy.retention_class\x1fs\x1f13\x1fsecurity_365d\x1e
 data_policy.cloud_allowed\x1fb\x1f4\x1ftrue\x1e
 integrity.payload_hash\x1fs\x1f71\x1fsha256:39de473dec94c28e7c2376880a524c31572d13096ea06ea64e8fa1de6060adfe\x1e
 integrity.idempotency_key\x1fs\x1f19\x1fevt_example_billing\x1e
-integrity.signature_key_id\x1fs\x1f18\x1fkey_billing_sig_01\x1e
+integrity.signature_key_id\x1fs\x1f14\x1fkey_billing_01\x1e
 integrity.signature\x1f-\x1f0\x1f\x1e
 control_lineage\x1fb\x1f4\x1ftrue\x1e
 control_lineage.control_origin\x1fs\x1f15\x1fsentinel_policy\x1e
@@ -765,15 +844,15 @@ control_lineage.sentinel_finding_ids.0\x1fs\x1f8\x1ffnd_0301\x1e
 control_lineage.sentinel_finding_ids.1\x1fs\x1f8\x1ffnd_0302\x1e
 ```
 
-**B2, the credential input** — `AUTH("credential", "key_billing_cred_01", event)`, computed after
-the signature is written. Record 39 binds the signature.
+**B2, the credential input** — `AUTH("credential", "key_billing_01", event)`, computed after the
+signature is written. Record 39 binds the signature.
 
-**48 records, 1917 bytes, SHA-256 `cd6be4cae6ae2a6c8a50ff81b6a73b0cf5bc0687d1d3b268a993410202fed07e`.**
+**48 records, 1908 bytes, SHA-256 `c8bf31c6f7de8aa9207615822ed0beccb82a0139e69850a8648eaa0344943ec2`.**
 
 ```text
 auth_format\x1fs\x1f27\x1fforgesentinel.event_auth.v1\x1e
 context\x1fs\x1f10\x1fcredential\x1e
-key_id\x1fs\x1f19\x1fkey_billing_cred_01\x1e
+key_id\x1fs\x1f14\x1fkey_billing_01\x1e
 producer.service\x1fs\x1f15\x1fbilling-service\x1e
 producer.instance_id\x1fs\x1f18\x1fbilling-service-01\x1e
 producer.version\x1fs\x1f5\x1f1.4.0\x1e
@@ -808,7 +887,7 @@ data_policy.retention_class\x1fs\x1f13\x1fsecurity_365d\x1e
 data_policy.cloud_allowed\x1fb\x1f4\x1ftrue\x1e
 integrity.payload_hash\x1fs\x1f71\x1fsha256:39de473dec94c28e7c2376880a524c31572d13096ea06ea64e8fa1de6060adfe\x1e
 integrity.idempotency_key\x1fs\x1f19\x1fevt_example_billing\x1e
-integrity.signature_key_id\x1fs\x1f18\x1fkey_billing_sig_01\x1e
+integrity.signature_key_id\x1fs\x1f14\x1fkey_billing_01\x1e
 integrity.signature\x1fs\x1f64\x1f0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\x1e
 control_lineage\x1fb\x1f4\x1ftrue\x1e
 control_lineage.control_origin\x1fs\x1f15\x1fsentinel_policy\x1e
@@ -827,12 +906,17 @@ control_lineage.sentinel_finding_ids.1\x1fs\x1f8\x1ffnd_0302\x1e
 |---|---|
 | The B1 signature input does not change when `integrity.signature` changes | pass |
 | The B2 credential input changes when `integrity.signature` changes | pass |
-| A changed `signature_key_id` leaves the old layout's credential input unchanged (F3, as round 1 found) and changes the new one | pass |
-| An absent `resource` and a present empty `resource` collide in the old layout (F2, as round 1 found) and differ in the new one | pass |
+| F3: a changed `signature_key_id` leaves the old layout's credential input unchanged, as round 1 found, and changes the new one | pass |
+| F2: an absent and an empty `resource` collide in the old layout, as round 1 found; the presence record alone separates them; and the failure rule refuses the empty one | pass |
+| A required object: absent, `{}`, `null` and `[]` give **one** encoding without the failure rules, and all four are refused with them | pass |
+| A missing required field is refused | pass |
+| In the `signature` context, a key id that is not `integrity.signature_key_id`, and an event with none, are refused | pass |
+| A hole in `sentinel_finding_ids` is refused; an empty array is the count `0` with no element records | pass |
+| A value that contains `0x1E` and `0x1F` still counts 46 records | pass |
 | Moving example B to another tenant changes both the signature input and the credential input (`KI-SENTINEL-20261102-008`) | pass |
 
-Each check that shows a defect closed also shows the old layout still has it, so no check passes
-for want of a real difference.
+Each check that shows a defect closed also shows the defect where it existed, so no check passes for
+want of a real difference.
 
 The superseded example — 41 records and 1479 bytes, with no presence records and no signature
 fields — survives only as the script's control. It must not be cited as current.
