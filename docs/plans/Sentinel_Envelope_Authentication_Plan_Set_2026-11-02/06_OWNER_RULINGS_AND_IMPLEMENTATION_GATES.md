@@ -27,7 +27,7 @@ incident happened.
 | Decision | Ruling | Condition | Where the plan now states it |
 |---|---|---|---|
 | D-1 Payload binding | **Approved** | Depend on `KI-SENTINEL-20261102-006`. The corrected payload digest must be verified before envelope authentication relies on it. | `01`, "The payload digest"; slice S0 in `05` |
-| D-2 Bound field set | **Approved; the count is superseded by R1-A and R1-B** | Bind all fixed records plus one record for each control-lineage finding id. **The count of 41 is superseded, and amendment 3 states no replacement**: R1-B adds three parent presence records, and R1-A's binding adds an unsettled number more, so the total is not yet derivable. Slice S1 derives and publishes it. A future authenticated field needs a versioned format change; this correction does not trigger that clause. | Amendment 3 below. The field table in `01` is stale and still shows 41 rows. |
+| D-2 Bound field set | **Approved; the count is superseded by R1-A and R1-B** | Bind all fixed records plus one record for each control-lineage finding id. **The count of 41 is superseded, and amendment 3 states no replacement**: R1-B adds three parent presence records, and R1-A's binding adds an unsettled number more, so the total is not yet derivable. The design-stage regeneration of `01` derives it before round 2 (the ruling on `KI-SENTINEL-20261104-001` below). A future authenticated field needs a versioned format change; this correction does not trigger that clause. | Amendment 3 below. The field table in `01` is stale and still shows 41 rows. |
 | D-3 Rejection reason code | **Approved** | Use `producer_auth_failed` externally. Keep useful internal diagnostic categories, and do not leak them to a caller. | `02`, "One reason code"; gate 5 below |
 | D-4 Version and algorithm | **Approved** | The gateway controls the algorithm and the version. Refuse an unsupported version. Never negotiate an algorithm from event input. | `01`, "Format name and version tag"; `02`, "Why the format carries no algorithm record" |
 | D-5 Unknown fields | **Approved** | Refuse an unknown envelope field. Define the permitted extension points, if any, in a future version. | `01`, "Why the format is one to one"; `03`, the `envelope.ts` row |
@@ -1005,8 +1005,9 @@ altogether. The number is retracted rather than corrected, because a stated
 count that no document can derive is the drift this plan set has already had to
 correct twice.
 
-Slice S1 derives and publishes the authoritative count, with the field table,
-the regenerated worked example and the golden vector in one place.
+**Corrected by the owner ruling on `KI-SENTINEL-20261104-001` (2026-11-04).** An earlier version
+said slice S1 derives and publishes the count. The design-stage regeneration of `01` now derives it,
+with the field table and the worked example, before round 2. Slice S1 implements the reviewed format.
 
 D-2 also said a future authenticated field needs a versioned format change. That
 clause is not triggered here. These records correct a defect that review found in
@@ -1014,12 +1015,73 @@ an unimplemented format, before any producer emits it. There is no installed bas
 and nothing to version, consistent with the no-backwards-compatibility rule in
 `CLAUDE.md`.
 
-Four artifacts are stale, and slice S1 owns all four: the field table in `01`,
-which still has 41 rows; the worked example in `01`, which is 41 records and 1479
-bytes; the record **indices** cited across `01`, `02`, `04`, `05` and ADR-027,
-which shift when records are inserted; and the golden vector. The round-1
+Four artifacts are stale: the field table in `01`, which still has 41 rows; the
+worked example in `01`, which is 41 records and 1479 bytes; the record **indices**
+cited across `01`, `02`, `04`, `05` and ADR-027, which shift when records are
+inserted; and the golden vector. Under the 2026-11-04 ruling the design-stage
+regeneration corrects the first three before round 2, and slice S1 owns the
+golden vector, which must reproduce the reviewed worked example. The round-1
 reviewer reproduced the 1479-byte value byte for byte, so the regenerated example
 needs the same independent reproduction.
+
+## Owner ruling on KI-SENTINEL-20261104-001 (2026-11-04): the format is settled in design, before round 2
+
+**Provenance.** In the operator session on 2026-11-04, the owner relayed recommended ruling text for
+`KI-SENTINEL-20261104-001` (option 1 of the three that entry lists), which itself said it was "recommended
+owner-ruling language, not a ruling already entered into the repository". The owner then approved it
+**as written**, in the same session, and ruled the derivation method below. This section records that
+approval. The principle the owner stated: *design review must approve the security contract before
+implementation is permitted to realize it.*
+
+**Disposition: option 1 — a design-stage correction, with implementation authorization withheld.**
+
+1. **Signing contexts are defined before round 2.** The design must enumerate explicitly which
+   envelope fields and contextual identifiers `integrity.signature` covers. At minimum, tenant
+   identity and all security-relevant routing and interpretation context must be cryptographically
+   bound, so that an otherwise valid signed event cannot be transplanted into another tenant.
+2. **`01` is regenerated as a documentation-only change.** The field table, the worked example and
+   the record count become prerequisites for round 2, not deliverables of slice S1. S1 may later
+   implement the reviewed format. It cannot define the format retroactively.
+3. **Round 2 stays a genuine independent review gate.** The reviewer assesses the complete signing
+   contract, the canonicalization rules, the tenant-binding properties and the worked example before
+   the design is accepted.
+4. **S1 stays unauthorized.** No gateway encoder, signer, verifier or enforcement code may begin on
+   the strength of this ruling.
+5. **The security findings stay open.** `KI-SENTINEL-20261102-008` (P0, tenant transplant) and `-011`
+   cannot be closed by documentation. Closure needs implementation evidence, negative tests and
+   independent review.
+
+**The evidence round 2 requires:**
+
+| Evidence | Round 2 requirement |
+|---|---|
+| Signing coverage | Explicit inclusion rules for each field and context |
+| Canonicalization | A deterministic, unambiguous signed-byte representation |
+| Tenant isolation | Rejection of cross-tenant replay and transplant, defined |
+| Worked example | A complete representative envelope, with the derivation of the signature input |
+| Field table | Consistent with the signing rules |
+| Record count | Recomputed and reconciled against the authoritative format |
+| Decision traceability | R1-F and R1-G stay visibly open unless separately ruled |
+
+**The derivation method (ruled the same day).** The byte-exact worked example is derived with a
+**disposable derivation script kept in this plan set as design evidence**. It is not shipped, nothing
+in `src/` imports it, and it is not wired into the gateway. The round-2 reviewer reproduces its output
+independently, as the round-1 reviewer reproduced the 1479-byte example. A script that is design
+evidence is not the reference encoder of option 3, which this ruling did not choose.
+
+**A constraint the ruling states.** The precise field set and the cryptographic representation must
+be established from the format contract itself. This ruling does not supply them, and they must not be
+invented from its summary.
+
+**What changes in this plan set.** S1 no longer owns the count, the field table, the worked example or
+R1-A's binding contexts; the design-stage regeneration of `01` settles all four before round 2. A
+regenerated table shifts the record **indices** cited in `01`, `02`, `04`, `05` and ADR-027, so the
+regeneration brings them into line in the same change, or round 2 would review an inconsistent design.
+The golden vector stays with S1, and it must reproduce the reviewed worked example byte for byte.
+
+**What it does not do.** It authorizes no implementation, enforcement, deployment, credential change
+or merge. It does not rule R1-F or R1-G. `KI-SENTINEL-20261104-001` stays open until the regenerated
+`01` exists and round 2 can start against a frozen commit.
 
 ## Findings disposition
 

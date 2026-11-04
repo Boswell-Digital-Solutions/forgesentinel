@@ -17,7 +17,8 @@ The owner ruled all ten D-series decisions on 2026-11-02, amended three of them,
 and added five implementation gates. The owner then checked the pull request and
 recorded four further **recommendations**, which are explicitly not approvals.
 Review round 1 later raised eight more decisions, R1-A to R1-H; the owner ruled
-**five** of them on the same day, and **three stay open: R1-F, R1-G and R1-H**.
+**six** of them on the same day — R1-A to R1-E, and R1-H through ruling 3 in
+`06` — and **two stay open: R1-F and R1-G**.
 **`06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` is the authoritative record,
 and it wins over any earlier text in this plan set.** It separates the rulings
 from the recommendations.
@@ -38,7 +39,9 @@ this.
 **The record count in this plan set is superseded.** D-2 fixed it at 41, and
 amendment 3 in `06` supersedes that without stating a replacement, because R1-A's
 binding contexts are unsettled. The 41-row field table and the 1479-byte worked
-example in `01` are stale, and slice S1 regenerates them.
+example in `01` are stale. Under the owner ruling on `KI-SENTINEL-20261104-001` in `06` (2026-11-04),
+a documentation-only regeneration of `01` corrects them before round 2; slice S1
+implements the reviewed format and cannot define it.
 
 The owner rules the correction a **P0 security priority**. The verified
 cross-tenant event re-targeting is a security-significant authentication
