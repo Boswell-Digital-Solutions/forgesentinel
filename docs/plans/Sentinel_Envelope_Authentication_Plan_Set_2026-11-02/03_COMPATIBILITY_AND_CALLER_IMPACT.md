@@ -98,7 +98,7 @@ current message breaks it.
 | `fixtures/golden/event.usage_tokens_recorded.json` | No change. The file holds an envelope with no credential and no signature. |
 | `fixtures/golden/directive.*.json` | No change. A control directive carries a placeholder signature: `tools/gen-fixtures.ts:284` writes 64 zero characters and the generator never imports `src/authority/`. The conclusion stands, and the earlier reason — that `src/authority/cssa-control.ts` signed it — was false (review finding F25). |
 | `fixtures/assurance/EAS-*.json` | No change. They carry no credential. The CI step that records their SHA-256 digests stays valid. |
-| `fixtures/golden/event_auth.v1.vector.json` (new) | The authoritative vector: the envelope, the context, the key id, the authenticated bytes as hex, the SHA-256 of those bytes, and the HMAC under a named test key. `fixtures/golden/manifest.json` gains its entry. |
+| `fixtures/golden/event_auth.v1.vector.json` (new) | The authoritative vector: the envelope, the context, the key id, the authenticated bytes as hex, the SHA-256 of those bytes, the audience, and the HMAC under a named test key and a named test audience. It is a committed fixture outside `fixtures/golden/manifest.json`: the manifest is generated, and `test/contracts.test.ts` refuses an entry with no contract validator. S1's own test verifies it (`09`, T-2). |
 
 The event bodies do not change, so the payload hashes, the dedupe keys and the
 ledger order stay the same. Only the credential and the signature values
@@ -129,7 +129,7 @@ or `buildEvent` to produce the value under test.
 
 ## Documentation changes
 
-The implementation slice must update these in the same change:
+The slice that changes the gateway (S3) and the documentation slice (S5) must update these. S1 does not change them: it adds no route, scope, command, setting or caller (`09`, section 2).
 
 - `doc/system/03-runtime-boundary.md` — the "Producer Authentication" section
   states that the gateway authenticates with HMAC over the payload hash. It

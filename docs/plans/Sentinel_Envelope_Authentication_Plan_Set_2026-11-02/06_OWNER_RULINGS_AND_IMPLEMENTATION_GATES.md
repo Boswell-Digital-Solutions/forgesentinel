@@ -1149,6 +1149,42 @@ workspace rule writes "deployment", not "production"; the owner's quotation is k
 
 The S1 request is `09_S1_IMPLEMENTATION_AUTHORIZATION_REQUEST.md`.
 
+## Owner ruling on O-2 and slice S1 (2026-11-04)
+
+**Provenance.** The owner issued this ruling in the operator session on 2026-11-04, in his own
+message headed "Owner ruling — Forge Sentinel S1". Quoted passages are his words.
+
+**Decision.** "Select audience binding through key derivation (O-2), conditionally. Do not authorize
+S1 implementation yet." The reason: it "preserves the frozen v1 envelope layout and avoids
+introducing a new signed field". The selection "is not permission to modify deriveAuthKey
+immediately."
+
+**The five conditions on O-2:**
+
+1. **Explicit audience identity.** "The derivation must use an unambiguous, canonical audience
+   identifier. Tenant identity and audience identity must remain distinct."
+2. **Cryptographic separation.** "Different audiences must derive different authentication keys
+   under the same root secret. Domain separation must be explicit."
+3. **Frozen-vector integrity.** "Existing vectors must not be silently rewritten. If the proposed
+   derivation changes their expected outputs, document the incompatibility and obtain approval for a
+   separately versioned vector set."
+4. **Fail-closed behaviour.** "Missing, malformed, ambiguous, or mismatched audience information must
+   never fall back to an unscoped key."
+5. **Independent verification.** "Tests must demonstrate audience separation, deterministic
+   derivation, cross-audience rejection, and detection of deliberately broken derivations."
+
+**S1: authorization withheld.** `09` must be revised "to establish exactly how audience identity
+enters deriveAuthKey, how the frozen vectors remain valid, and whether the mechanism introduces any
+dependency on O-3", and must "preserve the original S1 boundary: three new files, pure functions, no
+changes to existing modules, and no verification, registry, policy, deployment, or enforcement
+implementation". It "must clearly distinguish the selected design direction from implementation
+authorization."
+
+**Also.** The merge sequence of #48 and #49 is accepted as the handoff record, subject to the stated
+evidence. Pull request #50 stays open and unmerged. "O-3's scope model remains unresolved. Do not
+treat this O-2 decision as approval of registration semantics, tenant authorization, or enforcement
+behavior." No implementation, merge of #50, deployment or enforcement is authorized.
+
 ## Findings disposition
 
 | Finding | Owner disposition | Effect on this track |

@@ -760,6 +760,10 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **Source**: the owner's direction O-2 in the disposition on review round 2 (2026-11-04): "Require explicit audience binding for authenticated envelopes. The audience must be validated against the intended receiving authority." Round 2 (`08`) had raised it: no record binds an audience or a deployment.
 - **Why it is open**: the direction does not say how the audience is bound, and each way changes S1. (a) A bound audience record changes the v1 layout, the 46 records and the frozen vectors that S1 must match, and needs its own review. (b) Binding it in key derivation leaves the layout unchanged and changes S1's `deriveAuthKey`. (c) Binding it in the registration needs the O-3 scope model (`-012`) first.
 - **Request**: `09` asks the owner to rule the mechanism before S1 is authorized.
+- **Owner ruling (2026-11-04)**: mechanism (b), key derivation, selected **conditionally**. S1 stays unauthorized. The ruling is recorded in `06` ("Owner ruling on O-2 and slice S1").
+- **Proposed contract**: `09` revision 2, section 3. The audience is a fourth, required argument of `deriveAuthKey`, validated against a canonical grammar and refused, not normalized, when it does not match. It goes into the HKDF `info` as its own length-prefixed record, between the context and the key id. There is no unscoped form. The v1 layout and the frozen vectors do not change (section 4), and S1 does not depend on O-3 (section 5).
+- **Evidence**: `evidence/o2_derivation/o2_kdf_contract_check.mjs`, 18 of 18 checks pass, five mutants caught.
+- **Still open**: the owner's approval of the contract, then the revision of `02` to match it.
 - **Scope**: open.
 
 ## KI-SENTINEL-20261104-012: Registrations must carry an explicit scope (O-3), and no scope or authorization model exists — OPEN 2026-11-04 — design — blocks registration changes

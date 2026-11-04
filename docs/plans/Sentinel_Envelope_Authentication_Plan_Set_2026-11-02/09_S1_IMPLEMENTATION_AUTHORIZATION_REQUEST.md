@@ -1,141 +1,248 @@
-# 09 Slice S1 — Implementation Authorization Request
+# 09 Slice S1 — Implementation Authorization Request (revision 2)
 
-- **Status:** **A request. Nothing in this document is authorized.** The owner's disposition on
-  review round 2 (2026-11-04, in `06`) lets S1 "advance to implementation authorization review" and
-  asks for "an S1-only implementation authorization request specifying files, interfaces,
-  invariants, tests, and rollback boundaries". This is that request.
-- **Slice:** S1 in `05`: "`src/spine/event_auth.ts`: the field list, the encoder, the HKDF
-  derivation, the unit tests, the group H property and adversarial suite, and the golden vector.
-  Nothing calls it from the gateway."
+- **Status:** **A request. S1 is not authorized.**
+  - The owner's disposition on review round 2 let S1 "advance to implementation authorization
+    review".
+  - The owner's ruling on O-2 and S1 (2026-11-04, in `06`) **selected a design direction** —
+    audience binding through key derivation, conditionally — and **withheld authorization**.
+  - A selected direction is not an authorization. This revision supplies what that ruling asks for:
+    the exact derivation contract, the compatibility analysis, the O-3 answer and the test evidence.
+- **Slice:** S1 in `05`: the field schedule, the encoder, the HKDF derivation, the unit tests, the
+  group H suite and the golden vector. Nothing calls it from the gateway.
 - **Design under implementation:** `01` and `02` at the frozen commit `3cae2dd`, reviewed by round 2
-  (`08`, accepted as the review of record). S1 implements that design and does not define it.
-- **Decision needed before authorization:** O-2, audience binding (section 6). It changes S1
-  whichever way it is decided.
+  (`08`, the review of record), plus the derivation contract of section 3, which changes `02` and
+  needs the owner's approval.
+- **Revision 2 changes:** the derivation contract (section 3), the compatibility analysis (section
+  4), the O-3 answer (section 5), the audience tests (section 7), and a file footprint that keeps the
+  owner's boundary exactly (section 2). Revision 1 listed additive changes to four existing files,
+  which contradicted that boundary; section 2 removes them.
 
-## 1. The owner's preconditions, and their state
+## 1. Answers to the owner's three questions
 
-| # | Precondition (owner disposition) | State | Evidence |
-|---|---|---|---|
-| 1 | The R2-F3 and R2-F4 corrections are verified in the test matrix | **Met.** R2-F3: ADV-H10, NEG-L04 and PROP-H01 hold on two independent encoders, 28 of 28 checks. R2-F4: PROP-H02 is corrected in `04` to take its expected field set from the contract, and the corrected property fails the field-dropping mutant of `08` and passes the encoder. | `evidence/s1_preconditions/r2f3_matrix_check.mjs`, `r2f4_proph02_check.mjs` |
-| 2 | The encoder's outputs match the frozen canonical vectors | **A gate of the implementation**, defined in section 4: the three worked examples of `01` at `3cae2dd`. | `01`, "Worked example" |
-| 3 | Credential and signature domain separation remains enforced | **An invariant of the implementation**, I-6 to I-8 below, each with a test. | `02`, "Key derivation" |
-| 4 | No rejection-record, registration or authentication-policy behaviour is introduced through S1 | **A scope rule**, section 2: S1 changes no existing module, and a source check fails the build if any existing module imports `event_auth.ts`. | Section 2; test T-12 |
-| 5 | Tests and evidence are reproducible from committed sources | **A rule for every artifact below**: the vector, the test key and every script are committed, and nothing reads a secret from the environment. | Section 4 |
+| Question (owner ruling on O-2 and S1) | Answer | Where |
+|---|---|---|
+| How does audience identity enter `deriveAuthKey`? | As a fourth, required argument, validated against a canonical grammar, and written into the HKDF `info` as its own length-prefixed record, between the context and the key id. There is no default and no three-argument form. | Section 3 |
+| How do the frozen vectors remain valid? | The frozen v1 vectors are the authenticated bytes and their SHA-256 (`01`, examples A, B1 and B2). The derivation is not an input to those bytes, so they do not change; the evidence script checks example A byte for byte. No MAC, token or key vector is committed anywhere, so nothing is rewritten. | Section 4 |
+| Does the mechanism depend on O-3? | No, not for S1. The audience names the **receiving authority**, not the producer's tenant or scope, and S1 takes it as an argument. S3 will need one configuration value — the gateway's own audience — which is not a registration field. | Section 5 |
 
-## 2. Files
+## 2. Files: three new files, nothing else
 
-S1 adds files. It changes only the four existing files marked below, and each change is additive.
-
-| File | Change |
+| File | Content |
 |---|---|
-| `src/spine/event_auth.ts` | **New.** The field schedule, the encoder, the HKDF derivation and the MAC helper (section 3). |
-| `test/event_auth.test.ts` | **New.** The S1 test suite (section 4). The decoder for PROP-H02 lives here, not in `src/`. |
-| `fixtures/golden/event_auth.v1.vector.json` | **New.** The golden vector, per `03`: the envelope, the context, the key id, the authenticated bytes as hex, their SHA-256, and the HMAC under a named test key. |
-| `fixtures/golden/manifest.json` | Gains the vector's entry. |
-| `tools/gen-fixtures.ts` | Generates the vector, so gate G4 holds. It changes no other fixture. |
-| `doc/system/02-contract-surface.md` | Adds the vector to the cross-language contract evidence (`03`). |
-| `doc/SNTSYSTEM.md` | Rebuilt with `bash doc/system/BUILD.sh`. |
+| `src/spine/event_auth.ts` | **New.** The field schedule, the encoder, the derivation and the MAC helper. Pure functions only. |
+| `test/event_auth.test.ts` | **New.** The S1 suite, with the PROP-H02 decoder inside it. |
+| `fixtures/golden/event_auth.v1.vector.json` | **New.** The golden vector (`03`): the envelope, the context, the key id, the **audience**, the authenticated bytes as hex, their SHA-256, and the HMAC under a named test key and a named test audience. It states that both are test values. |
 
-**S1 does not change:** `src/spine/gateway.ts`, `producers.ts`, `ledger.ts`, `producer_secrets.ts`,
-`build.ts`, `src/contracts/envelope.ts`, `src/index.ts`, or any replay fixture. The validator rules
-belong to S2, the gateway wiring to S3, the rejection record to SL and S4, the registry rules to S6.
-`event_auth.ts` is not exported from `src/index.ts` in this slice, so nothing outside the tests can
-call it.
+**No existing file changes.** Revision 1 also changed four existing files. Each is unnecessary, and
+one would have broken an existing test:
 
-## 3. Interfaces
+| Existing file | Why S1 does not change it |
+|---|---|
+| `fixtures/golden/manifest.json` | It is generated by `tools/gen-fixtures.ts`, and `test/contracts.test.ts` validates each entry against a contract validator. No validator exists for an `event_auth` vector, so an entry would **fail that existing test**. The vector stays outside the manifest, verified by T-2. `03`'s line that adds it to the manifest is corrected in the same change as this revision. |
+| `tools/gen-fixtures.ts` | Not needed: the vector is a committed fixture outside the generator, so gate G4 still holds unchanged. |
+| `doc/system/02-contract-surface.md`, `doc/SNTSYSTEM.md` | The workspace rule asks for a `doc/system` change when a change adds a route, scope, command, setting or caller. S1 adds none: nothing calls the module. The slice that wires it (S3) documents it. |
+
+`event_auth.ts` is not exported from `src/index.ts`. `src/spine/gateway.ts`, `producers.ts`,
+`ledger.ts`, `producer_secrets.ts`, `build.ts` and `src/contracts/envelope.ts` do not change, and
+no replay fixture changes.
+
+## 3. The derivation contract (O-2)
+
+**Changed from the reviewed `02`.** `02` at `3cae2dd` derives
+`HKDF-SHA256(ikm = secret, salt = "forgesentinel.event_auth.v1", info = usage + "|" + key_id, L = 32)`.
+The contract below replaces the `info`, and keeps everything else.
+
+### 3.1 The audience identifier
+
+- **What it names:** the **receiving authority** — the gateway deployment that is meant to accept
+  the event. It is never a tenant, an account or a producer.
+- **Canonical grammar:** `aud:` then one to eight dot-separated labels; each label is a lowercase
+  ASCII letter, then up to 62 lowercase letters, digits or hyphens. At most 255 characters.
+  Regular expression: `^aud:[a-z][a-z0-9-]{0,62}(\.[a-z][a-z0-9-]{0,62}){0,7}$`.
+  Example: `aud:forgesentinel.gateway.test`.
+- **No normalization.** A value that does not match is refused, never repaired: no case folding,
+  no trimming, no Unicode normalization.
+- **Distinct from tenant identity.** The audience is its own argument and its own record in the
+  `info`. A tenant id is never passed as an audience, and the grammar refuses a tenant-shaped value
+  such as `ten_demo` (no `aud:` prefix).
+
+### 3.2 The derivation
+
+```text
+K_context = HKDF-SHA256(
+  ikm  = the producer secret, as bytes                       (unchanged)
+  salt = ASCII "forgesentinel.event_auth.v1"                 (unchanged)
+  info = R("kdf",      "forgesentinel.event_auth.v1.kdf")
+       ‖ R("context",  context)                              "credential" or "signature"
+       ‖ R("audience", audience)                             the canonical audience identifier
+       ‖ R("key_id",   registration key id)                  never the event's key id
+  L    = 32 )
+```
+
+`R(name, value)` is a record of `01`'s grammar: `name 0x1F s 0x1F length 0x1F value 0x1E`, the
+length being the UTF-8 byte count in decimal. **Domain separation is explicit:** the label record
+names the derivation, the context record separates the credential key from the signature key, and
+the audience record separates receiving authorities. **The encoding is injective** for the reason
+`01`'s format is: every field carries its length, so no value can move a field boundary. The
+earlier `usage + "|" + key_id` relied on the usage labels differing at byte 0; that argument does
+not extend to a third field.
+
+### 3.3 Refusals (fail closed)
+
+`deriveAuthKey` throws, and derives nothing, when:
+
+- the audience is absent, not a string, empty, longer than 255 characters, or outside the grammar
+  (code `audience_invalid`);
+- it is called with three arguments, which leaves the audience out — there is no unscoped form;
+- the context is not `credential` or `signature` (`context_invalid`);
+- the secret is empty (`secret_invalid`), or the key id is empty or holds a lone surrogate
+  (`key_id_invalid`).
+
+There is no fallback. In particular, no path derives with the earlier `info`, and none derives
+without an audience. A mismatched audience at verification time — the gateway's audience against
+the one a producer used — gives a different key, so the MAC fails. That happens in S3, as
+`producer_auth_failed`, with no audience in the message, so it is no oracle; S1 has no verifier.
+
+## 4. Compatibility analysis
+
+| Artifact | Effect of the contract | Action |
+|---|---|---|
+| The frozen v1 vectors: examples A, B1 and B2 of `01` (authenticated bytes and their SHA-256) | **None.** The derivation is not an input to the authenticated bytes. The evidence script checks example A: 1597 bytes, SHA-256 `ecb0d8f4…f998`, unchanged. | None |
+| The v1 layout (46 records) and `AUTH_FORMAT` | **None.** No record is added; the format name stays `forgesentinel.event_auth.v1`. | None |
+| MAC, token or derived-key vectors | **None exists.** No vector file is committed (`fixtures/golden/` holds none), no MAC or key value appears in the plan set, and review round 2's key probe records relations only, not values. A key under the earlier `info` does differ from one under this contract, so any MAC value would change — but none was ever frozen. | None |
+| The golden vector (G7) | **Created, not rewritten.** It does not exist yet; S1 creates it under this contract, with a named test audience. | Part of S1 |
+| `02`, "Key derivation" | **Changes.** The `info` construction above replaces the reviewed one. | Revised in the same change that records the owner's approval of this contract — not before |
+| Review round 2's HKDF checks (`08`, `evidence/round2/r2_probe_keys.mjs`) | They checked the reviewed `info`. Their properties — RFC 5869 A.1, `K_credential ≠ K_signature`, a token that does not verify as a signature, a broken transplant — are re-checked under this contract by the evidence script. | G8, the independent review of S1, re-verifies |
+
+**So no separately versioned vector set is needed:** no committed vector depends on the derivation.
+If the owner wants the derivation itself versioned, the label record already carries a version
+(`…v1.kdf`), and a later change to the derivation would change that label.
+
+## 5. Dependency on O-3
+
+**None for S1.** S1's `deriveAuthKey` takes the audience as an argument and decides nothing about
+who may send to whom.
+
+- The audience binds an event to its **receiving authority**. O-3 concerns the **scope of a
+  producer's registration** — which tenants a producer may speak for. The two are separate axes:
+  audience binding stops an event that one gateway accepts being replayed into another, whatever the
+  producer's scope.
+- **S3**, which wires the gateway, needs one configuration value: the gateway's own audience
+  identifier. That is gateway configuration, not a registration field, and S3 must use **one**
+  audience for each gateway, never trying several in turn, which would weaken the binding.
+- If O-3's model later lets a registration name the audiences a producer may target, that is
+  additive to this contract and changes nothing in S1.
+
+Nothing in this revision approves registration semantics, tenant authorization or enforcement
+behaviour.
+
+## 6. Interfaces
 
 ```ts
-// src/spine/event_auth.ts — every function is pure: no I/O, no clock, no environment, no global state.
+// src/spine/event_auth.ts — pure functions: no I/O, no clock, no environment, no global state.
 
 export const AUTH_FORMAT = "forgesentinel.event_auth.v1";
 export type AuthContext = "credential" | "signature";
 
-/** The authenticated bytes. A distinct nominal type, so a raw string or a payload hash cannot be
- *  passed where these bytes are required (gate G9). */
+/** The authenticated bytes, a distinct nominal type (gate G9). */
 export type AuthBytes = Uint8Array & { readonly __brand: "forgesentinel.AuthBytes" };
 
-/** One row of the fixed schedule: 46 rows, in 01's order. Element records follow row 46. */
+/** A canonical audience identifier (section 3.1). Only isAudienceId can produce one. */
+export type AudienceId = string & { readonly __brand: "forgesentinel.AudienceId" };
+export function isAudienceId(value: unknown): value is AudienceId;
+
 export interface FieldSpec {
-  readonly name: string;                    // the constant record name
+  readonly name: string;
   readonly kind: "s" | "b" | "c" | "presence" | "context";
-  readonly required: boolean;               // per src/contracts/envelope.ts
+  readonly required: boolean;              // per src/contracts/envelope.ts
 }
-export const FIELD_SCHEDULE: readonly FieldSpec[];
+export const FIELD_SCHEDULE: readonly FieldSpec[];   // 46 rows, in 01's order
 
-/** The refusal of 01's encoder failure rules. Its code is envelope_not_encodable. Its message names
- *  the rule and the field, never a value. */
+/** Refusals carry a code and name the rule and the field, never a value. */
 export class EnvelopeNotEncodable extends Error { readonly code: "envelope_not_encodable"; }
+export class DerivationRefused extends Error {
+  readonly code: "audience_invalid" | "context_invalid" | "secret_invalid" | "key_id_invalid";
+}
 
-/** AUTH(context, keyId, event) of 01. Throws EnvelopeNotEncodable. In the `signature` context,
- *  `keyId` must equal event.integrity.signature_key_id. */
+/** AUTH(context, keyId, event) of 01. In the `signature` context, keyId must equal
+ *  event.integrity.signature_key_id. */
 export function encodeAuth(context: AuthContext, keyId: string, event: EventEnvelope): AuthBytes;
 
-/** K_context of 02: HKDF-SHA256(ikm = secret, salt = AUTH_FORMAT, info = context + "|" + keyId, L = 32).
- *  keyId is the registration's, never the event's. */
-export function deriveAuthKey(secret: Uint8Array, context: AuthContext, registrationKeyId: string): Uint8Array;
+/** K_context of section 3.2. Four arguments; no default; throws DerivationRefused. */
+export function deriveAuthKey(secret: Uint8Array, context: AuthContext,
+                              audience: AudienceId, registrationKeyId: string): Uint8Array;
 
 /** hex(HMAC-SHA256(key, bytes)): 64 lowercase hex. */
 export function authMacHex(key: Uint8Array, bytes: AuthBytes): string;
 ```
 
-There is no verify function, no comparison, no registry lookup and no reason-code mapping. Those are
-authentication policy, and precondition 4 keeps them out of S1.
+There is no verify function, comparison, registry lookup, reason-code mapping or audience
+configuration. Those are verification and policy, and they stay out of S1.
 
-## 4. Tests and gates
+## 7. Tests and gates
 
-The suite is `test/event_auth.test.ts`. Every property has a **mutant control**: a seeded broken
-encoder against which the property must fail, so no property passes for want of a real difference
-(the lesson of review findings F17 and R2-F4).
+The suite is `test/event_auth.test.ts`. Every property has a **mutant control**: a deliberately
+broken implementation that the property must fail.
 
 | Id | Test | Source |
 |---|---|---|
-| T-1 | **Frozen vectors.** `encodeAuth` reproduces `01`'s examples at `3cae2dd`: A (46 records, 1597 bytes, SHA-256 `ecb0d8f4…f998`), B1 (48, 1841, `76d0514c…94d4`) and B2 (48, 1908, `c8bf31c6…3ec2`), byte for byte. | Precondition 2 |
-| T-2 | **Golden vector (G7).** The committed vector re-encodes to its bytes, its SHA-256 and its HMAC under the named test key. Its bytes are example A's. | `03`; G7 |
-| T-3 | PROP-H01, as corrected for R2-F3: no two distinct encodable envelopes give the same bytes, and every refusal case is refused. | `04` |
-| T-4 | PROP-H02, as corrected for R2-F4: the decoded projection has every leaf and parent that `envelope.ts` declares, taken from the contract and not from the schedule; and the round trip holds. | `04`; R2-F4 |
-| T-5 | ADV-H03 to ADV-H11, including ADV-H10 as corrected for R2-F3. | `04` |
-| T-6 | **R-5 drift test.** `FIELD_SCHEDULE`'s names, kinds and required flags equal the declared fields and types of `envelope.ts`, with `payload` as the one exclusion. | `05`, R-5 |
-| T-7 | **Failure rules.** Each rule of `01` refuses with `envelope_not_encodable`: a required field or object absent or not an object, a present optional parent without its required fields, a wrong type, `null`, a lone surrogate, a non-array or holed `sentinel_finding_ids`, a `signature`-context key id that is not `integrity.signature_key_id`. | `01` |
-| T-8 | **HKDF.** RFC 5869 test case A.1 reproduces, and `deriveAuthKey` gives `K_credential ≠ K_signature` for one secret and key id. | `02` |
-| T-9 | **Domain separation.** A credential MAC does not equal a signature MAC over the same event, and record 2 makes the two inputs differ. | `02`; precondition 3 |
-| T-10 | **Record 39.** In the `signature` context the input does not change with `integrity.signature`; in the `credential` context it does. | `01` |
+| T-1 | **Frozen vectors.** `encodeAuth` reproduces `01`'s examples at `3cae2dd` byte for byte: A (46 records, 1597 bytes, `ecb0d8f4…f998`), B1 (48, 1841, `76d0514c…94d4`), B2 (48, 1908, `c8bf31c6…3ec2`). | Owner precondition 2 |
+| T-2 | **Golden vector (G7).** The committed vector re-encodes to its bytes, its SHA-256 and its HMAC under the named test key and test audience. Its bytes are example A's. | `03`; G7 |
+| T-3 | PROP-H01, as corrected for R2-F3. | `04` |
+| T-4 | PROP-H02, as corrected for R2-F4: the expected field set comes from `envelope.ts`. | `04` |
+| T-5 | ADV-H03 to ADV-H11, ADV-H10 as corrected for R2-F3. | `04` |
+| T-6 | **R-5 drift test.** `FIELD_SCHEDULE` equals the declared fields, kinds and required flags of `envelope.ts`, with `payload` as the one exclusion. | `05`, R-5 |
+| T-7 | **Encoder failure rules**, each refusing with `envelope_not_encodable`. | `01` |
+| T-8 | **HKDF primitive.** RFC 5869 test case A.1 reproduces. | `02` |
+| T-9 | **Domain separation.** `K_credential ≠ K_signature`; a credential MAC is not a signature MAC; record 2 makes the two inputs differ. | `02`; owner precondition 3 |
+| T-10 | **Record 39.** The `signature` input does not change with `integrity.signature`; the `credential` input does. | `01` |
 | T-11 | **Tenant binding.** Moving an event to another tenant, or removing its tenant, changes both inputs. | `01`; `-008` |
-| T-12 | **Isolation.** A source check fails if any file under `src/` other than `event_auth.ts` imports it. | Precondition 4 |
+| T-12 | **Isolation.** A source check fails if any file under `src/` other than `event_auth.ts` imports it. | Owner precondition 4 |
+| T-13 | **Audience separation.** Two audiences give two keys under one root secret and one key id. | O-2 condition 2 |
+| T-14 | **Deterministic derivation.** The same four inputs give the same key. | O-2 condition 5 |
+| T-15 | **Cross-audience rejection.** A MAC made under audience A does not equal one under audience B over the same bytes. | O-2 condition 5 |
+| T-16 | **Fail closed.** Each refusal of section 3.3 throws its code, including a three-argument call and a tenant-shaped audience. | O-2 conditions 1 and 4 |
+| T-17 | **Broken derivations are caught.** Five mutants — the audience left out of the `info`, the fields joined without lengths, a malformed audience falling back to an unscoped key, an audience case-folded instead of refused, any string accepted as an audience — each fail one of T-13 to T-16. | O-2 condition 5 |
 
-The gates S1 must pass, from `05`: **G1** build, **G2** suite (402 existing tests plus the new ones,
-0 failures), **G4** fixture determinism, **G6** documentation, **G7** golden vector, and **G9**'s
-nominal-type part. **G8**, an independent review of the S1 change against a frozen commit, comes
-before merge. No skipped test counts as evidence (recommendation 2, item 5, ruled as ruling 2).
+**Evidence, now.** `evidence/o2_derivation/o2_kdf_contract_check.mjs` implements the contract of
+section 3 as design evidence, and runs T-8 and T-13 to T-17 against it, plus the compatibility
+checks of section 4: **18 of 18 pass**, and each of the five mutants is caught. Run it from the
+plan-set directory with `node evidence/o2_derivation/o2_kdf_contract_check.mjs`. The R2-F3 and
+R2-F4 evidence is in `evidence/s1_preconditions/`.
 
-**Reproducibility (precondition 5).** The vector uses a key from `test/support/producers.ts`, which
-is already public and which a production or staging runtime refuses (`KI-SENTINEL-20261030-002`),
-and the vector names it and states that it is a test key. Every check above runs from committed
-sources with `npm ci --ignore-scripts && npm test`.
+**Gates (from `05`):** G1 build, G2 suite (the existing 402 tests plus the new ones, 0 failures),
+G4 fixture determinism, G7 golden vector, G9's nominal-type part, and **G8, an independent review
+of the S1 change against a frozen commit, before merge** — which is where the derivation contract
+gets its independent verification in code. No skipped test counts as evidence (recommendation 2,
+item 5, ruled as ruling 2). G6 is unaffected, because S1 changes no documentation.
 
-## 5. Rollback boundaries
+## 8. Rollback boundaries
 
-- **S1 is additive.** It adds one module, one test file and one fixture, and it extends one
-  generator and two documents. Nothing at run time calls the module.
-- **Rollback is a revert of the S1 commit.** No data, no ledger, no configuration, no secret and no
-  replay fixture changes, so a revert needs no migration and leaves the gateway as it is today.
-- **Stop and revert when:** a frozen vector does not reproduce (T-1); a gate fails; a file outside
-  section 2 changes; any existing module imports `event_auth.ts` (T-12); or the independent review
-  (G8) finds a blocking defect.
-- **What a rollback does not undo.** Nothing: S1 creates no state outside the repository.
+- **S1 adds three files and changes none.** Nothing at run time calls the module.
+- **Rollback is a revert of the S1 commit.** No data, ledger, configuration, secret or fixture other
+  than the new vector changes, so a revert needs no migration.
+- **Stop and revert when:** a frozen vector does not reproduce (T-1); a gate fails; any file outside
+  section 2 changes; any module imports `event_auth.ts` (T-12); or the G8 review finds a blocking
+  defect.
 
-## 6. Open decisions that bear on S1
+## 9. The other open decisions
 
-| Decision | Effect on S1 | Request |
-|---|---|---|
-| **O-2, audience binding** (owner direction: "Require explicit audience binding for authenticated envelopes. The audience must be validated against the intended receiving authority.") | **Changes S1 either way.** (a) A bound audience record in the authenticated bytes changes the v1 layout: the 46 records, the frozen vectors and `01` change, and the change needs its own review before S1 can match "the frozen canonical vectors". (b) Binding the audience in key derivation (`info` gains the receiving authority) leaves the layout and the vectors unchanged, but changes `deriveAuthKey` and T-8. (c) Binding it outside S1, in the registration, needs the O-3 scope model first. | **Rule the mechanism before S1 is authorized.** Under (a), the frozen vectors of precondition 2 become those of the revised `01`. |
-| R1-F (`-0`), `-006` (float-shaped tokens) | None. No bound record is numeric (`01`); they govern the payload digest and the intake. | None for S1. |
-| R1-G (duplicate keys) | None. It governs the intake boundary. | None for S1. |
-| `-004` (one Ed25519 key) | None. It governs S6. | None for S1. |
-| `-005` (producer-required signature) | None. It governs the gateway's refusal, S2 and S3. | None for S1. |
-| R2-F8 (the HKDF `info` rationale and key-id uniqueness) | `deriveAuthKey` takes the registration's key id; uniqueness is enforced at S6 (D-9 safeguard 1). S1 adds no registry rule. | None for S1; the rationale in `02` is corrected separately. |
+| Decision | Effect on S1 |
+|---|---|
+| O-2 | **Direction selected** (key derivation, conditionally). This revision supplies the contract; its approval is requested below. |
+| O-3, registration scope (`-012`) | None (section 5). Not approved by this revision. |
+| R1-F, `-006` (numeric tokens) | None: no bound record is numeric. |
+| R1-G (duplicate keys) | None: it governs the intake boundary. |
+| `-004` (one Ed25519 key) | None: it governs S6. |
+| `-005` (producer-required signature) | None: it governs the gateway's refusal (S2, S3). |
+| R2-F8 (key-id uniqueness) | `deriveAuthKey` takes the registration's key id; uniqueness is enforced at S6. Two registrations that share a secret and a key id still derive one key for one audience. |
 
-## 7. What this request asks for
+## 10. What this request asks for
 
-Authorization to implement S1 exactly as sections 2 to 5 state, **after** O-2's mechanism is ruled,
-with no rejection-record, registration, authentication-policy, gateway, deployment or enforcement
-change. S2, S3, S4, SL and S6 stay blocked.
+1. **Approval of the derivation contract** of section 3. With that approval, `02` is revised to
+   match, in the same change that records it.
+2. **Then**, authorization to implement S1 exactly as sections 2 and 6 to 8 state: three new files,
+   pure functions, no change to an existing file, and no verification, registry, policy,
+   deployment or enforcement behaviour.
+
+S2, S3, S4, SL and S6 stay blocked. Nothing in this document is an authorization.
