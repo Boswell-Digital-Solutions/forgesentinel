@@ -1090,6 +1090,117 @@ or merge. It does not rule R1-F or R1-G. `KI-SENTINEL-20261104-001` stayed open 
 2026-11-04: the regenerated `01` is on `master` (#46, corrected by #47), and `07` names round 2's
 frozen commit, `3cae2dd`. The entry is closed.
 
+## Owner disposition on review round 2 (2026-11-04)
+
+**Provenance.** The owner issued this disposition in the operator session on 2026-11-04, in his own
+message headed "ForgeSentinel — Owner Disposition on Round 2". It is recorded here as an owner
+ruling. Quoted passages are his words.
+
+**Decision: conditional acceptance of round 2.** "S1 may advance to implementation authorization
+review. S2–S4 and SL remain blocked." The owner's reason: "The independent review provides strong
+evidence for the encoder design, but passing the design-review gate is not equivalent to
+authorizing implementation."
+
+### Review and merge
+
+| Item | Disposition |
+|---|---|
+| Pull request #48 | Approved for merge, provided its head and scope were unchanged from the reviewed version. Merged as `d99429b` after both were confirmed. |
+| Pull request #49 | Approved for merge after #48, subject to confirming that the archived review and scripts were unchanged and that the corrected test matrix passes. Merged as `e75a198` after both were confirmed (`evidence/s1_preconditions/`). |
+| `08_REVIEW_ROUND_2_FINDINGS.md` | **Accepted as the round-2 review of record**, preserving the reviewer's original findings and qualifications. |
+| Authorization boundary 1, the design-review gate | **Conditionally cleared for S1 only.** "No blanket clearance for the remaining slices." |
+
+### Owner directions on the open design decisions
+
+| Item | Owner direction |
+|---|---|
+| O-1, the claimed tenant | "Preserve the claimed tenant as untrusted observational metadata in the rejection record, never as authenticated identity or routing authority." |
+| O-4, the rejection digest | "Define a domain-separated SHA-256 digest over the exact received envelope bytes, before parsing or normalization. If exact bytes are unavailable, record that explicitly; never reconstruct them." |
+| O-2, audience binding | "Require explicit audience binding for authenticated envelopes. The audience must be validated against the intended receiving authority." |
+| O-3, registration scope | "Do not approve tenant-unscoped registrations by default. Require an explicit registration scope and authorization model before implementation." |
+| R2-F2, unbounded messages | "Validation failures must use bounded, structured error codes and fixed-size messages. No attacker-controlled raw strings in ledger messages." |
+
+The owner qualified O-1 and O-4: they "establish design intent, not a complete rejection-record
+schema. The final record mapping, byte availability semantics, and handling of malformed envelopes
+still require specification and adversarial testing."
+
+**O-1 amends ruling 1.** Ruling 1 removed all envelope metadata from the rejection record; R1-E kept
+the claimed tenant as an observed value. `08` (R2-F1) found the two in conflict. O-1 settles it on
+R1-E's side, for the claimed tenant only: the rejection record keeps it, labelled untrusted and
+observational, and it is never identity or routing authority. The rest of ruling 1 stands.
+
+### Implementation boundaries
+
+S1 may proceed to **a separate implementation authorization request**, provided:
+
+1. the R2-F3 and R2-F4 corrections are verified in the test matrix;
+2. the encoder's outputs match the frozen canonical vectors;
+3. credential and signature domain separation remains enforced;
+4. no rejection-record, registration or authentication-policy behaviour is introduced through S1;
+5. tests and evidence are reproducible from committed sources.
+
+R2-F1 and R2-F2 must be resolved and independently verified before their blocked slices advance.
+"The earlier unresolved findings R1-F, R1-G, -004, -005, and -006 retain their existing status.
+Nothing in this ruling silently closes or supersedes them."
+
+**What it does not authorize.** "No implementation is authorized by this response. No production
+deployment, enforcement-mode activation, or expansion of ForgeSentinel authority is approved." (The
+workspace rule writes "deployment", not "production"; the owner's quotation is kept as he wrote it.)
+
+The S1 request is `09_S1_IMPLEMENTATION_AUTHORIZATION_REQUEST.md`.
+
+## Owner ruling on O-2 and slice S1 (2026-11-04)
+
+**Provenance.** The owner issued this ruling in the operator session on 2026-11-04, in his own
+message headed "Owner ruling — Forge Sentinel S1". Quoted passages are his words.
+
+**Decision.** "Select audience binding through key derivation (O-2), conditionally. Do not authorize
+S1 implementation yet." The reason: it "preserves the frozen v1 envelope layout and avoids
+introducing a new signed field". The selection "is not permission to modify deriveAuthKey
+immediately."
+
+**The five conditions on O-2:**
+
+1. **Explicit audience identity.** "The derivation must use an unambiguous, canonical audience
+   identifier. Tenant identity and audience identity must remain distinct."
+2. **Cryptographic separation.** "Different audiences must derive different authentication keys
+   under the same root secret. Domain separation must be explicit."
+3. **Frozen-vector integrity.** "Existing vectors must not be silently rewritten. If the proposed
+   derivation changes their expected outputs, document the incompatibility and obtain approval for a
+   separately versioned vector set."
+4. **Fail-closed behaviour.** "Missing, malformed, ambiguous, or mismatched audience information must
+   never fall back to an unscoped key."
+5. **Independent verification.** "Tests must demonstrate audience separation, deterministic
+   derivation, cross-audience rejection, and detection of deliberately broken derivations."
+
+**S1: authorization withheld.** `09` must be revised "to establish exactly how audience identity
+enters deriveAuthKey, how the frozen vectors remain valid, and whether the mechanism introduces any
+dependency on O-3", and must "preserve the original S1 boundary: three new files, pure functions, no
+changes to existing modules, and no verification, registry, policy, deployment, or enforcement
+implementation". It "must clearly distinguish the selected design direction from implementation
+authorization."
+
+**Also.** The merge sequence of #48 and #49 is accepted as the handoff record, subject to the stated
+evidence. Pull request #50 stays open and unmerged. "O-3's scope model remains unresolved. Do not
+treat this O-2 decision as approval of registration semantics, tenant authorization, or enforcement
+behavior." No implementation, merge of #50, deployment or enforcement is authorized.
+
+## Owner decision on the O-2 derivation contract (2026-11-04)
+
+- **Disposition**: the owner approves the contract of `09` section 3 conditionally, as a design contract. The approval depends on verification of the committed evidence. S1 is not authorized.
+- **Approved requirements**:
+  - `deriveAuthKey` takes four arguments. No three-argument form and no fallback exist.
+  - An invalid audience fails closed with `audience_invalid`. The derivation does not normalize, substitute or infer an audience.
+  - HKDF uses the stated salt, length-prefixed `info` records and a 32-byte output.
+  - Keys for different audiences are separate. A MAC for one audience does not authenticate under another.
+  - Each receiving gateway has exactly one configured audience. No gateway tries several audiences.
+  - The authenticated-byte layouts, their SHA-256 values and the golden examples stay unchanged.
+  - Audience binding gives no tenant authorization, registration scope or enforcement authority (O-3 stays open).
+- **Grammar, as the owner reads it**: one to eight non-empty lowercase labels after `aud:`. An empty suffix is invalid.
+- **Conditions for final acceptance**: the 18 checks and the five mutants pass; the grammar is unambiguous; the contract and its vectors reproduce from committed sources; PR #50 holds no implementation change; the manifest resolves.
+- **Verification**: the author verified `83608cc` against a `git archive` of the pushed head. Every condition passed. The verification found two evidence defects, D1 and D2 (`KI-SENTINEL-20261104-013`). On the owner's word, a docs-only commit corrected them. The author is not an independent reviewer (G8).
+- **Boundary**: O-2's design direction is approved conditionally. The merge of PR #50 waits on verification. S1 and S3 are not authorized. A revision of `02` may be proposed as documentation reconciliation after the contract is verified. That permission does not extend to implementation, and it does not permit operational keys.
+
 ## Findings disposition
 
 | Finding | Owner disposition | Effect on this track |
@@ -1110,9 +1221,10 @@ Three boundaries, in order. Each needs its own explicit authorization.
    2026-11-02, so what remains is round 2 against the corrected `01`, with a
    frozen commit named before it starts. The commit is named: `3cae2dd`
    (`07`, 2026-11-04). **Round 2 ran the same day** (`08`): verdict "safe to
-   proceed to implementation authorization with the conditions listed". Whether
-   that clears this boundary is the owner's decision, and `08` becomes the review
-   of record only if the owner accepts it. Merging the documentation did not clear
+   proceed to implementation authorization with the conditions listed". The owner
+   accepted `08` as the review of record and cleared this boundary
+   **conditionally, for S1 only** (owner disposition on review round 2, above).
+   It is not cleared for S2, S3, S4 or SL. Merging the documentation did not clear
    it, and neither did the rulings.
 2. **Implementation authorization.** Each slice in `05` needs the owner's
    explicit authorization. Design approval is not implementation authorization.

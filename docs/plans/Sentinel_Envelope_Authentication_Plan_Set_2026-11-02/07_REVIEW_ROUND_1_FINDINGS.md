@@ -172,7 +172,9 @@ document of record in this plan set, as round 1's did.
 
 **Round 2 ran on 2026-11-04** against `3cae2dd`. Its findings are `08_REVIEW_ROUND_2_FINDINGS.md`:
 verdict **safe to proceed to implementation authorization with the conditions listed**, with two
-blocking findings that hold slices SL, S2, S3 and S4 (not the S1 encoder).
+blocking findings that hold slices SL, S2, S3 and S4 (not the S1 encoder). **The owner accepted `08`
+as the round-2 review of record on 2026-11-04, and cleared authorization boundary 1 conditionally,
+for S1 only** (`06`, owner disposition on review round 2).
 
 ### Why the frozen commit is a ruling and not a preference
 
