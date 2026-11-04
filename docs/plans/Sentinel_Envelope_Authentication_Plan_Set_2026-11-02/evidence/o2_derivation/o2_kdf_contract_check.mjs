@@ -7,8 +7,9 @@
 //   node evidence/o2_derivation/o2_kdf_contract_check.mjs
 //
 // It shows, for the proposed contract: RFC 5869 A.1, determinism, context and audience separation,
-// cross-audience rejection, the injectivity of the info encoding, the fail-closed refusals, that the
-// frozen v1 vectors are unchanged, and that each deliberately broken derivation (a mutant) is caught.
+// cross-audience rejection, the injectivity of the info encoding, the fail-closed refusals, two known-answer
+// values, that the frozen v1 vectors are unchanged, and that each deliberately broken derivation (a mutant)
+// is caught.
 
 import { hkdfSync, createHmac, createHash, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -28,10 +29,11 @@ function assertAudience(a) {
   if (typeof a !== "string" || a.length > 255 || !AUDIENCE_GRAMMAR.test(a)) throw new Error("audience_invalid");
 }
 const CONTEXTS = new Set(["credential", "signature"]);
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
 
 /** One record of 01's grammar: <name> 0x1F s 0x1F <length> 0x1F <value> 0x1E. Length-prefixed, so injective. */
 function rec(name, value) {
-  if (/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(value)) throw new Error("unpaired surrogate");
+  if (LONE_SURROGATE.test(value)) throw new Error("unpaired surrogate"); // unreachable from deriveAuthKey: each input is checked first
   const v = Buffer.from(value, "utf8");
   return Buffer.concat([Buffer.from(`${name}${US}s${US}${v.length}${US}`), v, Buffer.from(RS)]);
 }
@@ -46,7 +48,7 @@ function deriveAuthKey(secret, context, audience, keyId, impl = {}) {
   if (!(secret instanceof Uint8Array) || secret.length === 0) throw new Error("secret_invalid");
   if (!CONTEXTS.has(context)) throw new Error("context_invalid");
   (impl.assertAudience ?? assertAudience)(audience);
-  if (typeof keyId !== "string" || keyId.length === 0) throw new Error("key_id_invalid");
+  if (typeof keyId !== "string" || keyId.length === 0 || LONE_SURROGATE.test(keyId)) throw new Error("key_id_invalid");
   const info = (impl.kdfInfo ?? kdfInfo)(context, audience, keyId);
   return Buffer.from(hkdfSync("sha256", secret, Buffer.from(AUTH_FORMAT, "ascii"), info, 32));
 }
@@ -107,6 +109,20 @@ check("fail-closed: an unknown context is refused", throws(() => deriveAuthKey(S
 check("fail-closed: an empty secret and an empty key id are refused",
   throws(() => deriveAuthKey(Buffer.alloc(0), "credential", AUD_A, "k"), "secret_invalid") &&
   throws(() => deriveAuthKey(SECRET, "credential", AUD_A, ""), "key_id_invalid"));
+
+check("fail-closed: a key id with a lone high or low surrogate is refused with key_id_invalid (09, section 3.3)",
+  ["k\ud800", "\udc00k", "a\ud800b"].every((k) => throws(() => deriveAuthKey(SECRET, "credential", AUD_A, k), "key_id_invalid")) &&
+  !throws(() => deriveAuthKey(SECRET, "credential", AUD_A, "k\ud83d\ude00")));
+
+// Known answers: the derivation's output, pinned. Two independent implementations agree on these values
+// (this script on Node's hkdfSync, and an HKDF written by hand in Python from 09, section 3.2, alone).
+// SECRET is the published test value above. These are test keys, never operational keys.
+const KNOWN = [
+  ["credential", AUD_A, "key_usage_01", "1bc9486c41bcd69ce064d2cf12f6dab0cd9508450aae095b4c124b56f54e3673"],
+  ["signature", AUD_B, "key_billing_01", "e1180424aa87b0161e843136647b8772a40d60ffed8105e4be4ad3e7d31fc8b5"],
+];
+for (const [c, a, k, hex] of KNOWN)
+  check(`known answer: ${c} / ${a} / ${k}`, deriveAuthKey(SECRET, c, a, k).toString("hex") === hex);
 
 // Frozen-vector integrity: the derivation is not an input to the authenticated bytes.
 const frozen = {

@@ -1185,6 +1185,22 @@ evidence. Pull request #50 stays open and unmerged. "O-3's scope model remains u
 treat this O-2 decision as approval of registration semantics, tenant authorization, or enforcement
 behavior." No implementation, merge of #50, deployment or enforcement is authorized.
 
+## Owner decision on the O-2 derivation contract (2026-11-04)
+
+- **Disposition**: the owner approves the contract of `09` section 3 conditionally, as a design contract. The approval depends on verification of the committed evidence. S1 is not authorized.
+- **Approved requirements**:
+  - `deriveAuthKey` takes four arguments. No three-argument form and no fallback exist.
+  - An invalid audience fails closed with `audience_invalid`. The derivation does not normalize, substitute or infer an audience.
+  - HKDF uses the stated salt, length-prefixed `info` records and a 32-byte output.
+  - Keys for different audiences are separate. A MAC for one audience does not authenticate under another.
+  - Each receiving gateway has exactly one configured audience. No gateway tries several audiences.
+  - The authenticated-byte layouts, their SHA-256 values and the golden examples stay unchanged.
+  - Audience binding gives no tenant authorization, registration scope or enforcement authority (O-3 stays open).
+- **Grammar, as the owner reads it**: one to eight non-empty lowercase labels after `aud:`. An empty suffix is invalid.
+- **Conditions for final acceptance**: the 18 checks and the five mutants pass; the grammar is unambiguous; the contract and its vectors reproduce from committed sources; PR #50 holds no implementation change; the manifest resolves.
+- **Verification**: the author verified `83608cc` against a `git archive` of the pushed head. Every condition passed. The verification found two evidence defects, D1 and D2 (`KI-SENTINEL-20261104-013`). On the owner's word, a docs-only commit corrected them. The author is not an independent reviewer (G8).
+- **Boundary**: O-2's design direction is approved conditionally. The merge of PR #50 waits on verification. S1 and S3 are not authorized. A revision of `02` may be proposed as documentation reconciliation after the contract is verified. That permission does not extend to implementation, and it does not permit operational keys.
+
 ## Findings disposition
 
 | Finding | Owner disposition | Effect on this track |

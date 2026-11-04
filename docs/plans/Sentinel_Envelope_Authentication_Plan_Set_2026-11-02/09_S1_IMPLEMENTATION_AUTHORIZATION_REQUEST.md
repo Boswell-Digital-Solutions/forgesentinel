@@ -1,4 +1,4 @@
-# 09 Slice S1 — Implementation Authorization Request (revision 2)
+# 09 Slice S1 — Implementation Authorization Request (revision 3)
 
 - **Status:** **A request. S1 is not authorized.**
   - The owner's disposition on review round 2 let S1 "advance to implementation authorization
@@ -16,6 +16,7 @@
   4), the O-3 answer (section 5), the audience tests (section 7), and a file footprint that keeps the
   owner's boundary exactly (section 2). Revision 1 listed additive changes to four existing files,
   which contradicted that boundary; section 2 removes them.
+- **Revision 3 changes:** after the verification of `83608cc` (`KI-SENTINEL-20261104-013`), the evidence refuses a lone-surrogate key id with `key_id_invalid` (D1) and pins two known-answer values (D2); section 7 adds T-18. The owner approved the contract of section 3 conditionally, as a design contract (`06`). S1 is still not authorized.
 
 ## 1. Answers to the owner's three questions
 
@@ -203,10 +204,11 @@ broken implementation that the property must fail.
 | T-15 | **Cross-audience rejection.** A MAC made under audience A does not equal one under audience B over the same bytes. | O-2 condition 5 |
 | T-16 | **Fail closed.** Each refusal of section 3.3 throws its code, including a three-argument call and a tenant-shaped audience. | O-2 conditions 1 and 4 |
 | T-17 | **Broken derivations are caught.** Five mutants — the audience left out of the `info`, the fields joined without lengths, a malformed audience falling back to an unscoped key, an audience case-folded instead of refused, any string accepted as an audience — each fail one of T-13 to T-16. | O-2 condition 5 |
+| T-18 | **Known answers.** The derivation reproduces the two committed key values of the evidence script, under its published test secret. A record-order error passes every relation check and fails only this one. | O-2 condition 5; verification D2 |
 
 **Evidence, now.** `evidence/o2_derivation/o2_kdf_contract_check.mjs` implements the contract of
-section 3 as design evidence, and runs T-8 and T-13 to T-17 against it, plus the compatibility
-checks of section 4: **18 of 18 pass**, and each of the five mutants is caught. Run it from the
+section 3 as design evidence, and runs T-8 and T-13 to T-18 against it, plus the compatibility
+checks of section 4: **21 of 21 pass**, and each of the five mutants is caught. Revision 3 added the lone-surrogate refusal (D1) and two known-answer values (D2), after the verification of `83608cc`. Run it from the
 plan-set directory with `node evidence/o2_derivation/o2_kdf_contract_check.mjs`. The R2-F3 and
 R2-F4 evidence is in `evidence/s1_preconditions/`.
 

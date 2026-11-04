@@ -762,7 +762,8 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **Request**: `09` asks the owner to rule the mechanism before S1 is authorized.
 - **Owner ruling (2026-11-04)**: mechanism (b), key derivation, selected **conditionally**. S1 stays unauthorized. The ruling is recorded in `06` ("Owner ruling on O-2 and slice S1").
 - **Proposed contract**: `09` revision 2, section 3. The audience is a fourth, required argument of `deriveAuthKey`, validated against a canonical grammar and refused, not normalized, when it does not match. It goes into the HKDF `info` as its own length-prefixed record, between the context and the key id. There is no unscoped form. The v1 layout and the frozen vectors do not change (section 4), and S1 does not depend on O-3 (section 5).
-- **Evidence**: `evidence/o2_derivation/o2_kdf_contract_check.mjs`, 18 of 18 checks pass, five mutants caught.
+- **Evidence**: `evidence/o2_derivation/o2_kdf_contract_check.mjs`, 21 of 21 checks pass, five mutants caught (18 at `83608cc`; `-013` added three).
+- **Owner decision (2026-11-04)**: the contract is approved conditionally as a design contract, subject to verification of the committed evidence. S1 and S3 stay unauthorized. The merge of PR #50 waits on that verification.
 - **Still open**: the owner's approval of the contract, then the revision of `02` to match it.
 - **Scope**: open.
 
@@ -772,3 +773,12 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **Source**: the owner's direction O-3 (2026-11-04): "Do not approve tenant-unscoped registrations by default. Require an explicit registration scope and authorization model before implementation." Round 2 had raised it: a registration is not scoped to a tenant, so a producer's key can sign for any tenant.
 - **What is missing**: the scope model — what a registration's scope names, how the gateway enforces it against the authenticated tenant, and how the secrets file declares it (a schema change that `KI-SENTINEL-20261030-002` and slice S6 also touch).
 - **Scope**: open. No registration change may be implemented until the model is specified and approved. S1 makes no registration change.
+
+## KI-SENTINEL-20261104-013: The O-2 evidence at `83608cc` refused a lone-surrogate key id with the wrong code, and pinned no derivation output — CLOSED 2026-11-04 — evidence
+
+- **Classification**: Evidence defect. The derivation contract is not affected.
+- **Source**: the author's verification of PR #50 at `83608cc` against the owner's conditions on the O-2 contract (2026-11-04). The verification ran on a `git archive` of the pushed head. The author is not an independent reviewer (G8).
+- **D1**: `09` section 3.3 states that a key id with a lone surrogate is refused with `key_id_invalid`. The script refused it with `unpaired surrogate`, from its record encoder. No check covered the case. The refusal failed closed, but its code did not agree with the contract.
+- **D2**: no committed value pinned the derivation's output. The checks proved relations only, for example that two keys differ. A derivation that wrote the records in the wrong order passed every check.
+- **Fix**: `deriveAuthKey` in the script now refuses a lone-surrogate key id with `key_id_invalid`, and a check covers a lone high surrogate, a lone low surrogate and a valid pair. Two known-answer checks pin the key values. A hand-written HKDF in Python, built from `09` section 3.2 alone, gives the same values. Each new check fails against the defect it covers. `09` adds T-18.
+- **Scope**: closed. The owner's merge decision on PR #50 remains open.
