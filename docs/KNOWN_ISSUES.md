@@ -764,7 +764,9 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **Proposed contract**: `09` revision 2, section 3. The audience is a fourth, required argument of `deriveAuthKey`, validated against a canonical grammar and refused, not normalized, when it does not match. It goes into the HKDF `info` as its own length-prefixed record, between the context and the key id. There is no unscoped form. The v1 layout and the frozen vectors do not change (section 4), and S1 does not depend on O-3 (section 5).
 - **Evidence**: `evidence/o2_derivation/o2_kdf_contract_check.mjs`, 21 of 21 checks pass, five mutants caught (18 at `83608cc`; `-013` added three).
 - **Owner decision (2026-11-04)**: the contract is approved conditionally as a design contract, subject to verification of the committed evidence. S1 and S3 stay unauthorized. The merge of PR #50 waits on that verification.
-- **Still open**: the owner's approval of the contract, then the revision of `02` to match it.
+- **Owner disposition on PR #50 (2026-11-04)**: the owner accepted the independent G8 review of `f143b23` (PASS) and authorized the merge. PR #50 merged as `7749737`, and its tree equals `f143b23`'s tree.
+- **`02` revision**: proposed after the merge, in the documentation-only change that adds `-014`. It goes for review before its merge.
+- **Still open**: the review and merge of the `02` revision; S1's authorization.
 - **Scope**: open.
 
 ## KI-SENTINEL-20261104-012: Registrations must carry an explicit scope (O-3), and no scope or authorization model exists — OPEN 2026-11-04 — design — blocks registration changes
@@ -781,4 +783,14 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **D1**: `09` section 3.3 states that a key id with a lone surrogate is refused with `key_id_invalid`. The script refused it with `unpaired surrogate`, from its record encoder. No check covered the case. The refusal failed closed, but its code did not agree with the contract.
 - **D2**: no committed value pinned the derivation's output. The checks proved relations only, for example that two keys differ. A derivation that wrote the records in the wrong order passed every check.
 - **Fix**: `deriveAuthKey` in the script now refuses a lone-surrogate key id with `key_id_invalid`, and a check covers a lone high surrogate, a lone low surrogate and a valid pair. Two known-answer checks pin the key values. A hand-written HKDF in Python, built from `09` section 3.2 alone, gives the same values. Each new check fails against the defect it covers. `09` adds T-18.
-- **Scope**: closed. The owner's merge decision on PR #50 remains open.
+- **Scope**: closed. The owner authorized the merge of PR #50 at `f143b23`, and it merged as `7749737` (`06`).
+
+## KI-SENTINEL-20261104-014: The independent G8 review of `f143b23` found two untested contract rules (F1, F2) and two stale statements (F3) — OPEN 2026-11-04 — S1 acceptance — tracks F1 and F2 until S1 proves them
+
+- **Classification**: Test-coverage gap (F1, F2) and documentation defect (F3). The contract text is not affected: the review found no defect in it.
+- **Source**: Grok Bot's independent G8 review of PR #50 at `f143b23` (2026-11-04), preserved on PR #50. The owner accepted it, accepted F1 to F3 as non-blocking, and authorized the merge (`06`).
+- **F1 (Medium)**: `09` section 3.2 states that a record's length is its UTF-8 byte count. Every input of the evidence is ASCII, so a length prefix that counts UTF-16 code units passes all 21 checks (the reviewer's mutant M6; the author confirmed it).
+- **F2 (Low)**: `09` sections 3.1 and 3.3 cap the audience at 255 characters, and the grammar alone allows 515. No input reaches the cap, so removing it passes all 21 checks (mutant M1; the author confirmed it).
+- **F3 (Low, documentation)**: `09` section 4 said "no MAC or key value appears in the plan set", which was not true after revision 3. `-011` said "Still open: the owner's approval of the contract" after the owner had approved it.
+- **Disposition**: the owner made F1 and F2 S1 acceptance-test requirements. `09` revision 4 states them: T-18 adds a non-ASCII key-id known answer, with its UTF-8 length checked, and T-16 adds the 255/256 audience boundary. F3 is corrected in `09` section 4 and in `-011`. The evidence script stays as reviewed at `f143b23`.
+- **Scope**: open for F1 and F2 until S1's suite passes T-16 and T-18 at the G8 review of S1. F3 is closed by the `02` revision, when that revision merges. **F1 and F2 are not resolved by a document.**
