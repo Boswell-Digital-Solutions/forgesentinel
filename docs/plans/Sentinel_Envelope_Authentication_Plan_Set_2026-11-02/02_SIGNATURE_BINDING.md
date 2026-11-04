@@ -113,7 +113,7 @@ The order in `ingest` stays as it is, for three reasons.
 
 1. `validateEventEnvelope` runs first. The encoder then receives a well-typed
    envelope, and `envelope_not_encodable` stays rare.
-2. The payload hash check runs next. Record 34 therefore binds a digest that
+2. The payload hash check runs next. Record 36 therefore binds a digest that
    the gateway already proved against the real payload.
 3. Authentication runs after both. An event that fails the contract never
    reaches the encoder.

@@ -107,7 +107,7 @@ amendment to R1-E's wording, which did not reach the denial record in
 `KI-SENTINEL-20261102-016`. R1-A, R1-B and R1-C followed on the same day, and
 ruling 3 in `06` later answered R1-H, so **six are ruled and two stay open: R1-F
 and R1-G**. The table below gives each one. Amendment 3 in `06`
-supersedes D-2's bound record count of 41 and states no replacement, because
+supersedes D-2's bound record count of 41 and states no replacement (which the regeneration of `01` (2026-11-04) later derived: 46 fixed records), because
 R1-B adds three parent presence records and R1-A's binding adds an unsettled
 number more.
 

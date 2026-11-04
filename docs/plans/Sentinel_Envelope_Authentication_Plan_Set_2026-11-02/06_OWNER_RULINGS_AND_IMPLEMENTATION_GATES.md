@@ -27,7 +27,7 @@ incident happened.
 | Decision | Ruling | Condition | Where the plan now states it |
 |---|---|---|---|
 | D-1 Payload binding | **Approved** | Depend on `KI-SENTINEL-20261102-006`. The corrected payload digest must be verified before envelope authentication relies on it. | `01`, "The payload digest"; slice S0 in `05` |
-| D-2 Bound field set | **Approved; the count is superseded by R1-A and R1-B** | Bind all fixed records plus one record for each control-lineage finding id. **The count of 41 is superseded, and amendment 3 states no replacement**: R1-B adds three parent presence records, and R1-A's binding adds an unsettled number more, so the total is not yet derivable. The design-stage regeneration of `01` derives it before round 2 (the ruling on `KI-SENTINEL-20261104-001` below). A future authenticated field needs a versioned format change; this correction does not trigger that clause. | Amendment 3 below. The field table in `01` is stale and still shows 41 rows. |
+| D-2 Bound field set | **Approved; the count is superseded by R1-A and R1-B** | Bind all fixed records plus one record for each control-lineage finding id. **The count of 41 is superseded, and amendment 3 states no replacement**: R1-B adds three parent presence records, and R1-A's binding adds an unsettled number more, so the total was not derivable when amendment 3 was written. The regeneration of `01` (2026-11-04) derived it: **46 fixed records**, plus one for each finding id. A future authenticated field needs a versioned format change; this correction does not trigger that clause. | Amendment 3 below. The field table in `01` is stale and still shows 41 rows. |
 | D-3 Rejection reason code | **Approved** | Use `producer_auth_failed` externally. Keep useful internal diagnostic categories, and do not leak them to a caller. | `02`, "One reason code"; gate 5 below |
 | D-4 Version and algorithm | **Approved** | The gateway controls the algorithm and the version. Refuse an unsupported version. Never negotiate an algorithm from event input. | `01`, "Format name and version tag"; `02`, "Why the format carries no algorithm record" |
 | D-5 Unknown fields | **Approved** | Refuse an unknown envelope field. Define the permitted extension points, if any, in a future version. | `01`, "Why the format is one to one"; `03`, the `envelope.ts` row |
@@ -987,7 +987,8 @@ a record that falsely claims to be an accepted event.
 Ruling D-2 fixed the bound set at 41 records, "the 41 fixed records plus one
 record for each control-lineage finding id". **That count is superseded. This
 amendment states no replacement count, because the count is not yet
-determinable.**
+determinable.** *(Outcome, 2026-11-04: the regeneration of `01` (2026-11-04) derived the replacement, 46 fixed records, and
+this amendment's reasoning is unchanged.)*
 
 Two ruled corrections feed it, and only one of them is countable today:
 
@@ -1015,12 +1016,11 @@ an unimplemented format, before any producer emits it. There is no installed bas
 and nothing to version, consistent with the no-backwards-compatibility rule in
 `CLAUDE.md`.
 
-Four artifacts are stale: the field table in `01`, which still has 41 rows; the
-worked example in `01`, which is 41 records and 1479 bytes; the record **indices**
-cited across `01`, `02`, `04`, `05` and ADR-027, which shift when records are
-inserted; and the golden vector. Under the 2026-11-04 ruling the design-stage
-regeneration corrects the first three before round 2, and slice S1 owns the
-golden vector, which must reproduce the reviewed worked example. The round-1
+Four artifacts were stale: the field table in `01`, which had 41 rows; the worked
+example in `01`, which was 41 records and 1479 bytes; the record **indices** cited
+across `01`, `02`, `04`, `05` and ADR-027; and the golden vector. The regeneration of `01` (2026-11-04)
+corrected the first three, under the 2026-11-04 ruling. Slice S1 owns the golden
+vector, which must reproduce example A of `01` byte for byte. The round-1
 reviewer reproduced the 1479-byte value byte for byte, so the regenerated example
 needs the same independent reproduction.
 
