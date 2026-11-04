@@ -17,7 +17,8 @@ The owner ruled all ten D-series decisions on 2026-11-02, amended three of them,
 and added five implementation gates. The owner then checked the pull request and
 recorded four further **recommendations**, which are explicitly not approvals.
 Review round 1 later raised eight more decisions, R1-A to R1-H; the owner ruled
-**five** of them on the same day, and **three stay open: R1-F, R1-G and R1-H**.
+**six** of them on the same day — R1-A to R1-E, and R1-H through ruling 3 in
+`06` — and **two stay open: R1-F and R1-G**.
 **`06_OWNER_RULINGS_AND_IMPLEMENTATION_GATES.md` is the authoritative record,
 and it wins over any earlier text in this plan set.** It separates the rulings
 from the recommendations.

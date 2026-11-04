@@ -69,8 +69,8 @@ with every condition. The summary:
 | D-10 | The records | Approved | A short ADR, and a plan registry entry requested through the authorized `forge` change process. |
 
 No **D-series** decision in this plan set is open. Review round 1 then raised
-eight further decisions, R1-A to R1-H; five are ruled and **three stay open:
-R1-F, R1-G and R1-H**. `07_REVIEW_ROUND_1_FINDINGS.md` holds them. The next
+eight further decisions, R1-A to R1-H; six are ruled — R1-A to R1-E, and R1-H
+through ruling 3 in `06` — and **two stay open: R1-F and R1-G**. `07_REVIEW_ROUND_1_FINDINGS.md` holds them. The next
 boundary is independent design review, then implementation authorization for each
 slice.
 

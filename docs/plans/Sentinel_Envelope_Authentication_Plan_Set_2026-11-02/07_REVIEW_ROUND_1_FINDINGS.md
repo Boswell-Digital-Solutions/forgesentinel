@@ -104,8 +104,9 @@ Round 1 does not propose rulings. These are the decisions it surfaced.
 
 **Two are ruled (2026-11-02): R1-D and R1-E.** `06` holds both rulings, and an
 amendment to R1-E's wording, which did not reach the denial record in
-`KI-SENTINEL-20261102-016`. R1-A, R1-B and R1-C followed on the same day, so
-**five are ruled and three stay open: R1-F, R1-G and R1-H**. Amendment 3 in `06`
+`KI-SENTINEL-20261102-016`. R1-A, R1-B and R1-C followed on the same day, and
+ruling 3 in `06` later answered R1-H, so **six are ruled and two stay open: R1-F
+and R1-G**. The table below gives each one. Amendment 3 in `06`
 supersedes D-2's bound record count of 41 and states no replacement, because
 R1-B adds three parent presence records and R1-A's binding adds an unsettled
 number more.
