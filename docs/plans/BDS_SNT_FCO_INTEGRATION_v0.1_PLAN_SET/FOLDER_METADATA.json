@@ -1,0 +1,13 @@
+{
+  "folder_name": "BDS_SNT_FCO_INTEGRATION_v0.1_PLAN_SET",
+  "plan_id": "BDS-SNT-FCO-v0.1",
+  "version": "0.1",
+  "prepared": "2026-11-05",
+  "timezone": "America/New_York",
+  "decision_owner": "Charlie Boswell",
+  "lifecycle": "proposed",
+  "canonical_drive_destination": "/Forge/Plans/BDS_SNT_FCO_INTEGRATION_v0.1_PLAN_SET/",
+  "component_count": 10,
+  "compilation": "00-09 in order, by hand",
+  "house_form_conformance": "BDS-PSS-001"
+}

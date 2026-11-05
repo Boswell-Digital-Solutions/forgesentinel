@@ -1,0 +1,94 @@
+plan_id: BDS-SNT-FCO-v0.1
+title: Forge Sentinel and forge-command Integration
+lifecycle: proposed
+authority: Planning; operator direction 2026-11-05 covers WP-00, WP-01 and WP-03 (component 09)
+decision_owner: Charlie Boswell
+prepared: 2026-11-05 America/New_York
+proposed_canonical_owner: Boswell-Digital-Solutions/forgesentinel
+canonical_drive_destination: "/Forge/Plans/BDS_SNT_FCO_INTEGRATION_v0.1_PLAN_SET/"
+compilation: 00-09 in order
+source_revisions:
+  forgesentinel: 7749737
+  forge-command: 88d783e
+  forge: b7906c50
+rulings: [R-1, R-2, R-3, R-4, R-5, R-6, R-7, R-8, R-9]
+authority_gaps:
+  - {id: AG-1, closed_by: D-1, blocks: WP-08}
+  - {id: AG-2, closed_by: D-2, blocks: WP-09}
+  - {id: AG-3, closed_by: D-3, blocks: WP-09}
+  - {id: AG-4, closed_by: D-5, blocks: WP-10}
+  - {id: AG-5, closed_by: D-7, blocks: WP-02}
+  - {id: AG-6, closed_by: D-8, blocks: WP-03}
+decisions: [D-1, D-2, D-3, D-4, D-5, D-6, D-7, D-8]
+work_packages:
+  - id: WP-00
+    title: "Plan set"
+    owner: "forgesentinel; forge"
+    status: authorized
+    blocked_by: []
+    acceptance: [AC-00.1, AC-00.2]
+  - id: WP-01
+    title: "forge-command declares forgesentinel"
+    owner: "forge-command"
+    status: authorized
+    blocked_by: []
+    acceptance: [AC-01.1, AC-01.2, AC-01.3, AC-01.4]
+  - id: WP-02
+    title: "forgesentinel adopts RepoManifest.v1"
+    owner: "forgesentinel"
+    status: blocked
+    blocked_by: ["D-7"]
+    acceptance: [AC-02.1, AC-02.2]
+  - id: WP-03
+    title: "forge recompiles the map"
+    owner: "forge"
+    status: authorized_after_WP-01
+    blocked_by: ["D-8 (row only)"]
+    acceptance: [AC-03.1, AC-03.2]
+  - id: WP-04
+    title: "Retarget integration documents"
+    owner: "forgesentinel"
+    status: blocked
+    blocked_by: ["D-1", "D-2", "D-5"]
+    acceptance: []
+  - id: WP-05
+    title: "Incident report contract"
+    owner: "forgesentinel"
+    status: blocked
+    blocked_by: ["D-4"]
+    acceptance: [AC-05.1, AC-05.2, AC-05.3]
+  - id: WP-06
+    title: "sentinel report"
+    owner: "forgesentinel"
+    status: blocked
+    blocked_by: ["WP-05"]
+    acceptance: [AC-06.1, AC-06.2, AC-06.3, AC-06.4]
+  - id: WP-07
+    title: "Systems / Incidents"
+    owner: "forge-command"
+    status: blocked
+    blocked_by: ["WP-05", "slice authorization"]
+    acceptance: [AC-07.1, AC-07.2, AC-07.3, AC-07.4, AC-07.5, AC-07.6, AC-07.7]
+  - id: WP-08
+    title: "Decisions back"
+    owner: "forgesentinel; forge-command; DataForge"
+    status: blocked
+    blocked_by: ["D-1"]
+    acceptance: []
+  - id: WP-09
+    title: "Governed control"
+    owner: "TBD by D-2"
+    status: blocked
+    blocked_by: ["D-2", "D-3", "ADR-026", "envelope track"]
+    acceptance: []
+  - id: WP-10
+    title: "Missions"
+    owner: "forge-command; forgesentinel"
+    status: blocked
+    blocked_by: ["R-4", "D-5"]
+    acceptance: [AC-10.0]
+gates:
+  - {id: GT-1, passes_when: "WP-01 and WP-03 merged, with WP-02 when D-7 is accepted"}
+  - {id: GT-2, passes_when: "WP-05 to WP-07 merged and AC-07.7 recorded"}
+  - {id: GT-3, passes_when: "WP-08 merged"}
+  - {id: GT-4, passes_when: "WP-09 and WP-10 merged"}

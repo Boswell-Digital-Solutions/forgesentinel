@@ -1,0 +1,23 @@
+{
+  "manifest_id": "BDS-SNT-FCO-v0.1-manifest",
+  "plan_id": "BDS-SNT-FCO-v0.1",
+  "version": "0.1",
+  "prepared_at": "2026-11-05T00:00:00-05:00",
+  "files": [
+    "00_PLAN_SET_INDEX.md",
+    "01_BINDING_RULINGS_AND_NON_GOALS.md",
+    "02_AUTHORITY_BOUNDARY_AND_GAPS.md",
+    "03_GOVERNING_PROTOCOL_BINDING_AND_COVERAGE.md",
+    "04_CONTRACT_AND_PROVENANCE.md",
+    "05_CORE_SPECIFICATION.md",
+    "06_DECISION_SEMANTICS.md",
+    "07_QA_AND_VERIFICATION.md",
+    "08_WORK_PACKAGES_AND_GATES.md",
+    "09_OPERATOR_REVIEW_PACKET.md",
+    "BDS-SNT-FCO-v0.1_COMPILED_PLAN_SET.md",
+    "FOLDER_METADATA.json",
+    "REGISTRY_ENTRY.json",
+    "plan_set.yaml",
+    "plan_set_manifest.json"
+  ]
+}
