@@ -1,0 +1,13 @@
+{
+  "plan_id": "BDS-SNT-FCO-v0.1",
+  "title": "Forge Sentinel and forge-command Integration",
+  "class": "plan_set",
+  "scope": "cross_repository",
+  "lifecycle": "proposed",
+  "status": "proposed",
+  "authority": "Planning; operator direction 2026-11-05 covers WP-00, WP-01 and WP-03",
+  "decision_owner": "Charlie Boswell",
+  "prepared": "2026-11-05",
+  "owner_repository": "Boswell-Digital-Solutions/forgesentinel",
+  "plan_path": "docs/plans/BDS_SNT_FCO_INTEGRATION_v0.1_PLAN_SET/00_PLAN_SET_INDEX.md"
+}
