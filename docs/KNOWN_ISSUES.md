@@ -782,3 +782,48 @@ Two measurements on this track were wrong because they skipped these. Slice S2's
 - **D2**: no committed value pinned the derivation's output. The checks proved relations only, for example that two keys differ. A derivation that wrote the records in the wrong order passed every check.
 - **Fix**: `deriveAuthKey` in the script now refuses a lone-surrogate key id with `key_id_invalid`, and a check covers a lone high surrogate, a lone low surrogate and a valid pair. Two known-answer checks pin the key values. A hand-written HKDF in Python, built from `09` section 3.2 alone, gives the same values. Each new check fails against the defect it covers. `09` adds T-18.
 - **Scope**: closed. The owner's merge decision on PR #50 remains open.
+
+## KI-SENTINEL-20261105-001: Every Forge Command integration artifact targets the predecessor `Forge_Command`, not the rebuild `forge-command` — OPEN 2026-11-05 — integration — blocks Forge Command integration
+
+- **Classification**: Integration design drift.
+- **Source**: the integration review of 2026-11-05 (`docs/sentinel/forge-command-integration-review-2026-11-05.md`, finding G-1).
+- **What is wrong**: the operator ruled that `forge-command` is the Forge Command of concern for every repository that touches it. This repository's integration artifacts name the predecessor and its objects:
+  - `docs/sentinel/eas-04b-forge-command-compatibility.md` locks the adapter to predecessor fields: an admitted Registry target, CP4 ceilings and a predecessor authorization issuer;
+  - plan `07` §2, §7 and §8 and plan `09` give `Forge_Command` the operator review, the incident lifecycle and the directive issuer;
+  - ADR-026 gives the control-directive key to `forge-command-policy`;
+  - `docs/sentinel/implementation-status.md` Wave 4, gate E and SNT-300 to SNT-310 name the predecessor's UI;
+  - `src/intel/prime.ts` names the authority `forge_command_operator`.
+- **Effect**: an integration slice built from these documents builds against a system that the rebuild replaces. The rebuild has no HTTP API, no registry admission state, no token issuer and no signer.
+- **Fix**: retarget each document to `forge-command`, using the field map in the review's section 6. The retarget is documentation, and it needs the operator rulings D-1 to D-5 of the review first.
+- **Scope**: open.
+
+## KI-SENTINEL-20261105-002: The Forge Command mission admission is validated for shape only, so a forged admission passes — OPEN 2026-11-05 — security — latent
+
+- **Classification**: Missing authentication on a contract boundary.
+- **Source**: the integration review of 2026-11-05 (finding G-2).
+- **Evidence**: `src/integration/forge-command-adapter.ts:123-187`. `validateForgeCommandMissionAdmission` checks the fields, times, caps, lanes and identity independence. `issuerId` and `authorizationId` are pattern-checked strings. The admission carries no signature, and no key binds it to its issuer. Only the return has an `integrity.hash` (lines 189-230), and it is an unkeyed SHA-256.
+- **Effect**: any caller that can pass an admission can write one that validates. Today no caller exists: the adapter, the collector and the harness are library-only, and the harness is not exported (EAS-04E). The defect becomes real when a runtime entry point admits a mission.
+- **Fix**: the admission must carry evidence that this repository can verify against forge-command. Two signatures already exist there: the SMITH Ed25519 signature on the RunIntent, and the FIDO2 presence evidence on the approve receipt. A P3 token from the issuer `fcn_local` is a third, when one exists. The choice is a design decision.
+- **Scope**: open.
+
+## KI-SENTINEL-20261105-003: Forge Sentinel has no read surface that forge-command can use — OPEN 2026-11-05 — integration
+
+- **Classification**: Missing interface.
+- **Source**: the integration review of 2026-11-05 (finding G-3). `forge` plan `BDS-FCO-CSD-v0.1` recorded the same constraint for another consumer.
+- **What is wrong**: forge-command connects a source only through a `read` command that returns `live` data or an absence state (its chapter 10.5). This repository has no HTTP route, no `/health`, and no published output file. `sentinel replay` prints to standard output. `sentinel watch-cssa` keeps worker state for itself.
+- **Effect**: forge-command's Systems / Incidents section, which absorbs forgesentinel, has nothing to read, and the Living Topology cannot observe the node's health.
+- **Fix**: a design decision (review D-4). The review recommends a versioned, read-only report that `sentinel` publishes, labelled shadow, which forge-command reads as it reads forge's pin report.
+- **Scope**: open.
+
+## KI-SENTINEL-20261105-004: The control-directive signer that the design gives to Forge Command policy is code in this repository, with a symmetric key — OPEN 2026-11-05 — security — design
+
+- **Classification**: Authority placed in the wrong system, and a design-to-code divergence.
+- **Source**: the integration review of 2026-11-05 (finding G-4).
+- **Evidence**:
+  - `src/authority/cssa-control.ts:22-30`: `ControlDirectiveIssuer`, documented as "owned by Forge_Command policy", has the issuer `forge-command-policy`. It signs with HMAC-SHA256 (lines 17-20).
+  - Plan `07` §8 specifies `"algorithm": "ed25519"` for the directive.
+  - ADR-026 accepts HMAC for the MVP and requires Ed25519 at three call sites before any non-shadow deployment. It does not say which system holds the directive signer.
+- **What is wrong**: an HMAC verifier holds the signing key, so `CssaControlRegistry`, which verifies, could also issue. The class that represents the Forge Command signer is in the system that the signer is meant to constrain. forge-command has no signer and no `sign`-class command (its chapter 15.3).
+- **Effect**: today none, because the directive path is test-only and shadow. Before a Sentinel-originated control reaches CSSA, the signer needs an owner outside this repository and an asymmetric key.
+- **Fix**: an operator ruling on who signs a directive (review D-2), then ADR-026's Ed25519 change. `forge-command` records the matching gap as `FCO-SENTINEL-DIRECTIVE-SIGNER-20261105`.
+- **Scope**: open.
