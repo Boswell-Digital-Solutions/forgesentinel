@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Repo Identity
+
+- Default branch: master
+
 ## Project Overview
 
 Forge Sentinel is a governed security-intelligence fabric for the Forge ecosystem. It builds behavioral baselines, correlates evidence across time and services, explains its reasoning, and requests the smallest bounded response through the correct authority — without ever becoming an authority itself. This repository is a TypeScript modular monolith implementing the first production MVP slice (Waves 0-3 plus the policy/capability/receipt spine).
