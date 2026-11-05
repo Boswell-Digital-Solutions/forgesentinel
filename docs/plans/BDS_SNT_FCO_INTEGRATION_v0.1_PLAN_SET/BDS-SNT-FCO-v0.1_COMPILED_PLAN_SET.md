@@ -434,7 +434,7 @@ This document is section 08. Each work package has the nine-field brief of BDS-P
 | Field | Record |
 |---|---|
 | Outcome | forgesentinel declares DataForge and Forge-Agents as upstream authorities in a valid `repo.manifest.yaml`. |
-| Starting evidence | No `repo.manifest.yaml`; a hand-written `CLAUDE.md`; the forge-held manifest is empty (`KI-FORGE-20261105-001`). |
+| Starting evidence | No `repo.manifest.yaml`; a hand-written `CLAUDE.md`; the forge-held manifest is empty (`KI-FORGE-20261105-002`). |
 | Prerequisites | D-7. A pinned forge_contract_core revision for the schema and generator. |
 | Permitted scope | `repo.manifest.yaml`, the four agent files, the generator lock, `doc/system/04-dependencies.md`, `docs/KNOWN_ISSUES.md`. |
 | Boundaries | The generated `CLAUDE.md` must keep every rule of the current hand-written one; a rule that the generator cannot carry pauses the work. |
