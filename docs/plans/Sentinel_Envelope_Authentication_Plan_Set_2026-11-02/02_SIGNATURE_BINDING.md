@@ -14,28 +14,55 @@ with that context and that key id.
 
 ## Key derivation (the D-6 amendment)
 
-One producer secret derives two keys. Nothing uses the producer secret directly
-as an HMAC key.
+One producer secret derives two keys for each audience. Nothing uses the
+producer secret directly as an HMAC key.
+
+**Revised for O-2 (2026-11-04).** The owner selected audience binding through key
+derivation, and approved the contract of `09` section 3 conditionally, as a design
+contract (`06`). The independent G8 review of `f143b23` passed. This section states
+that contract. `09` section 3 is the source, and the two must not differ. The
+reviewed derivation at `3cae2dd` used `info = usage + "|" + key_id`. That `info` is
+retired, and no path derives with it.
 
 ```text
 SALT = "forgesentinel.event_auth.v1"                       (ASCII, not secret)
+R(name, value) = name 0x1F "s" 0x1F <UTF-8 byte length of value, decimal> 0x1F value 0x1E
 
-K_credential = HKDF-SHA256(ikm = producer.secret, salt = SALT,
-                           info = "credential|" + key_id, L = 32)
-K_signature  = HKDF-SHA256(ikm = producer.secret, salt = SALT,
-                           info = "signature|"  + key_id, L = 32)
+K_context = HKDF-SHA256(ikm  = producer.secret, salt = SALT,
+                        info = R("kdf",      "forgesentinel.event_auth.v1.kdf")
+                             ‖ R("context",  context)          "credential" or "signature"
+                             ‖ R("audience", audience)         the gateway's audience identifier
+                             ‖ R("key_id",   key_id),          the registration's key id
+                        L    = 32)
+
+K_credential = K_context with context = "credential"
+K_signature  = K_context with context = "signature"
 ```
+
+`R` is a record of `01`'s grammar. The length is the UTF-8 byte count, not a
+count of UTF-16 code units.
 
 | Parameter | Value | Reason |
 |---|---|---|
 | Function | HKDF-SHA256, `node:crypto.hkdfSync("sha256", ikm, salt, info, 32)` | It is in the Node standard library, so the repository stays dependency-free. |
 | `ikm` | The producer secret from the registration, as UTF-8 bytes | The root secret never becomes an HMAC key itself. |
 | `salt` | The constant format name, in ASCII | The salt is a non-secret domain label. HKDF-Extract stays a secure pseudo-random function with a constant salt for the secrets the protected-environment rules admit. Those rules check length and character variety, not entropy, and `src/spine/producer_secrets.ts:68` skips them entirely outside `production` and `staging`, so a development or test secret is not strength-checked at all (review finding F9). |
-| `info` | The usage, then one vertical-bar character, then **the registration's** `key_id` | The usage separates the two keys. The key id stops one producer's derived key from matching another's, even if two secrets ever matched. The key id comes from the registration, never from the event or the credential, so attacker-controlled input never selects derivation material (review finding F11). The two usage labels differ at byte 0, so no key id, not even one containing a vertical bar, produces a cross-context collision. |
+| `info` | Four length-prefixed records: the derivation label, the context, the audience, then **the registration's** `key_id` | The label names the derivation and carries its version. The context separates the two keys. The audience separates receiving authorities (O-2). Every record carries its length, so no value can move a field boundary, and the encoding is injective. The earlier argument, that the two usage labels differ at byte 0, does not extend to more than two fields. The key id separates registrations whose key ids differ. The registry does not yet refuse a shared key id, so two registrations with one secret and one key id derive one key for each audience (R2-F8, open; `09` section 9). The key id comes from the registration, never from the event or the credential, so attacker-controlled input never selects derivation material (review finding F11). |
+| `audience` | The receiving gateway's own audience identifier. It matches `^aud:[a-z][a-z0-9-]{0,62}(\.[a-z][a-z0-9-]{0,62}){0,7}$` and is at most 255 characters (`09` section 3.1). Each label starts with a lowercase ASCII letter, then has up to 62 lowercase letters, digits or hyphens, so a label has 1 to 63 characters. There are one to eight labels. | It binds a key to one receiving authority, so an event that one gateway accepts does not authenticate at another. It is never a tenant, an account or a producer. It gives no tenant authorization, registration scope or enforcement authority (O-3 stays open). A value outside the grammar is refused with `audience_invalid`. It is never normalized, substituted or defaulted. **Each gateway has exactly one configured audience**, and a gateway never tries several audiences in turn. |
 | `L` | 32 bytes | It matches the SHA-256 output length, so HKDF-Expand needs one block. SHA-256's block is 64 bytes, and its security levels are 128-bit collision and 256-bit preimage (review finding F10 corrected an earlier, wrong reason). |
 
 Both derived keys are 32 bytes. A derived key never appears in a log, an error,
 a receipt or a rejection record.
+
+**Refusals.** The derivation takes four arguments. It has no default and no
+three-argument form. It refuses, and derives nothing, when:
+
+- the audience is invalid (`audience_invalid`);
+- the context is not `credential` or `signature` (`context_invalid`);
+- the secret is empty (`secret_invalid`);
+- the key id is empty or holds a lone surrogate (`key_id_invalid`).
+
+`09` section 3.3 is the source.
 
 **The limit, stated plainly.** HMAC is symmetric, so the gateway holds the
 producer secret and can derive both keys. Derivation gives usage separation and
@@ -98,9 +125,13 @@ Implementation note: `crypto.hkdfSync` returns an `ArrayBuffer`, not a
 
 `buildEvent` (`src/spine/build.ts:25`) produces both values. It must use the
 same encoder and the same derivation. A separate copy of the field list or of
-the `info` strings would drift, so one module holds the field list, the
+the `info` records would drift, so one module holds the field list, the
 derivation and the encoder, and the builder, the registry and the gateway all
 import it.
+
+The builder and the gateway must derive with the same audience. This document
+does not specify how a producer learns the gateway's audience. That is a design
+item for S3, and it needs its own authorization.
 
 Derivation runs once for each registration, not once for each event. The
 registry may cache the two derived keys beside the registration, which is
@@ -243,7 +274,7 @@ must implement and prove.
    of the wrong length fails before any verification.
 6. **The derivation does not carry over.** HKDF derivation exists because HMAC
    is symmetric. An Ed25519 key is not derived from a shared secret, so the
-   `info` strings are retired for that producer, and the `context` record then
+   `info` records are retired for that producer, and the `context` record then
    carries the domain separation alone.
 7. **A key rotation is a registration change, with its own receipt.** The
    secrets-file schema change that ADR-026 needs must record which algorithm

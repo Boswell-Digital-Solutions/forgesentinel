@@ -1,4 +1,4 @@
-# 09 Slice S1 — Implementation Authorization Request (revision 3)
+# 09 Slice S1 — Implementation Authorization Request (revision 4)
 
 - **Status:** **A request. S1 is not authorized.**
   - The owner's disposition on review round 2 let S1 "advance to implementation authorization
@@ -9,14 +9,16 @@
     the exact derivation contract, the compatibility analysis, the O-3 answer and the test evidence.
 - **Slice:** S1 in `05`: the field schedule, the encoder, the HKDF derivation, the unit tests, the
   group H suite and the golden vector. Nothing calls it from the gateway.
-- **Design under implementation:** `01` and `02` at the frozen commit `3cae2dd`, reviewed by round 2
-  (`08`, the review of record), plus the derivation contract of section 3, which changes `02` and
-  needs the owner's approval.
+- **Design under implementation:** `01` at the frozen commit `3cae2dd`, reviewed by round 2 (`08`,
+  the review of record), and `02` as revised to the derivation contract of section 3. The owner
+  approved that contract conditionally, as a design contract, and accepted the independent G8
+  review of `f143b23` (`06`).
 - **Revision 2 changes:** the derivation contract (section 3), the compatibility analysis (section
   4), the O-3 answer (section 5), the audience tests (section 7), and a file footprint that keeps the
   owner's boundary exactly (section 2). Revision 1 listed additive changes to four existing files,
   which contradicted that boundary; section 2 removes them.
 - **Revision 3 changes:** after the verification of `83608cc` (`KI-SENTINEL-20261104-013`), the evidence refuses a lone-surrogate key id with `key_id_invalid` (D1) and pins two known-answer values (D2); section 7 adds T-18. The owner approved the contract of section 3 conditionally, as a design contract (`06`). S1 is still not authorized.
+- **Revision 4 changes:** after the G8 review of `f143b23` (`KI-SENTINEL-20261104-014`), T-16 adds the 255-character audience boundary (F2), T-18 adds a non-ASCII key-id known answer (F1), and section 4 corrects a stale statement (F3). `02` is revised to section 3 in the same change. The contract's semantics do not change. S1 is still not authorized.
 
 ## 1. Answers to the owner's three questions
 
@@ -110,9 +112,9 @@ the one a producer used — gives a different key, so the MAC fails. That happen
 |---|---|---|
 | The frozen v1 vectors: examples A, B1 and B2 of `01` (authenticated bytes and their SHA-256) | **None.** The derivation is not an input to the authenticated bytes. The evidence script checks example A: 1597 bytes, SHA-256 `ecb0d8f4…f998`, unchanged. | None |
 | The v1 layout (46 records) and `AUTH_FORMAT` | **None.** No record is added; the format name stays `forgesentinel.event_auth.v1`. | None |
-| MAC, token or derived-key vectors | **None exists.** No vector file is committed (`fixtures/golden/` holds none), no MAC or key value appears in the plan set, and review round 2's key probe records relations only, not values. A key under the earlier `info` does differ from one under this contract, so any MAC value would change — but none was ever frozen. | None |
+| MAC, token or derived-key vectors | **None under the earlier derivation.** No vector file is committed (`fixtures/golden/` holds none), and review round 2's key probe records relations only, not values. A key under the earlier `info` does differ from one under this contract, so any MAC value would change, but none was ever frozen. **Since revision 3, the plan set pins derived-key values under this contract**: two known answers in the evidence script, and a third in T-18. They are test keys under a published test secret, never operational keys. No MAC or token value is pinned. | None |
 | The golden vector (G7) | **Created, not rewritten.** It does not exist yet; S1 creates it under this contract, with a named test audience. | Part of S1 |
-| `02`, "Key derivation" | **Changes.** The `info` construction above replaces the reviewed one. | Revised in the same change that records the owner's approval of this contract — not before |
+| `02`, "Key derivation" | **Changes.** The `info` construction above replaces the reviewed one. | Revised in revision 4, after the owner's conditional approval and the G8 review of `f143b23` |
 | Review round 2's HKDF checks (`08`, `evidence/round2/r2_probe_keys.mjs`) | They checked the reviewed `info`. Their properties — RFC 5869 A.1, `K_credential ≠ K_signature`, a token that does not verify as a signature, a broken transplant — are re-checked under this contract by the evidence script. | G8, the independent review of S1, re-verifies |
 
 **So no separately versioned vector set is needed:** no committed vector depends on the derivation.
@@ -202,15 +204,21 @@ broken implementation that the property must fail.
 | T-13 | **Audience separation.** Two audiences give two keys under one root secret and one key id. | O-2 condition 2 |
 | T-14 | **Deterministic derivation.** The same four inputs give the same key. | O-2 condition 5 |
 | T-15 | **Cross-audience rejection.** A MAC made under audience A does not equal one under audience B over the same bytes. | O-2 condition 5 |
-| T-16 | **Fail closed.** Each refusal of section 3.3 throws its code, including a three-argument call and a tenant-shaped audience. | O-2 conditions 1 and 4 |
+| T-16 | **Fail closed.** Each refusal of section 3.3 throws its code, including a three-argument call and a tenant-shaped audience. **The 255-character cap (F2):** a grammar-valid audience of 255 characters is accepted, and a grammar-valid audience of 256 characters is refused with `audience_invalid`. Example: `aud:` and four labels of 63, 63, 63 and 59 `a` characters gives 255; a last label of 60 gives 256. The grammar alone accepts up to 515 characters, so only this case tests the cap. | O-2 conditions 1 and 4; G8 F2 |
 | T-17 | **Broken derivations are caught.** Five mutants — the audience left out of the `info`, the fields joined without lengths, a malformed audience falling back to an unscoped key, an audience case-folded instead of refused, any string accepted as an audience — each fail one of T-13 to T-16. | O-2 condition 5 |
-| T-18 | **Known answers.** The derivation reproduces the two committed key values of the evidence script, under its published test secret. A record-order error passes every relation check and fails only this one. | O-2 condition 5; verification D2 |
+| T-18 | **Known answers.** The derivation reproduces the two committed key values of the evidence script, under its published test secret. A record-order error passes every relation check and fails only this one. **Non-ASCII key id (F1):** with context `credential`, audience `aud:forgesentinel.gateway.test` and key id `clé_🔑_01` (`cl\u00e9_\u{1F511}_01`: 9 UTF-16 code units, 12 UTF-8 bytes), the key is `ab04d19adcb662eecfd6536cf5856779e58a90c30e41118db4c06cd050d37d48`. Node's `hkdfSync` and a hand-written Python HKDF give this value. A length prefix that counts UTF-16 code units gives `b5f3f04c…831b`, so the case fails it. The test also asserts that the `key_id` record's length field reads `12`. | O-2 condition 5; verification D2; G8 F1 |
 
 **Evidence, now.** `evidence/o2_derivation/o2_kdf_contract_check.mjs` implements the contract of
 section 3 as design evidence, and runs T-8 and T-13 to T-18 against it, plus the compatibility
 checks of section 4: **21 of 21 pass**, and each of the five mutants is caught. Revision 3 added the lone-surrogate refusal (D1) and two known-answer values (D2), after the verification of `83608cc`. Run it from the
 plan-set directory with `node evidence/o2_derivation/o2_kdf_contract_check.mjs`. The R2-F3 and
 R2-F4 evidence is in `evidence/s1_preconditions/`.
+
+**Not covered by the evidence script (G8 F1 and F2).** The independent G8 review of `f143b23` found
+two mutants that pass all 21 checks: one removes the 255-character cap (F2), and one counts the
+`info` length prefix in UTF-16 code units (F1). The script stays as reviewed. **F1 and F2 are S1
+acceptance-test requirements** (T-16 and T-18 above, `KI-SENTINEL-20261104-014`). They are open
+until S1's suite proves them.
 
 **Gates (from `05`):** G1 build, G2 suite (the existing 402 tests plus the new ones, 0 failures),
 G4 fixture determinism, G7 golden vector, G9's nominal-type part, and **G8, an independent review
@@ -241,9 +249,10 @@ item 5, ruled as ruling 2). G6 is unaffected, because S1 changes no documentatio
 
 ## 10. What this request asks for
 
-1. **Approval of the derivation contract** of section 3. With that approval, `02` is revised to
-   match, in the same change that records it.
-2. **Then**, authorization to implement S1 exactly as sections 2 and 6 to 8 state: three new files,
+1. ~~Approval of the derivation contract of section 3.~~ **Done:** approved conditionally, as a
+   design contract. The G8 review of `f143b23` was accepted (`06`). `02` is revised to match in
+   revision 4.
+2. **Next**, authorization to implement S1 exactly as sections 2 and 6 to 8 state: three new files,
    pure functions, no change to an existing file, and no verification, registry, policy,
    deployment or enforcement behaviour.
 

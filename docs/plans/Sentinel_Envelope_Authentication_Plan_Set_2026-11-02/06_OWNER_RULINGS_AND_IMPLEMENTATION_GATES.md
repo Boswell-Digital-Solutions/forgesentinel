@@ -48,6 +48,8 @@ owner amended this. The two values must now use independent keys.
 - `K_credential = HKDF-SHA256(ikm = producer secret, salt = the format name, info = "credential|" + key_id, L = 32)`
 - `K_signature  = HKDF-SHA256(ikm = producer secret, salt = the format name, info = "signature|" + key_id, L = 32)`
 
+> **Superseded for `info` (2026-11-04).** The O-2 derivation contract replaces the `info` above. The salt and `L` do not change. `02` ("Key derivation") and `09` section 3 state the current contract. The ruling text above stays as it was given.
+
 The `context` record stays. Separation then holds at the key and at the
 message. `node:crypto.hkdfSync` provides HKDF-SHA256, so the repository stays
 dependency-free.
@@ -1200,6 +1202,23 @@ behavior." No implementation, merge of #50, deployment or enforcement is authori
 - **Conditions for final acceptance**: the 18 checks and the five mutants pass; the grammar is unambiguous; the contract and its vectors reproduce from committed sources; PR #50 holds no implementation change; the manifest resolves.
 - **Verification**: the author verified `83608cc` against a `git archive` of the pushed head. Every condition passed. The verification found two evidence defects, D1 and D2 (`KI-SENTINEL-20261104-013`). On the owner's word, a docs-only commit corrected them. The author is not an independent reviewer (G8).
 - **Boundary**: O-2's design direction is approved conditionally. The merge of PR #50 waits on verification. S1 and S3 are not authorized. A revision of `02` may be proposed as documentation reconciliation after the contract is verified. That permission does not extend to implementation, and it does not permit operational keys.
+
+## Owner disposition on PR #50 and the G8 review (2026-11-04)
+
+- **Decision**: the owner accepts the independent G8 review of PR #50 at `f143b236532701caab0c761b67b85e3f6bbdd468`, and authorizes the merge at that head.
+- **Reviewer**: Grok Bot, independent and read-only. Its verdict is PASS, with no blocking findings, and all four owner conditions hold. PR #50 preserves the review as attributable evidence.
+- **Merge**: PR #50 merged as `7749737` (a squash). Its tree equals the tree of `f143b23`.
+- **Findings**:
+
+| Finding | Owner disposition | Required action |
+|---|---|---|
+| F1, Medium | Accepted, non-blocking for PR #50 | S1's T-18 adds a non-ASCII key-id known answer, and the test checks the UTF-8 byte length, not the count of UTF-16 code units. |
+| F2, Low | Accepted, non-blocking for PR #50 | S1's T-16 tests the 255-character audience boundary, with a grammar-valid value over the cap. |
+| F3, Low | Accepted. A documentation correction is required. | The documentation-only revision after the merge corrects both stale statements. |
+
+- **Tracking**: F1 and F2 are S1 acceptance-test requirements (`KI-SENTINEL-20261104-014`). They are not resolved.
+- **After the merge**: the owner authorizes a proposal for the documentation-only revision of `02` and the associated corrections. The proposal adds F1 and F2 to the S1 acceptance requirements and corrects F3. It keeps the approved O-2 contract and does not change its semantics. It goes for review before its merge.
+- **Boundary**: S1 and S3 implementation, operational key generation and deployment are not authorized. This ruling accepts the review evidence and authorizes one documentation merge. It does not approve implementation.
 
 ## Findings disposition
 
