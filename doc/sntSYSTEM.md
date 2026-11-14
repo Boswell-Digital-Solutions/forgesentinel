@@ -1,13 +1,13 @@
         # Forge Sentinel - Compiled System Reference
 
-        **Designation:** SNT
+        **Designation:** snt
         **Document role:** Canonical compiled technical reference for the Forge Sentinel security-intelligence fabric
         **Source:** `doc/system/`
         **Build command:** `bash doc/system/BUILD.sh`
         **Document version:** 2.1 (2026-09-20) - flat-layout compliance migration
         **Protocol:** BDS Documentation Protocol v2.0; BDS Repo Documentation System Canonical Compliance Standard
 
-        > **Generated artifact warning:** `doc/SNTSYSTEM.md` is assembled output. Edit
+        > **Generated artifact warning:** `doc/sntSYSTEM.md` is assembled output. Edit
         > the source modules under `doc/system/` and rebuild. Hand edits to the
         > compiled artifact are overwritten by the next build.
 
@@ -15,7 +15,7 @@
 
         - Command: `bash doc/system/BUILD.sh`
         - Validation: `bash doc/system/validate_snapshots.sh` runs during assembly
-        - Primary output: `doc/SNTSYSTEM.md`
+        - Primary output: `doc/sntSYSTEM.md`
 
         This `doc/system/` tree is the canonical source of truth for Forge Sentinel. It uses
         explicit **truth classes**: canonical facts define repo role, authority
@@ -177,7 +177,7 @@ If a test or script starts to read a documentation path, add that path as a re-i
 The Documentation CI is `.github/workflows/documentation.yml`.
 It runs on a change under `docs/`, under `doc/`, to any `*.md` file, or to its own workflow file.
 It runs `bash doc/system/BUILD.sh` and then `git diff --exit-code -- doc`.
-`doc/SNTSYSTEM.md` is committed, so the diff step fails when the assembled reference does not match its parts.
+`doc/sntSYSTEM.md` is committed, so the diff step fails when the assembled reference does not match its parts.
 
 This repository is the security layer of the ecosystem.
 The code CI is security evidence, and this rule does not weaken it: every change to a non-documentation file runs the full build and the full test run.

@@ -17,7 +17,7 @@ Forge Sentinel is a governed security-intelligence fabric for the Forge ecosyste
 - `npm run build` — compile TypeScript (`tsc -p tsconfig.json`)
 - `npm run fixtures` — build then regenerate deterministic fixtures (`dist/tools/gen-fixtures.js`)
 - `npm run cli` — run the CLI (`dist/src/cli.js`); supports `replay <fixture.jsonl>` and `validate <event|directive> <file.json>`
-- `bash doc/system/BUILD.sh` — rebuild the compiled doc artifact `doc/SNTSYSTEM.md` from its source modules under `doc/system/`
+- `bash doc/system/BUILD.sh` — rebuild the compiled doc artifact `doc/sntSYSTEM.md` from its source modules under `doc/system/`
 
 ## Architecture
 
@@ -30,7 +30,7 @@ Forge Sentinel is a governed security-intelligence fabric for the Forge ecosyste
 - `fixtures/golden/` — cross-language golden contract fixtures + manifest; `fixtures/replay/` — deterministic end-to-end scenario fixtures (JSONL)
 - `test/` — exit-gate tests covering contracts, gateway, ledger, baselines, prime, policy, capability, CSSA, and end-to-end replay
 - `docs/plans/` — the integrated plan set (source of truth for design intent); `docs/sentinel/implementation-status.md` — implementation status by wave/epic
-- `doc/system/` — canonical source-of-truth doc modules (BDS Documentation Protocol v2.0); `doc/SNTSYSTEM.md` is a generated artifact — edit the sources and rebuild, never hand-edit the compiled file
+- `doc/system/` — canonical source-of-truth doc modules (BDS Documentation Protocol v2.0); `doc/sntSYSTEM.md` is a generated artifact — edit the sources and rebuild, never hand-edit the compiled file
 
 ## Notes
 

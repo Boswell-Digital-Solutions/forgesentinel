@@ -44,7 +44,7 @@ If a test or script starts to read a documentation path, add that path as a re-i
 The Documentation CI is `.github/workflows/documentation.yml`.
 It runs on a change under `docs/`, under `doc/`, to any `*.md` file, or to its own workflow file.
 It runs `bash doc/system/BUILD.sh` and then `git diff --exit-code -- doc`.
-`doc/SNTSYSTEM.md` is committed, so the diff step fails when the assembled reference does not match its parts.
+`doc/sntSYSTEM.md` is committed, so the diff step fails when the assembled reference does not match its parts.
 
 This repository is the security layer of the ecosystem.
 The code CI is security evidence, and this rule does not weaken it: every change to a non-documentation file runs the full build and the full test run.
